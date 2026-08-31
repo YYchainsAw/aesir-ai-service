@@ -8,3 +8,7 @@ app = FastAPI(
     description="Local command-parsing service for Aesir Combat Prototype.",
 )
 app.include_router(router)
+
+
+
+
