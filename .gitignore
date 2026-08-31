@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Model artifacts and training outputs
+models/
+checkpoints/
+runs/
+*.pt
+*.pth
+*.onnx
+
+# IDE and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

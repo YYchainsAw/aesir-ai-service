@@ -1,0 +1,1 @@
+"""Aesir local AI service."""
