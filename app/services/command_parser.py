@@ -21,8 +21,11 @@ def parse_command(text: str) -> ParseCommandResponse:
         try:
             from app.services.parsers.llm import LLMCommandParser
 
-            return LLMCommandParser().parse(text)
-        except NotImplementedError:
-            pass  # LLM 后端尚未接线 → 回退到规则解析器。
+            resp = LLMCommandParser().parse(text)
+            if resp.recognized:
+                return resp
+            # LLM 明确不确定（recognized:false）→ 让规则解析器最终兜底
+        except Exception:
+            pass  # LLM 配置缺失 / 网络 / 校验失败 → 回退到规则解析器，保证不崩。
 
     return RuleCommandParser().parse(text)

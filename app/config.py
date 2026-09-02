@@ -18,3 +18,23 @@ def get_parser_backend() -> str:
     覆盖环境变量。取值：``rule``（默认）或 ``llm``。
     """
     return os.environ.get("AESIR_PARSER_BACKEND", "rule")
+
+
+def get_llm_base_url() -> str:
+    """LLM Chat Completions 的基础地址（OpenAI 兼容）。默认 DeepSeek。"""
+    return os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/v1")
+
+
+def get_llm_model() -> str:
+    """LLM 模型名。默认 DeepSeek 的 deepseek-chat。"""
+    return os.environ.get("LLM_MODEL", "deepseek-chat")
+
+
+def get_llm_api_key() -> str | None:
+    """LLM API key。未配置时返回 None，解析器会因此抛 LLMNotConfiguredError。"""
+    return os.environ.get("LLM_API_KEY")
+
+
+def get_llm_timeout() -> float:
+    """LLM 请求超时（秒）。"""
+    return float(os.environ.get("LLM_TIMEOUT", "30"))
