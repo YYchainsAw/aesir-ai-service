@@ -32,9 +32,11 @@ def test_facade_defaults_to_rule_backend() -> None:
 
 
 def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
-    # 后端被设为 llm，但适配器还是只会抛错的桩；facade 必须回退到规则解析器，
-    # 指令仍然能被解析出来。
+    # LLM 未配置时，facade 必须回退到规则解析器；测试不能读取开发者本机的 API 配置。
     monkeypatch.setenv("AESIR_PARSER_BACKEND", "llm")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
     result = parse_command("艾琳，撤退并优先保命")
     assert result.recognized is True

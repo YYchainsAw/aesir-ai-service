@@ -1,8 +1,15 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def force_mock_companion_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """接口测试不得依赖开发者本机的真实 LLM 配置。"""
+    monkeypatch.setenv("AESIR_COMPANION_BACKEND", "mock")
 
 
 def test_companion_chat_returns_mock_ue_friendly_response() -> None:
@@ -34,6 +41,15 @@ def test_companion_chat_rejects_combat_state() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_companion_chat_rejects_unknown_companion() -> None:
+    response = client.post(
+        "/v1/companion/chat",
+        json={"text": "你好", "companion_id": "companion.unknown"},
+    )
+
+    assert response.status_code == 404
 
 
 def test_companion_chat_requires_text() -> None:

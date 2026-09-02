@@ -51,7 +51,10 @@ class OpenAICompatibleLLMClient:
             raise LLMClientError("LLM_API_KEY, LLM_MODEL and LLM_BASE_URL must be configured.")
 
         self._settings = settings
-        self._http_client = http_client or httpx.Client(timeout=settings.timeout_seconds)
+        try:
+            self._http_client = http_client or httpx.Client(timeout=settings.timeout_seconds)
+        except (ImportError, ValueError) as error:
+            raise LLMClientError("Unable to initialize the configured LLM HTTP client.") from error
 
     def generate_json(
         self,

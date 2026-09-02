@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-
-import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.schemas.companion_dialogue import (
@@ -14,8 +10,7 @@ from app.schemas.companion_dialogue import (
 )
 from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
-
-_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
+from app.services.companion.profile_repository import CompanionProfile, CompanionProfileRepository
 
 
 class _DialoguePayload(BaseModel):
@@ -33,21 +28,19 @@ class _DialoguePayload(BaseModel):
 class LLMCompanionDialogueService:
     """用 Alice 的静态人设生成受 UE 表现目录约束的回复。"""
 
-    def __init__(self, client: LLMClient | None = None) -> None:
+    def __init__(
+        self,
+        client: LLMClient | None = None,
+        *,
+        profile: CompanionProfile | None = None,
+    ) -> None:
         self._client = client or create_llm_client()
-        self._profile = _load_profile()
+        self._profile = profile or CompanionProfileRepository().load_primary()
 
     def reply(self, request: CompanionDialogueRequest) -> CompanionDialogueResponse:
-        allowed_emotions = _ids_from_profile(self._profile, "allowed_emotion_ids")
-        allowed_gestures = _ids_from_profile(self._profile, "allowed_gesture_ids")
-        allowed_faces = _ids_from_profile(self._profile, "allowed_facial_expression_ids")
-
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
-                allowed_emotions=allowed_emotions,
-                allowed_gestures=allowed_gestures,
-                allowed_faces=allowed_faces,
             ),
             user_prompt=request.text,
         )
@@ -57,11 +50,11 @@ class LLMCompanionDialogueService:
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
 
-        if response_payload.emotion_id not in allowed_emotions:
+        if response_payload.emotion_id not in self._profile.allowed_emotion_ids:
             raise LLMClientError("LLM returned an unknown emotion ID.")
-        if response_payload.gesture_id not in allowed_gestures:
+        if response_payload.gesture_id not in self._profile.allowed_gesture_ids:
             raise LLMClientError("LLM returned an unknown gesture ID.")
-        if response_payload.facial_expression_id not in allowed_faces:
+        if response_payload.facial_expression_id not in self._profile.allowed_facial_expression_ids:
             raise LLMClientError("LLM returned an unknown facial-expression ID.")
 
         return CompanionDialogueResponse(
@@ -75,51 +68,25 @@ class LLMCompanionDialogueService:
         )
 
 
-def _load_profile() -> dict[str, Any]:
-    try:
-        profile = yaml.safe_load(_PROFILE_PATH.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as error:
-        raise LLMClientError("Unable to load the primary companion profile.") from error
-
-    if not isinstance(profile, dict):
-        raise LLMClientError("Primary companion profile must be a YAML mapping.")
-    return profile
-
-
-def _ids_from_profile(profile: dict[str, Any], key: str) -> set[str]:
-    values = profile.get(key)
-    if not isinstance(values, list):
-        raise LLMClientError(f"Profile field '{key}' must be a list.")
-
-    ids = {item.get("id") for item in values if isinstance(item, dict) and isinstance(item.get("id"), str)}
-    if not ids:
-        raise LLMClientError(f"Profile field '{key}' contains no IDs.")
-    return ids
-
-
 def _build_system_prompt(
-    profile: dict[str, Any],
-    *,
-    allowed_emotions: set[str],
-    allowed_gestures: set[str],
-    allowed_faces: set[str],
+    profile: CompanionProfile,
 ) -> str:
-    identity = profile.get("identity", {})
-    persona = profile.get("persona", {})
-    speaking_style = profile.get("speaking_style", {})
-    rules = profile.get("conversation_rules", {}).get("response_rules", [])
+    identity = profile.raw.get("identity", {})
+    persona = profile.raw.get("persona", {})
+    speaking_style = profile.raw.get("speaking_style", {})
+    rules = profile.raw.get("conversation_rules", {}).get("response_rules", [])
 
     return "\n".join(
         [
             "You are a non-combat game companion. Reply in Chinese.",
-            f"Character: {identity.get('display_name', 'Alice')}.",
+            f"Character: {profile.display_name}.",
             f"Persona: {persona.get('background', '')}",
             f"Speaking style: {speaking_style.get('tone', '')}",
             "Response rules: " + " ".join(str(rule) for rule in rules),
             "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible.",
-            f"Allowed emotion_id values: {sorted(allowed_emotions)}.",
-            f"Allowed gesture_id values: {sorted(allowed_gestures)}.",
-            f"Allowed facial_expression_id values: {sorted(allowed_faces)}.",
+            f"Allowed emotion_id values: {sorted(profile.allowed_emotion_ids)}.",
+            f"Allowed gesture_id values: {sorted(profile.allowed_gesture_ids)}.",
+            f"Allowed facial_expression_id values: {sorted(profile.allowed_facial_expression_ids)}.",
             "Do not issue combat commands, describe game mechanics, or invent IDs.",
         ]
     )

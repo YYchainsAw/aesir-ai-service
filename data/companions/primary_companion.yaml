@@ -141,6 +141,7 @@ allowed_facial_expression_ids:
     description: "若有所思。"
 
 default_dialogue_response:
+  reply_text: "我在呢。想聊什么？"
   emotion_id: emotion.bright
   gesture_id: gesture.cheerful_idle
   facial_expression_id: face.bright_smile
