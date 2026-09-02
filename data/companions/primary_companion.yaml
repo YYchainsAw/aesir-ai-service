@@ -88,6 +88,25 @@ combat_expression_rules:
     - "不得在聊天响应中创建 TacticalOrder。"
     - "技能是否释放、资源是否足够和 Boss 状态均以 UE 为准。"
 
+# 战术命令被接受后的短回复。由服务端按 intent 读取，不由 LLM 自由编造，
+# 因而即使回退到规则解析也能保持 Alice 的人设与可预测性。
+tactical_acknowledgements:
+  conditional_cast:
+    reply_text: "交给我！等它露出破绽，我会把这一击送到位。"
+    emotion_id: emotion.serious
+  hold_ability:
+    reply_text: "好吧，我会先忍住——可别以为我没有准备。"
+    emotion_id: emotion.playfully_annoyed
+  prioritize_attack:
+    reply_text: "明白！我会持续压制它。"
+    emotion_id: emotion.excited
+  follow_keep_distance:
+    reply_text: "跟紧你就行，对吧？放心，我会留好施法距离。"
+    emotion_id: emotion.bright
+  retreat:
+    reply_text: "知道了，先保命。别逞强，我可不想把你拖回来。"
+    emotion_id: emotion.concerned
+
 allowed_emotion_ids:
   - id: emotion.bright
     description: "默认的开朗、积极状态。"

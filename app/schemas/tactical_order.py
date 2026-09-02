@@ -118,3 +118,12 @@ class ParseCommandResponse(_StrictSchema):
     recognized: bool
     order: TacticalOrder | None = None
     message: str
+    source: Literal["rule", "llm", "rule_fallback"] = "rule"
+    companion_reply: "TacticalAcknowledgement | None" = None
+
+
+class TacticalAcknowledgement(_StrictSchema):
+    """队友对已接受战术命令的短回应，由人设配置生成。"""
+
+    reply_text: str
+    emotion_id: str

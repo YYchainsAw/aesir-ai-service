@@ -73,3 +73,19 @@ def test_tactical_llm_parser_rejects_extra_fields() -> None:
 
     with pytest.raises(LLMClientError, match="does not match TacticalOrder schema"):
         parser.parse("做一个不存在的动作")
+
+
+def test_tactical_llm_parser_marks_its_own_source() -> None:
+    parser = LLMCommandParser(
+        StubLLMClient(
+            {
+                "recognized": False,
+                "order": None,
+                "message": "Unknown command.",
+            }
+        )
+    )
+
+    response = parser.parse("做一个不存在的动作")
+
+    assert response.source == "llm"

@@ -27,6 +27,9 @@ class LLMCommandParser(CommandParser):
             temperature=0.0,
         )
         try:
-            return ParseCommandResponse.model_validate(payload)
+            response = ParseCommandResponse.model_validate(payload)
         except ValidationError as error:
             raise LLMClientError("LLM tactical response does not match TacticalOrder schema.") from error
+
+        # 来源由服务端决定，不能相信 LLM 自行声明的来源。
+        return response.model_copy(update={"source": "llm"})

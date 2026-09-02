@@ -29,6 +29,7 @@ def test_facade_defaults_to_rule_backend() -> None:
     result = parse_command("艾琳，撤退并优先保命")
     assert result.recognized is True
     assert result.order.intent == "retreat"
+    assert result.source == "rule"
 
 
 def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
@@ -41,6 +42,7 @@ def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
     result = parse_command("艾琳，撤退并优先保命")
     assert result.recognized is True
     assert result.order.intent == "retreat"
+    assert result.source == "rule_fallback"
 
     unknown = parse_command("艾琳，马上释放不存在的技能")
     assert unknown.recognized is False
