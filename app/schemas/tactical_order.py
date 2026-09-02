@@ -8,17 +8,23 @@ make sense for it.
 
 from typing import Annotated, Literal, TypeAlias, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class ParseCommandRequest(BaseModel):
+class _StrictSchema(BaseModel):
+    """拒绝 LLM 或调用方传入的未声明字段。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ParseCommandRequest(_StrictSchema):
     text: str = Field(min_length=1, max_length=500, description="Player text command")
 
 
 # ---------------------------------------------------------------------------
 # Shared envelope fields (kept flat so UE's C++ struct maps 1:1)
 # ---------------------------------------------------------------------------
-class _OrderBase(BaseModel):
+class _OrderBase(_StrictSchema):
     protocol_version: Literal["1.0"] = "1.0"
     agent: Literal["Eirin"] = "Eirin"
     priority: Literal["high"] = "high"
@@ -28,32 +34,32 @@ class _OrderBase(BaseModel):
 # ---------------------------------------------------------------------------
 # Trigger / action vocabulary (whitelist for UE validation)
 # ---------------------------------------------------------------------------
-class Trigger(BaseModel):
+class Trigger(_StrictSchema):
     target: Literal["Boss"]
     state: Literal["Stunned"]
 
 
-class CastAbilityAction(BaseModel):
+class CastAbilityAction(_StrictSchema):
     type: Literal["CastAbility"]
     ability_id: Literal["Explosion"]
 
 
-class HoldAbilityAction(BaseModel):
+class HoldAbilityAction(_StrictSchema):
     type: Literal["HoldAbility"]
     ability_id: Literal["Explosion"]
 
 
-class AttackAction(BaseModel):
+class AttackAction(_StrictSchema):
     type: Literal["Attack"]
 
 
-class FollowAction(BaseModel):
+class FollowAction(_StrictSchema):
     type: Literal["Follow"]
     target: Literal["Player"]
     keep_distance: bool = True
 
 
-class RetreatAction(BaseModel):
+class RetreatAction(_StrictSchema):
     type: Literal["Retreat"]
 
 
@@ -108,7 +114,7 @@ TacticalOrder: TypeAlias = Annotated[
 ]
 
 
-class ParseCommandResponse(BaseModel):
+class ParseCommandResponse(_StrictSchema):
     recognized: bool
     order: TacticalOrder | None = None
     message: str

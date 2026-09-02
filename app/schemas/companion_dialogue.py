@@ -6,15 +6,17 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompanionDialogueRequest(BaseModel):
     """玩家发送给非战斗队友的文字消息。"""
 
+    model_config = ConfigDict(extra="forbid")
+
     text: str = Field(min_length=1, max_length=500, description="玩家输入或 ASR 转写的文本")
     companion_id: str = Field(
-        default="companion.eirin",
+        default="companion.alice",
         min_length=1,
         max_length=100,
         description="UE 中队友的稳定 ID",
@@ -25,6 +27,8 @@ class CompanionDialogueRequest(BaseModel):
 class CompanionDialogueResponse(BaseModel):
     """UE 可直接映射为字幕、表情和 Montage 的对话响应。"""
 
+    model_config = ConfigDict(extra="forbid")
+
     protocol_version: Literal["0.1"] = "0.1"
     companion_id: str
     reply_text: str
@@ -32,4 +36,4 @@ class CompanionDialogueResponse(BaseModel):
     gesture_id: str
     facial_expression_id: str
     interruptible: bool = True
-    source: Literal["mock"] = "mock"
+    source: Literal["mock", "llm", "fallback"] = "mock"

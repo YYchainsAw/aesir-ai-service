@@ -1,22 +1,32 @@
-"""基于 LLM 的命令解析器（第二阶段槽位，尚未接线）。
+"""使用共享 LLM 客户端的战术指令解析器。"""
 
-骨架阶段刻意只保留结构，不引入任何 LLM SDK 依赖。真正的集成步骤都记在
-下面的 ``parse`` TODO 里：注入一个 client（OpenAI 兼容 / Ark 等）、拼接
-prompt、请求结构化 JSON、按 ``TacticalOrder`` 白名单校验后返回
-``ParseCommandResponse``。在此之前，facade 会回退到规则解析器。
-"""
+from pydantic import ValidationError
 
 from app.schemas.tactical_order import ParseCommandResponse
 from app.services.parsers.base import CommandParser
+from app.services.llm.client import LLMClient, LLMClientError
+from app.services.llm.factory import create_llm_client
 
 
 class LLMCommandParser(CommandParser):
-    """基于 LLM 的解析器（第二阶段槽位）。
+    """将自然语言转换为受现有 TacticalOrder Schema 限制的 JSON。"""
 
-    TODO(第二阶段)：注入 LLM client，用玩家文本拼接 prompt，请求约束在
-    ``TacticalOrder`` 白名单内的结构化 JSON，并校验为 ``ParseCommandResponse``。
-    目前尚未接线。
-    """
+    def __init__(self, client: LLMClient | None = None) -> None:
+        self._client = client or create_llm_client()
 
     def parse(self, text: str) -> ParseCommandResponse:
-        raise NotImplementedError("AESIR_PARSER_BACKEND=llm is not implemented yet.")
+        payload = self._client.generate_json(
+            system_prompt=(
+                "You convert Chinese ARPG tactical commands into JSON. "
+                "Return only a JSON object with exactly: recognized, order, message. "
+                "Use only the supported agent Eirin, target Boss, ability Explosion, and existing "
+                "TacticalOrder intent/action values. Unknown commands must return recognized=false, "
+                "order=null, and a short message."
+            ),
+            user_prompt=text,
+            temperature=0.0,
+        )
+        try:
+            return ParseCommandResponse.model_validate(payload)
+        except ValidationError as error:
+            raise LLMClientError("LLM tactical response does not match TacticalOrder schema.") from error

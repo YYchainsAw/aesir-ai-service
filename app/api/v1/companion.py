@@ -4,7 +4,7 @@ from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
     CompanionDialogueResponse,
 )
-from app.services.companion.dialogue_service import create_mock_dialogue_reply
+from app.services.companion.dialogue_service import create_dialogue_reply
 
 router = APIRouter(prefix="/v1/companion", tags=["companion"])
 
@@ -15,4 +15,4 @@ def chat_with_companion(request: CompanionDialogueRequest) -> CompanionDialogueR
 
     仅允许 exploration / conversation 状态调用；战斗战术必须继续使用独立接口。
     """
-    return create_mock_dialogue_reply(request)
+    return create_dialogue_reply(request)
