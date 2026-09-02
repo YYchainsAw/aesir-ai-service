@@ -1,0 +1,35 @@
+"""非战斗状态下的队友对话协议。
+
+首版只提供固定模拟回复，用于让 UE 先完成字幕、表情与动作提示的联调。
+后续接入 LLM 时保持本文件中的请求/响应结构不变。
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class CompanionDialogueRequest(BaseModel):
+    """玩家发送给非战斗队友的文字消息。"""
+
+    text: str = Field(min_length=1, max_length=500, description="玩家输入或 ASR 转写的文本")
+    companion_id: str = Field(
+        default="companion.eirin",
+        min_length=1,
+        max_length=100,
+        description="UE 中队友的稳定 ID",
+    )
+    game_state: Literal["exploration", "conversation"] = "exploration"
+
+
+class CompanionDialogueResponse(BaseModel):
+    """UE 可直接映射为字幕、表情和 Montage 的对话响应。"""
+
+    protocol_version: Literal["0.1"] = "0.1"
+    companion_id: str
+    reply_text: str
+    emotion_id: str
+    gesture_id: str
+    facial_expression_id: str
+    interruptible: bool = True
+    source: Literal["mock"] = "mock"
