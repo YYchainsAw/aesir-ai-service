@@ -30,10 +30,10 @@ def _has_any(text: str, *keywords: str) -> bool:
 
 
 class RuleCommandParser(CommandParser):
-    """Deterministic rule parser covering the first batch of five commands.
+    """确定性规则解析器，覆盖第一批五条指令。
 
-    Replaced later by an LLM adapter without changing the output schema. The
-    most specific intent wins, so more-constrained commands are checked first.
+    后续会被 LLM 适配器替换，但输出 Schema 保持不变。约束越强的指令越靠前
+    判断，保证「最具体的意图」优先命中。
     """
 
     def parse(self, text: str) -> ParseCommandResponse:
@@ -45,7 +45,7 @@ class RuleCommandParser(CommandParser):
                 message="Command not recognized: no supported agent (expected Eirin).",
             )
 
-        # 1. Conditional cast: cast Explosion when the Boss is stunned.
+        # 1. 条件施法：Boss 眩晕时释放爆裂魔法。
         if _has_any(t, "眩晕", "stun") and _has_any(t, "爆裂魔法", "explosion"):
             return ParseCommandResponse(
                 recognized=True,
@@ -56,7 +56,7 @@ class RuleCommandParser(CommandParser):
                 message="Command recognized: cast Explosion when the Boss is stunned.",
             )
 
-        # 2. Hold ability: keep Explosion in reserve.
+        # 2. 保留技能：把爆裂魔法握在手里暂时不用。
         if _has_any(t, "保留", "hold", "save", "先别用", "不要用", "攒") and _has_any(
             t, "爆裂魔法", "explosion"
         ):
@@ -68,7 +68,7 @@ class RuleCommandParser(CommandParser):
                 message="Command recognized: hold Explosion in reserve.",
             )
 
-        # 3. Retreat: back off and prioritize survival.
+        # 3. 撤退：后撤并优先保命。
         if _has_any(t, "撤退", "retreat", "保命", "撤离", "逃跑"):
             return ParseCommandResponse(
                 recognized=True,
@@ -76,7 +76,7 @@ class RuleCommandParser(CommandParser):
                 message="Command recognized: retreat and prioritize survival.",
             )
 
-        # 4. Follow and keep distance.
+        # 4. 跟随并保持距离。
         if _has_any(t, "跟随", "跟着", "follow", "跟我") and _has_any(t, "距离", "distance"):
             return ParseCommandResponse(
                 recognized=True,
@@ -86,7 +86,7 @@ class RuleCommandParser(CommandParser):
                 message="Command recognized: follow the player and keep distance.",
             )
 
-        # 5. Prioritize normal attacks.
+        # 5. 优先普通攻击。
         if _has_any(t, "优先") and _has_any(t, "普通攻击", "普攻", "平a", "平砍", "attack"):
             return ParseCommandResponse(
                 recognized=True,

@@ -1,10 +1,9 @@
-"""LLM-backed command parser (Phase-2 slot, not yet wired).
+"""基于 LLM 的命令解析器（第二阶段槽位，尚未接线）。
 
-Kept deliberately structural: no LLM SDK dependency is introduced in the
-skeleton. The actual integration steps live behind the ``parse`` TODO below —
-inject a client (OpenAI-compatible / Ark / etc.), build the prompt, request
-structured JSON, validate against the ``TacticalOrder`` whitelist, and return a
-``ParseCommandResponse``. The facade falls back to the rule parser until then.
+骨架阶段刻意只保留结构，不引入任何 LLM SDK 依赖。真正的集成步骤都记在
+下面的 ``parse`` TODO 里：注入一个 client（OpenAI 兼容 / Ark 等）、拼接
+prompt、请求结构化 JSON、按 ``TacticalOrder`` 白名单校验后返回
+``ParseCommandResponse``。在此之前，facade 会回退到规则解析器。
 """
 
 from app.schemas.tactical_order import ParseCommandResponse
@@ -12,11 +11,11 @@ from app.services.parsers.base import CommandParser
 
 
 class LLMCommandParser(CommandParser):
-    """Phase-2 slot for an LLM-backed parser.
+    """基于 LLM 的解析器（第二阶段槽位）。
 
-    TODO(phase-2): inject an LLM client, build the prompt from the player text,
-    request structured JSON constrained to the ``TacticalOrder`` whitelist, and
-    validate the result into a ``ParseCommandResponse``. Not wired yet.
+    TODO(第二阶段)：注入 LLM client，用玩家文本拼接 prompt，请求约束在
+    ``TacticalOrder`` 白名单内的结构化 JSON，并校验为 ``ParseCommandResponse``。
+    目前尚未接线。
     """
 
     def parse(self, text: str) -> ParseCommandResponse:

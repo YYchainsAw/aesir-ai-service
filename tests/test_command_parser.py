@@ -32,8 +32,8 @@ def test_facade_defaults_to_rule_backend() -> None:
 
 
 def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
-    # Backend is llm, but the adapter is still a stub that raises; the facade
-    # must fall back to the rule parser so the command still resolves.
+    # 后端被设为 llm，但适配器还是只会抛错的桩；facade 必须回退到规则解析器，
+    # 指令仍然能被解析出来。
     monkeypatch.setenv("AESIR_PARSER_BACKEND", "llm")
 
     result = parse_command("艾琳，撤退并优先保命")
