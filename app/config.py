@@ -1,6 +1,14 @@
-"""Aesir AI 服务的运行时配置。"""
+"""Aesir AI 服务的运行时配置。
+
+若项目根目录存在 ``.env``，会在 import 时自动加载（依赖 ``python-dotenv``）。
+所有配置项都有安全默认值，因此即使没有 ``.env`` 也能直接运行。
+"""
 
 import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def get_parser_backend() -> str:

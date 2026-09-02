@@ -39,6 +39,9 @@
 
 ## 测试
 
+测试依赖放在 `requirements-dev.txt`（含 `pytest`/`httpx`），先装再跑：
+
 ```powershell
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest
 ```
