@@ -1,8 +1,15 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def force_rule_tactical_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """接口测试不得调用开发者本机的真实战术 LLM。"""
+    monkeypatch.setenv("AESIR_PARSER_BACKEND", "rule")
 
 
 def test_health_check() -> None:
@@ -26,6 +33,11 @@ def test_example_command_returns_tactical_order() -> None:
     assert body["order"]["intent"] == "conditional_cast"
     assert body["order"]["trigger"] == {"target": "Boss", "state": "Stunned"}
     assert body["order"]["action"]["ability_id"] == "Explosion"
+    assert body["source"] == "rule"
+    assert body["companion_reply"] == {
+        "reply_text": "交给我！等它露出破绽，我会把这一击送到位。",
+        "emotion_id": "emotion.serious",
+    }
 
 
 def test_hold_ability() -> None:

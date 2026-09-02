@@ -7,7 +7,9 @@
 
 from app.config import get_parser_backend
 from app.schemas.tactical_order import ParseCommandResponse
+from app.services.llm.client import LLMClientError
 from app.services.parsers.rule import RuleCommandParser
+from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
 
 
 def parse_command(text: str) -> ParseCommandResponse:
@@ -21,11 +23,16 @@ def parse_command(text: str) -> ParseCommandResponse:
         try:
             from app.services.parsers.llm import LLMCommandParser
 
-            resp = LLMCommandParser().parse(text)
-            if resp.recognized:
-                return resp
-            # LLM 明确不确定（recognized:false）→ 让规则解析器最终兜底
-        except Exception:
-            pass  # LLM 配置缺失 / 网络 / 校验失败 → 回退到规则解析器，保证不崩。
+            response = LLMCommandParser().parse(text)
+        except LLMClientError:
+            response = RuleCommandParser().parse(text).model_copy(
+                update={"source": "rule_fallback"}
+            )
+    else:
+        response = RuleCommandParser().parse(text)
 
-    return RuleCommandParser().parse(text)
+    if response.order is None:
+        return response
+
+    acknowledgement = create_tactical_acknowledgement(response.order.intent)
+    return response.model_copy(update={"companion_reply": acknowledgement})

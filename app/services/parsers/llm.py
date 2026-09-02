@@ -1,9 +1,6 @@
-"""基于 LLM 的命令解析器（OpenAI 兼容 Chat Completions API，默认 DeepSeek）。
+"""使用共享 LLM 客户端的战术指令解析器。"""
 
-输入任意自然语言指令，输出被白名单约束的 ``TacticalOrder``。所有网络/JSON/
-Pydantic 校验失败统一转成 ``LLMError``，由 facade 捕获后回退到规则解析器，
-保证 UE 永不收到不合法的 order。
-"""
+from pydantic import ValidationError
 
 import json
 
@@ -13,6 +10,8 @@ from pydantic import TypeAdapter
 from app.config import get_llm_api_key, get_llm_base_url, get_llm_model, get_llm_timeout
 from app.schemas.tactical_order import ParseCommandResponse, TacticalOrder
 from app.services.parsers.base import CommandParser
+from app.services.llm.client import LLMClient, LLMClientError
+from app.services.llm.factory import create_llm_client
 
 
 class LLMError(Exception):
@@ -56,11 +55,10 @@ _order_adapter = TypeAdapter(TacticalOrder)
 
 
 class LLMCommandParser(CommandParser):
-    """基于 LLM 的解析器。构造时可注入 httpx.Client 便于测试。
+    """将自然语言转换为受现有 TacticalOrder Schema 限制的 JSON。"""
 
-    TODO(后续可选)：异步化、流式、多轮对话、fine-tune。当前保持同步，由
-    FastAPI 线程池承载，与现有同步路由一致。
-    """
+    def __init__(self, client: LLMClient | None = None) -> None:
+        self._client = client or create_llm_client()
 
     def __init__(self, client: httpx.Client | None = None) -> None:
         self._owns_client = client is None
@@ -73,53 +71,21 @@ class LLMCommandParser(CommandParser):
         ]
 
     def parse(self, text: str) -> ParseCommandResponse:
-        api_key = get_llm_api_key()
-        if not api_key:
-            raise LLMNotConfiguredError(
-                "LLM_API_KEY is not set; refusing to call the LLM API."
-            )
-
-        base_url = get_llm_base_url().rstrip("/")
-        try:
-            resp = self._client.post(
-                f"{base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": get_llm_model(),
-                    "messages": self._build_messages(text),
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            content = data["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
-            raise LLMError(f"LLM request failed: {exc}") from exc
-
-        return self._parse_response_content(content)
-
-    def _parse_response_content(self, content: str) -> ParseCommandResponse:
-        """把 LLM 返回的 JSON 字符串校验为 ParseCommandResponse。"""
-        try:
-            raw = json.loads(content)
-            if not isinstance(raw, dict):
-                raise ValueError("LLM response is not a JSON object.")
-            if raw.get("recognized") is False:
-                return ParseCommandResponse(
-                    recognized=False,
-                    order=None,
-                    message=str(raw.get("message") or "Command not recognized."),
-                )
-            order_dict = raw.get("order")
-            if not isinstance(order_dict, dict):
-                raise ValueError("LLM response is missing a valid 'order' object.")
-            order = _order_adapter.validate_python(order_dict)
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
-            raise LLMError(f"LLM output failed validation: {exc}") from exc
-
-        return ParseCommandResponse(
-            recognized=True,
-            order=order,
-            message="Command recognized by the LLM parser.",
+        payload = self._client.generate_json(
+            system_prompt=(
+                "You convert Chinese ARPG tactical commands into JSON. "
+                "Return only a JSON object with exactly: recognized, order, message. "
+                "Use only the supported agent Eirin, target Boss, ability Explosion, and existing "
+                "TacticalOrder intent/action values. Unknown commands must return recognized=false, "
+                "order=null, and a short message."
+            ),
+            user_prompt=text,
+            temperature=0.0,
         )
+        try:
+            response = ParseCommandResponse.model_validate(payload)
+        except ValidationError as error:
+            raise LLMClientError("LLM tactical response does not match TacticalOrder schema.") from error
+
+        # 来源由服务端决定，不能相信 LLM 自行声明的来源。
+        return response.model_copy(update={"source": "llm"})

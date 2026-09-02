@@ -7,4 +7,3 @@ huggingface_hub==1.29.0
 tokenizers==0.23.1
 numpy==2.5.2
 av==18.1.0
-PyYAML==6.0.3

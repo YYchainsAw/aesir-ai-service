@@ -5,10 +5,19 @@
 """
 
 import os
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+@dataclass(frozen=True)
+class LLMSettings:
+    api_key: str
+    model: str
+    base_url: str
+    timeout_seconds: float
 
 
 def get_parser_backend() -> str:
@@ -20,21 +29,16 @@ def get_parser_backend() -> str:
     return os.environ.get("AESIR_PARSER_BACKEND", "rule")
 
 
-def get_llm_base_url() -> str:
-    """LLM Chat Completions 的基础地址（OpenAI 兼容）。默认 DeepSeek。"""
-    return os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/v1")
+def get_companion_backend() -> str:
+    """返回陪伴对话后端：mock（默认）或 llm。"""
+    return os.environ.get("AESIR_COMPANION_BACKEND", "mock")
 
 
-def get_llm_model() -> str:
-    """LLM 模型名。默认 DeepSeek 的 deepseek-chat。"""
-    return os.environ.get("LLM_MODEL", "deepseek-chat")
-
-
-def get_llm_api_key() -> str | None:
-    """LLM API key。未配置时返回 None，解析器会因此抛 LLMNotConfiguredError。"""
-    return os.environ.get("LLM_API_KEY")
-
-
-def get_llm_timeout() -> float:
-    """LLM 请求超时（秒）。"""
-    return float(os.environ.get("LLM_TIMEOUT", "30"))
+def get_llm_settings() -> LLMSettings:
+    """读取两个业务链路共用的 LLM Provider 配置。"""
+    return LLMSettings(
+        api_key=os.environ.get("LLM_API_KEY", ""),
+        model=os.environ.get("LLM_MODEL", ""),
+        base_url=os.environ.get("LLM_BASE_URL", ""),
+        timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "15")),
+    )
