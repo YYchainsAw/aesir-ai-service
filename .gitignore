@@ -24,3 +24,5 @@ runs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+.claude/
