@@ -1,0 +1,10 @@
+# 机器学习 / 语音识别（阶段 3 ASR）依赖。按阶段按需安装，不影响核心服务。
+# 安装：.venv\Scripts\python -m pip install -r requirements-ml.txt
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+onnxruntime==1.29.0
+huggingface_hub==1.29.0
+tokenizers==0.23.1
+numpy==2.5.2
+av==18.1.0
+PyYAML==6.0.3

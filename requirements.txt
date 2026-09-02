@@ -1,5 +1,6 @@
+# Aesir AI Service —— 服务运行时依赖。
+# 安装：.venv\Scripts\python -m pip install -r requirements.txt
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 pydantic==2.13.5
-pytest==9.1.1
-httpx==0.28.1
+python-dotenv==1.2.3

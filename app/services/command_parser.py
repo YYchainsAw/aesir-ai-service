@@ -1,35 +1,28 @@
-from app.schemas.tactical_order import (
-    Action,
-    ParseCommandResponse,
-    TacticalOrder,
-    Trigger,
-)
+"""命令解析的对外入口（facade）。
+
+规则解析逻辑已迁到 ``parsers/rule.py``；本模块保留 ``app/api/routes.py`` 依赖的
+``parse_command`` 入口，负责选择后端，并在必要时回退到规则解析器，保证服务永不
+出现「无法作答」的情况。
+"""
+
+from app.config import get_parser_backend
+from app.schemas.tactical_order import ParseCommandResponse
+from app.services.parsers.rule import RuleCommandParser
 
 
 def parse_command(text: str) -> ParseCommandResponse:
-    """Temporary deterministic parser used before an LLM adapter is introduced.
+    """把玩家文本解析为 UE 兼容的战术指令。
 
-    The output schema is deliberately constrained to identifiers that UE can validate.
+    根据 ``AESIR_PARSER_BACKEND``（默认 ``rule``）选择后端。只要 LLM 后端还没
+    实现，它就会抛出 ``NotImplementedError``，这里捕获后回退到规则解析器，让输入
+    仍能被安全解析。
     """
-    normalized = text.strip().lower().replace("，", ",").replace("。", "")
-    has_eirin = "艾琳" in normalized or "eirin" in normalized
-    has_boss = "boss" in normalized
-    has_stun = "眩晕" in normalized or "stun" in normalized
-    has_explosion = "爆裂魔法" in normalized or "explosion" in normalized
+    if get_parser_backend() == "llm":
+        try:
+            from app.services.parsers.llm import LLMCommandParser
 
-    if has_eirin and has_boss and has_stun and has_explosion:
-        return ParseCommandResponse(
-            recognized=True,
-            order=TacticalOrder(
-                agent="Eirin",
-                intent="conditional_cast",
-                trigger=Trigger(target="Boss", state="Stunned"),
-                action=Action(type="CastAbility", ability_id="Explosion"),
-            ),
-            message="Command recognized: Eirin will cast Explosion when the Boss is stunned.",
-        )
+            return LLMCommandParser().parse(text)
+        except NotImplementedError:
+            pass  # LLM 后端尚未接线 → 回退到规则解析器。
 
-    return ParseCommandResponse(
-        recognized=False,
-        message="Command not recognized by the current rule parser.",
-    )
+    return RuleCommandParser().parse(text)

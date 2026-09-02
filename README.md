@@ -25,12 +25,23 @@
 }
 ```
 
-响应中的 `order` 是传给 UE 的受限战术命令。当前为规则解析器，只支持该示例命令；不识别的文本会明确返回 `recognized: false`。未来只替换 `app/services/command_parser.py`，不改变 UE 通信协议。
+响应中的 `order` 是传给 UE 的受限战术命令。当前为规则解析器，支持以下 5 条指令：
+
+| 指令 | intent | 动作 |
+| --- | --- | --- |
+| 艾琳，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `CastAbility(Explosion)` |
+| 艾琳，保留爆裂魔法 | `hold_ability` | `HoldAbility(Explosion)` |
+| 艾琳，撤退并优先保命 | `retreat` | `Retreat` |
+| 艾琳，跟随我并保持距离 | `follow_keep_distance` | `Follow(Player)` |
+| 艾琳，优先普通攻击 | `prioritize_attack` | `Attack` |
+
+不识别的文本会明确返回 `recognized: false` 且 `order: null`。未来只替换 `app/services/command_parser.py`，不改变 UE 通信协议。
 
 ## 测试
 
+测试依赖放在 `requirements-dev.txt`（含 `pytest`/`httpx`），先装再跑：
+
 ```powershell
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest
 ```
-
-test
