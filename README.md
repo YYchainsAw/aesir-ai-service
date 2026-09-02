@@ -45,3 +45,25 @@
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest
 ```
+
+## 启动与调试
+
+先起服务（保持窗口运行）：
+
+```powershell
+.\.venv\Scripts\python -m uvicorn app.main:app --reload
+```
+
+然后在新窗口调用接口。注意：PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，不是真正的 curl，**请改用 `Invoke-RestMethod` 或 `curl.exe`**：
+
+```powershell
+# 健康检查
+Invoke-RestMethod http://127.0.0.1:8000/health
+
+# 解析战术指令（PowerShell 原生，无需转义 JSON）
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
+  -ContentType "application/json" `
+  -Body '{"text":"艾琳，等 Boss 眩晕时使用爆裂魔法"}'
+```
+
+浏览器打开 `http://127.0.0.1:8000/docs` 可交互式调用接口。
