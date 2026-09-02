@@ -1,97 +1,28 @@
-from app.schemas.tactical_order import (
-    AttackAction,
-    CastAbilityAction,
-    ConditionalCast,
-    FollowAction,
-    FollowKeepDistance,
-    HoldAbility,
-    HoldAbilityAction,
-    ParseCommandResponse,
-    PrioritizeAttack,
-    Retreat,
-    RetreatAction,
-    Trigger,
-)
+"""Public command-parsing facade.
 
+The rule parsing logic now lives in ``parsers/rule.py``; this module keeps the
+``parse_command`` entry point that ``app/api/routes.py`` depends on, selecting a
+backend and falling back to the rule parser so the service never fails to answer.
+"""
 
-def _normalize(text: str) -> str:
-    return (
-        text.strip()
-        .lower()
-        .replace("，", ",")
-        .replace("。", "")
-        .replace(" ", "")
-    )
-
-
-def _has_any(text: str, *keywords: str) -> bool:
-    return any(keyword in text for keyword in keywords)
+from app.config import get_parser_backend
+from app.schemas.tactical_order import ParseCommandResponse
+from app.services.parsers.rule import RuleCommandParser
 
 
 def parse_command(text: str) -> ParseCommandResponse:
-    """Deterministic rule parser covering the first batch of five commands.
+    """Parse player text into a UE-safe tactical order.
 
-    Replaced later by an LLM adapter without changing the output schema. The
-    most specific intent wins, so more-constrained commands are checked first.
+    Selects the backend from ``AESIR_PARSER_BACKEND`` (default ``rule``). While
+    the LLM backend is unimplemented it raises ``NotImplementedError``, which we
+    catch and fall back to the rule parser so utterances still resolve safely.
     """
-    t = _normalize(text)
+    if get_parser_backend() == "llm":
+        try:
+            from app.services.parsers.llm import LLMCommandParser
 
-    if not _has_any(t, "艾琳", "eirin"):
-        return ParseCommandResponse(
-            recognized=False,
-            message="Command not recognized: no supported agent (expected Eirin).",
-        )
+            return LLMCommandParser().parse(text)
+        except NotImplementedError:
+            pass  # LLM backend not wired yet → fall back to the rule parser.
 
-    # 1. Conditional cast: cast Explosion when the Boss is stunned.
-    if _has_any(t, "眩晕", "stun") and _has_any(t, "爆裂魔法", "explosion"):
-        return ParseCommandResponse(
-            recognized=True,
-            order=ConditionalCast(
-                trigger=Trigger(target="Boss", state="Stunned"),
-                action=CastAbilityAction(type="CastAbility", ability_id="Explosion"),
-            ),
-            message="Command recognized: cast Explosion when the Boss is stunned.",
-        )
-
-    # 2. Hold ability: keep Explosion in reserve.
-    if _has_any(t, "保留", "hold", "save", "先别用", "不要用", "攒") and _has_any(
-        t, "爆裂魔法", "explosion"
-    ):
-        return ParseCommandResponse(
-            recognized=True,
-            order=HoldAbility(
-                action=HoldAbilityAction(type="HoldAbility", ability_id="Explosion")
-            ),
-            message="Command recognized: hold Explosion in reserve.",
-        )
-
-    # 3. Retreat: back off and prioritize survival.
-    if _has_any(t, "撤退", "retreat", "保命", "撤离", "逃跑"):
-        return ParseCommandResponse(
-            recognized=True,
-            order=Retreat(action=RetreatAction(type="Retreat")),
-            message="Command recognized: retreat and prioritize survival.",
-        )
-
-    # 4. Follow and keep distance.
-    if _has_any(t, "跟随", "跟着", "follow", "跟我") and _has_any(t, "距离", "distance"):
-        return ParseCommandResponse(
-            recognized=True,
-            order=FollowKeepDistance(
-                action=FollowAction(type="Follow", target="Player", keep_distance=True)
-            ),
-            message="Command recognized: follow the player and keep distance.",
-        )
-
-    # 5. Prioritize normal attacks.
-    if _has_any(t, "优先") and _has_any(t, "普通攻击", "普攻", "平a", "平砍", "attack"):
-        return ParseCommandResponse(
-            recognized=True,
-            order=PrioritizeAttack(action=AttackAction(type="Attack")),
-            message="Command recognized: prioritize normal attacks.",
-        )
-
-    return ParseCommandResponse(
-        recognized=False,
-        message="Command not recognized by the current rule parser.",
-    )
+    return RuleCommandParser().parse(text)
