@@ -3,8 +3,7 @@
 默认环境（未装 faster-whisper / 未设 AESIR_ASR_SMOKE=1）下只跑空音频那条纯逻辑
 用例，不加载模型、不依赖 ML 包，不拖慢既有测试集。需要真机冒烟时才启用：
 
-    # PowerShell:  $env:AESIR_ASR_SMOKE = "1"
-    python -m pytest tests/test_transcriber_faster_whisper.py -m asr_smoke
+    # PowerShell:  $env:AESIR_ASR_SMOKE = "1"; python -m pytest tests/test_transcriber_faster_whisper.py
 """
 
 import io
@@ -35,6 +34,8 @@ def test_factory_selects_faster_whisper(monkeypatch) -> None:
 
 
 # ---- 真机冒烟：需 AESIR_ASR_SMOKE=1 且模型可加载（可能触发下载，国内配 HF 镜像） ----
+# 真机冒烟：需 AESIR_ASR_SMOKE=1。用 skipif 门控而非自定义 marker，
+# 保证默认全量 pytest 不真跑模型（不拖慢、不依赖下载），也无配置蔓延。
 asr_smoke = pytest.mark.skipif(
     os.environ.get("AESIR_ASR_SMOKE") != "1",
     reason="真机冒烟需 AESIR_ASR_SMOKE=1",
