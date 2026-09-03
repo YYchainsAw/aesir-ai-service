@@ -24,7 +24,7 @@ AESIR_PARSER_BACKEND=llm
 # DeepSeek（OpenAI 兼容）。换 Qwen/Ark 只需改下面两项
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
-LLM_TIMEOUT=30
+LLM_TIMEOUT_SECONDS=30
 
 # 你的真实 key（必填）
 LLM_API_KEY=sk-xxxxxx
@@ -61,15 +61,23 @@ for text in [
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
-用 `Invoke-RestMethod` 调（PowerShell 里 `curl` 是别名，勿用）：
+用 `Invoke-RestMethod` 调（PowerShell 里 `curl` 是别名，勿用）。正式接口为契约 v0.1 的 `/v1/commands/parse`（携带能力目录；目录缺省时新指令可能因 ID 越界被拒）：
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
   -ContentType "application/json" `
-  -Body '{"text":"艾琳，等 Boss 血量低于一半就开大"}'
+  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾琳，等 Boss 血量低于一半就开大","context":{"catalog_revision":"dev-001","locale":"zh-CN","agents":[{"id":"companion.eirin","ability_ids":["ability.eirin.explosion","ability.eirin.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
 
 > 新指令能返回合法 `order`（如 `conditional_cast`）即联调通过。
+>
+> 遗留别名 `POST /parse-command` 只传 `text`，服务端回填默认能力目录，也可用于快速自测：
+>
+> ```powershell
+> Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
+>   -ContentType "application/json" `
+>   -Body '{"text":"艾琳，等 Boss 血量低于一半就开大"}'
+> ```
 
 ---
 

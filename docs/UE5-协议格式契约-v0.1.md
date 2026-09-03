@@ -2,7 +2,7 @@
 
 > 状态：**格式化金标准（golden）**，作为 UE / Python / LLM 三者共同的反序列化契约
 > 配套：《UE5_模型服务联调技术规范_v0.1.md》的本体；本文只聚焦 §5–§7 的**返回类型与格式**，把类型穷尽定义，消除对端只能靠猜的歧义。
-> 更新日期：2026-09-02
+> 更新日期：2026-09-03
 
 ---
 
@@ -332,9 +332,9 @@
 
 ## 10. 落地清单
 
-- [ ] Python：`TacticalOrder` 改为按 `intent` 判别 + `when`/`then`/`expires` 判别联合 + ID 字符串 + `priority:int`
-- [ ] Python：`ParseCommandResponse` 增加 `request_id`/`order_id`；`order` 内移除硬编码 `protocol_version`
-- [ ] Python：解析时校验 ID ∈ `context`；目录外 ID → `recognized:false`
-- [ ] LLM prompt：改喂 `context` 的 ID 目录 + 判别联合结构说明 + 5 份 golden 示例
+- [x] Python：`TacticalOrder` 改为按 `intent` 判别 + `when`/`then`/`expires` 判别联合 + ID 字符串 + `priority:int`
+- [x] Python：`ParseCommandResponse` 增加 `request_id`/`order_id`；`order` 内移除硬编码 `protocol_version`
+- [x] Python：解析时校验 ID ∈ `context`；目录外 ID → `recognized:false`
+- [x] LLM prompt：改喂 `context` 的 ID 目录 + 判别联合结构说明 + 5 份 golden 示例（`app/services/parsers/llm.py`）
 - [ ] UE：`FTacticalOrder` 实现判别反序列化 + `{ref:...}` 解析 + UUID 校验
-- [ ] 测试：5 份 golden JSON 各配 1 例合法 + 1 例未知 type/越界 ID 负例
+- [x] 测试：5 份 golden JSON 各配 1 例合法 + 1 例未知 type/越界 ID 负例（`tests/test_api.py`、`tests/test_command_parser.py`、`tests/test_parser_llm.py`）

@@ -1,69 +1,70 @@
 # Aesir AI Service
 
-为 **Aesir Combat Prototype** 提供本地 AI 服务。第一阶段负责把玩家的文本战术指令转换为 UE 可校验的 `TacticalOrder` JSON；后续扩展语音识别、LLM 指令解析和强化学习走位策略。
+为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON（契约 v0.1）。解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。
+
+详细设计见 `docs/项目介绍.md`；UE 侧通信契约见 `docs/UE5-协议格式契约-v0.1.md`。
 
 ## 启动
 
 ```powershell
+.\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
 服务启动后访问：
 
-- `http://127.0.0.1:8000/health`：健康检查
+- `http://127.0.0.1:8000/health`：健康检查（返回 `protocol_version: "0.1"`）
 - `http://127.0.0.1:8000/docs`：交互式接口文档
 
 ## 当前接口
 
-`POST /parse-command`
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/v1/commands/parse` | 契约 v0.1：文本 + 能力目录 `context` + `request_id` |
+| `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
+| `POST` | `/v1/companion/chat` | 陪伴对话 |
+| `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
-请求：
+支持的 5 条战术指令（`intent`）：
 
-```json
-{
-  "text": "艾琳，等 Boss 眩晕时使用爆裂魔法"
-}
+| 指令 | intent | 动作 `then.type` |
+| --- | --- | --- |
+| 艾琳，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `cast_ability` |
+| 艾琳，保留爆裂魔法 | `hold_ability` | `hold_ability` |
+| 艾琳，撤退并优先保命 | `retreat` | `retreat` |
+| 艾琳，跟随我并保持距离 | `follow_keep_distance` | `follow` |
+| 艾琳，优先普通攻击 | `prioritize_attack` | `set_priority` |
+
+不识别的文本会明确返回 `recognized: false` 且 `order: null`，UE 端可安全忽略。
+
+### 文本示例
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
+  -ContentType "application/json" `
+  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾琳，撤退并优先保命","context":{"agents":[{"id":"companion.eirin","ability_ids":["ability.eirin.explosion","ability.eirin.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
 
-响应中的 `order` 是传给 UE 的受限战术命令。当前为规则解析器，支持以下 5 条指令：
+### 语音（真实 ASR）
 
-| 指令 | intent | 动作 |
-| --- | --- | --- |
-| 艾琳，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `CastAbility(Explosion)` |
-| 艾琳，保留爆裂魔法 | `hold_ability` | `HoldAbility(Explosion)` |
-| 艾琳，撤退并优先保命 | `retreat` | `Retreat` |
-| 艾琳，跟随我并保持距离 | `follow_keep_distance` | `Follow(Player)` |
-| 艾琳，优先普通攻击 | `prioritize_attack` | `Attack` |
+`.env` 设 `AESIR_ASR_BACKEND=faster_whisper`（模型/设备等见 `.env.example`；首次需装 `requirements-ml.txt` 并配 `HF_ENDPOINT=https://hf-mirror.com` 下载模型）：
 
-不识别的文本会明确返回 `recognized: false` 且 `order: null`。未来只替换 `app/services/command_parser.py`，不改变 UE 通信协议。
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
+  -Form @{ file = Get-Item cmd.wav; request_id = "1fad2e69-4a2d-4308-ad4f-2f8abb338b89" }
+```
+
+默认 `AESIR_ASR_BACKEND=mock` 返回 `AESIR_ASR_MOCK_TEXT` 固定文本，用于无模型环境自测。
 
 ## 测试
-
-测试依赖放在 `requirements-dev.txt`（含 `pytest`/`httpx`），先装再跑：
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest
 ```
 
-## 启动与调试
+覆盖契约 v0.1、语音链路、LLM 回退等（44 通过 + 2 条真机 ASR 冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
 
-先起服务（保持窗口运行）：
+## 调试
 
-```powershell
-.\.venv\Scripts\python -m uvicorn app.main:app --reload
-```
-
-然后在新窗口调用接口。注意：PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，不是真正的 curl，**请改用 `Invoke-RestMethod` 或 `curl.exe`**：
-
-```powershell
-# 健康检查
-Invoke-RestMethod http://127.0.0.1:8000/health
-
-# 解析战术指令（PowerShell 原生，无需转义 JSON）
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
-  -ContentType "application/json" `
-  -Body '{"text":"艾琳，等 Boss 眩晕时使用爆裂魔法"}'
-```
-
-浏览器打开 `http://127.0.0.1:8000/docs` 可交互式调用接口。
+PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，**请改用 `Invoke-RestMethod` 或 `curl.exe`**。浏览器打开 `http://127.0.0.1:8000/docs` 可交互式调用接口。

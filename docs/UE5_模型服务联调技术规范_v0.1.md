@@ -1,7 +1,7 @@
 # Aesir Combat Prototype｜UE5 × 模型服务联调技术规范 v0.1
 
 > 状态：**拟定，作为 UE 与 Python 两端的共同契约**  
-> 更新日期：2026-09-02  
+> 更新日期：2026-09-03  
 > 适用范围：单机 ARPG 的语音战术指挥、队友任务执行与后续 RL 走位策略。
 
 ## 1. 目标与边界
@@ -26,31 +26,30 @@
 
 ## 2. 当前模型服务进度
 
-项目目录：`C:\Users\YYchainsaw\PycharmProjects\aesir-ai-service`
+项目目录：`F:\python\aesir-ai-service`（开发分支 `develop-dyh`）
 
 ### 已完成
 
-- Python 3.11 虚拟环境、GitHub 仓库与 FastAPI 服务骨架。
-- `GET /health` 健康检查。
-- `POST /parse-command` 文本命令解析接口。
-- `RuleCommandParser`：支持条件施法、保留技能、优先普攻、跟随保持距离、撤退五种规则指令。
-- `CommandParser` 抽象与 `LLMCommandParser` 占位实现；选择 LLM 后端时会安全回退到规则解析器。
-- `.env.example`、运行时/ML/开发测试依赖拆分、接口测试与中文启动文档。
+- Python 3.12 虚拟环境、GitHub 仓库与 FastAPI 服务骨架。
+- `GET /health` 健康检查（返回 `protocol_version: "0.1"`）。
+- 契约 v0.1：`POST /v1/commands/parse`（能力目录 `context` + `request_id`），`POST /parse-command` 保留为遗留别名。
+- `RuleCommandParser`：支持条件施法、保留技能、优先普攻、跟随保持距离、撤退五种规则指令（判别联合 + ID 白名单校验）。
+- `LLMCommandParser`：共享 OpenAI 兼容 `LLMClient`（默认 DeepSeek），输出严格 Pydantic 校验 + 目录越界拦截；失败/不确定时回退规则解析器（`source: rule_fallback`）。
+- `POST /v1/voice/command` 组合端点：音频 → ASR → 同一解析层；`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper（`small` 模型，已端到端验证），`mock` 返回固定文本。
+- `POST /v1/companion/chat` 非战斗陪伴对话（mock / llm 后端，YAML 人设）。
+- pytest 全绿：44 通过 + 2 条真机 ASR 冒烟（`AESIR_ASR_SMOKE=1` 门控，默认跳过）。
+- `.env.example`、运行时/ML/开发测试依赖拆分、接口测试与中文文档。
 
 ### 当前阻塞
 
-`requirements.txt` 已声明 `python-dotenv==1.2.3`，但本地 `.venv` 尚未安装它，导致测试收集时失败。开始下一阶段前必须执行：
-
-```powershell
-.\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest -q
-```
+无。测试与本地启动均可直接复现（见 `docs/启动说明.md`）。
 
 ### 尚未开始
 
 - UE 侧 HTTP 客户端、`FTacticalOrder`、队友任务组件与 Boss 状态事件。
-- 语音采集、ASR 接口与按住说话交互。
-- 真实 LLM Client、结构化输出约束与模型评测集。
+- 专用 `POST /v1/speech/transcribe` 端点（组合端点已可用，见 §6.3）。
+- 真实中文人声的 ASR 命中率与延迟调优（当前仅验证到正弦波端到端降级路径）。
+- 模型评测集（≥30 条中文有效/无效战术命令）。
 - RL 训练环境、奖励函数、ONNX 导出与 UE 推理。
 
 ## 3. 架构决策
@@ -90,10 +89,10 @@ UE 再校验 → TacticalOrderComponent → BT/StateTree → GAS/技能系统
 | UE 战斗事件 | Gameplay Tags 或显式 C++ Delegate | Boss 眩晕等状态必须由事件/Tag 提供 |
 | UE 通信 | `FHttpModule`、`Json`、`JsonUtilities` | 本机 HTTP + JSON；首版不使用 WebSocket/gRPC |
 | UE 语音 | Audio Capture 插件、`AudioCaptureCore` | C++ 采集原始 PCM；Blueprint 可用于原型验证 |
-| API 服务 | Python 3.11、FastAPI、Uvicorn、Pydantic 2、HTTPX | 已建立 |
-| 配置 | `python-dotenv`、`.env` | 已声明，待安装 |
-| ASR | 首版 ASR Adapter；本地方案使用 `faster-whisper` | 已在 `requirements-ml.txt` 预留，未接线 |
-| LLM | 支持结构化 JSON 输出的云端或本地 Provider | 通过 Adapter 隔离厂商 SDK |
+| API 服务 | Python 3.12、FastAPI、Uvicorn、Pydantic 2、HTTPX | 已建立 |
+| 配置 | `python-dotenv`、`.env` | 已安装使用 |
+| ASR | 首版 ASR Adapter；本地方案使用 `faster-whisper` | 已接线：`AESIR_ASR_BACKEND=faster_whisper`（`small` 模型，`mock` 可回退） |
+| LLM | 支持结构化 JSON 输出的云端或本地 Provider | 已接入：OpenAI 兼容共享 Client（默认 DeepSeek，已实测） |
 | RL 训练 | PyTorch、Gymnasium、Stable-Baselines3 | 在 UE 训练场稳定后才加入 |
 | RL 部署 | ONNX + UE 端本地推理 | 先验证 Python 推理，再导出 ONNX |
 
@@ -248,7 +247,7 @@ Content-Type: multipart/form-data
 
 UE 收到转写后再调用 `/v1/commands/parse`。两步请求便于单独调试 ASR 和 LLM；后期若需要压缩调用，可由 Python 添加组合端点，但不得删除这两个基础端点。
 
-> **现状（mock 阶段）**：已实现组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`），内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。当前 `AESIR_ASR_BACKEND=mock` 只回固定文本（`AESIR_ASR_MOCK_TEXT`），用于全链路打通；非空的专用 `POST /v1/speech/transcribe` 与真实 faster-whisper 转写留待阶段 3。
+> **现状**：已实现组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`），内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。`AESIR_ASR_BACKEND=faster_whisper` 时走真实本机 Whisper 转写（默认 `small` 模型，已端到端验证），`mock` 返回固定文本用于自测。专用 `POST /v1/speech/transcribe` 端点尚未实现（待办）。
 
 ## 7. TacticalOrder 语义
 
@@ -318,10 +317,10 @@ Blackboard Key：BossCombatState
 LLM 只在下列路径接入：
 
 ```text
-app/api/routes.py
+app/api/routes.py / app/api/v1/voice.py
   → app/services/command_parser.py
     → app/services/parsers/llm.py
-      → app/integrations/llm_client.py（待新增）
+      → app/services/llm/client.py（共享 OpenAI 兼容 Client，factory 按配置创建）
 ```
 
 `LLMCommandParser` 的唯一输出是本规范的 JSON。其处理步骤：
@@ -338,11 +337,13 @@ LLM Provider 的 API Key、模型名和 Base URL 只存在 `.env`，绝不传给
 ### 9.2 ASR 接入位置
 
 ```text
-app/services/speech/base.py
-app/services/speech/asr.py
+app/services/transcribers/base.py          # ASRBackend 抽象 + TranscriptionError
+app/services/transcribers/mock.py           # 固定文本自测后端
+app/services/transcribers/faster_whisper.py # 真实本机 Whisper
+app/services/transcribers/factory.py        # 按 AESIR_ASR_BACKEND 选后端
 ```
 
-`ASRAdapter.transcribe(audio_bytes, locale)` 返回文本和语言代码。它不调用 LLM，也不生成战术命令。
+`ASRBackend.transcribe(audio_bytes)` 返回文本。它不调用 LLM，也不生成战术命令。
 
 ### 9.3 RL 接入位置
 
@@ -358,24 +359,24 @@ TacticalOrder（等待眩晕施法）
 
 ## 10. 近期开发目标
 
-### P0：恢复可验证状态（立即）
+### P0：恢复可验证状态（已完成 ✅）
 
 - 安装 `requirements-dev.txt` 并让全部测试通过。
 - 为现有 `/health` 和 `/parse-command` 保留回归测试。
 - 在 README 记录本地启动、测试和 `.env` 使用方式。
 
-**验收：** `pytest -q` 通过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
+**验收（已达成）：** `pytest -q` 44 通过 + 2 条真机冒烟跳过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
 
-### P1：冻结联调协议（下一步）
+### P1：冻结联调协议（已完成 ✅）
 
 - 按第 6 节将现有硬编码 `Eirin/Boss/Explosion` 的 `Literal` Schema 改为 ID 字符串。
 - 增加 `request_id`、`catalog_revision`、`context` 与 `order_id`。
 - 新增 `/v1/commands/parse`，原 `/parse-command` 暂作兼容入口。
 - 为协议示例、非法 ID、未知 ID、版本不支持增加测试。
 
-**验收：** Python 能根据请求内能力目录拒绝未知角色、技能和状态；UE 未接入时可用 API 文档手动验证。
+**验收（已达成）：** Python 能根据请求内能力目录拒绝未知角色、技能和状态；UE 未接入时可用 API 文档手动验证。
 
-### P2：UE 文本联调（先于语音）
+### P2：UE 文本联调（先于语音，待 UE 侧启动）
 
 - UE 实现 `FTacticalOrder`、`UCommandServiceSubsystem` 与 JSON 映射。
 - UE 使用调试按钮或文本输入请求 Python，而不是在 UE 内解析自然语言。
@@ -383,19 +384,19 @@ TacticalOrder（等待眩晕施法）
 
 **验收：** Python 返回的 `conditional_cast` JSON 能在 UE 日志/HUD 中显示为可读任务，非法 JSON 被安全拒绝。
 
-### P3：首个战斗闭环与 LLM（随后）
+### P3：首个战斗闭环与 LLM（Python 侧已完成，UE 侧待做）
 
-- 实现一名队友、一个 Boss、`state.stunned` 与一个可触发技能。
-- 接入真实 `LLMCommandParser`，但保留规则解析器回退。
-- 建立至少 30 条中文有效/无效战术命令测试集。
+- 实现一名队友、一个 Boss、`state.stunned` 与一个可触发技能。（UE 侧待做）
+- 接入真实 `LLMCommandParser`，但保留规则解析器回退。（已接入并实测，见 `docs/LLM-联调指南.md`）
+- 建立至少 30 条中文有效/无效战术命令测试集。（待建；现有 pytest 已覆盖 golden 正/负例）
 
 **验收：** 文本“艾琳，等 Boss 眩晕时使用爆裂魔法”能被模型正确转换、UE 验证、队友执行；模型不可用时规则命令仍可执行。
 
-### P4：Push-to-Talk 与 ASR（最后接入）
+### P4：Push-to-Talk 与 ASR（Python 侧已打通组合端点，UE 侧待做）
 
-- UE Audio Capture 采集与 WAV 编码。
-- `/v1/speech/transcribe` 和 ASR Adapter。
-- HUD 显示录音中、转写文本、解析中、命令已接受/拒绝。
+- UE Audio Capture 采集与 WAV 编码。（待 UE 侧）
+- `/v1/speech/transcribe` 和 ASR Adapter。（ASR 已接线 faster-whisper；专用 `/v1/speech/transcribe` 端点待做，组合端点 `/v1/voice/command` 已可用）
+- HUD 显示录音中、转写文本、解析中、命令已接受/拒绝。（待 UE 侧）
 
 **验收：** 按住说话到命令入队全链路不阻塞游戏主线程；失败能给出可理解反馈。
 
