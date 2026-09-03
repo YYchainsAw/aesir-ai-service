@@ -146,6 +146,56 @@ def test_v1_parse_rejects_invalid_request_id() -> None:
     assert response.status_code == 422
 
 
+def test_golden_contract_per_section_8() -> None:
+    """契约《UE5-协议格式契约-v0.1.md》§8 的 5 份 golden 输入必须各自命中对应行。"""
+    rid = "1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
+    golden = {
+        "艾琳，等 Boss 眩晕时使用爆裂魔法。": (80, {
+            "type": "state_entered",
+            "subject": "encounter.primary_hostile",
+            "tag": "state.stunned",
+        }, {
+            "type": "cast_ability",
+            "ability_id": "ability.eirin.explosion",
+            "target": {"ref": "when.subject"},
+        }),
+        "艾琳，这一整场都不要放爆裂魔法。": (60, None, {
+            "type": "hold_ability",
+            "ability_id": "ability.eirin.explosion",
+            "active": True,
+        }),
+        "艾琳，优先普通攻击。": (50, None, {
+            "type": "set_priority",
+            "mode": "basic_attack_first",
+        }),
+        "艾琳，跟着我并保持距离。": (40, None, {
+            "type": "follow",
+            "target": "party.player",
+            "keep_distance": True,
+        }),
+        "艾琳，撤退并优先保命。": (90, None, {"type": "retreat"}),
+    }
+    for text, (priority, when, then) in golden.items():
+        request = {
+            "protocol_version": "0.1",
+            "request_id": rid,
+            "text": text,
+            "context": DEFAULT_CONTEXT.model_dump(),
+        }
+        body = client.post("/v1/commands/parse", json=request).json()
+        assert body["recognized"] is True
+        assert body["request_id"] == rid
+        order = body["order"]
+        assert order["agent_id"] == "companion.eirin"
+        assert order["priority"] == priority
+        assert order["when"] == when
+        assert order["then"] == then
+        assert order["expires"] == {"type": "encounter_end"}
+        # 契约 §7.1：order 内不携带 protocol_version
+        assert "protocol_version" not in order
+        UUID(order["order_id"])
+
+
 def test_v1_parse_rejects_catalog_oob_ability() -> None:
     # 客户端声明能力目录里没有爆裂魔法 → 服务端不得产出越界 order
     request = {

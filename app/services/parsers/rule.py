@@ -85,7 +85,7 @@ class RuleCommandParser(CommandParser):
             return ParseCommandResponse(
                 request_id=request_id,
                 recognized=False,
-                message="Command not recognized: no supported agent (expected Eirin).",
+                message="当前无法确认该技能或目标。",
             )
 
         cat = _Catalog(context)
@@ -112,13 +112,14 @@ class RuleCommandParser(CommandParser):
                     ),
                     priority=80,
                 ),
-                message="Command recognized: cast Explosion when the Boss is stunned.",
+                message="好，等 Boss 眩晕时释放爆裂魔法。",
             )
 
         # 2. 保留技能：把爆裂魔法握在手里暂时不用。
+        #    覆盖契约 golden 示例「这一整场都不要放爆裂魔法」的「不要放」表达。
         if (
             cat.has_explosion
-            and _has_any(t, "保留", "hold", "save", "先别用", "不要用", "攒")
+            and _has_any(t, "保留", "hold", "save", "先别用", "不要用", "不要放", "别放", "攒")
             and _has_any(t, "爆裂魔法", "explosion")
         ):
             return ParseCommandResponse(
@@ -129,7 +130,7 @@ class RuleCommandParser(CommandParser):
                     then=HoldAbilityAction(ability_id=ABILITY_EXPLOSION, active=True),
                     priority=60,
                 ),
-                message="Command recognized: hold Explosion in reserve.",
+                message="明白，先把爆裂魔法保留住。",
             )
 
         # 3. 撤退：后撤并优先保命。
@@ -138,7 +139,7 @@ class RuleCommandParser(CommandParser):
                 request_id=request_id,
                 recognized=True,
                 order=Retreat(agent_id=AGENT, then=RetreatAction(), priority=90),
-                message="Command recognized: retreat and prioritize survival.",
+                message="知道了，先撤，优先保命。",
             )
 
         # 4. 跟随并保持距离。
@@ -155,7 +156,7 @@ class RuleCommandParser(CommandParser):
                     then=FollowAction(target=SELECTOR_PLAYER, keep_distance=True),
                     priority=40,
                 ),
-                message="Command recognized: follow the player and keep distance.",
+                message="好，跟上你并保持施法距离。",
             )
 
         # 5. 优先普通攻击。
@@ -170,11 +171,11 @@ class RuleCommandParser(CommandParser):
                     then=SetPriorityAction(mode="basic_attack_first"),
                     priority=50,
                 ),
-                message="Command recognized: prioritize normal attacks.",
+                message="了解，优先普通攻击。",
             )
 
         return ParseCommandResponse(
             request_id=request_id,
             recognized=False,
-            message="Command not recognized by the current rule parser.",
+            message="当前无法确认该技能或目标。",
         )
