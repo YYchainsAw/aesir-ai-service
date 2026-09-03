@@ -44,6 +44,26 @@ def get_asr_mock_text() -> str:
     return os.environ.get("AESIR_ASR_MOCK_TEXT", "")
 
 
+def get_asr_model() -> str:
+    """faster-whisper 模型名（按需下载）。默认 ``small``：8GB 显存够用、中文准确、延迟低。"""
+    return os.environ.get("AESIR_ASR_MODEL", "small")
+
+
+def get_asr_device() -> str:
+    """推理设备。默认 ``auto``：有 CUDA 用 GPU，否则 CPU，避免本地未装 CUDA 后端直接崩。"""
+    return os.environ.get("AESIR_ASR_DEVICE", "auto")
+
+
+def get_asr_compute_type() -> str:
+    """量化类型。默认 ``int8_float16``：CUDA 上加速、CPU 自动退化为 int8。"""
+    return os.environ.get("AESIR_ASR_COMPUTE_TYPE", "int8_float16")
+
+
+def get_asr_language() -> str:
+    """转写语言，跳过语言检测省开销。默认中文 ``zh``。"""
+    return os.environ.get("AESIR_ASR_LANGUAGE", "zh")
+
+
 def get_llm_settings() -> LLMSettings:
     """读取两个业务链路共用的 LLM Provider 配置。"""
     return LLMSettings(
