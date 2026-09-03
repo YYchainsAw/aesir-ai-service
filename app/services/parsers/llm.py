@@ -1,91 +1,127 @@
-"""使用共享 LLM 客户端的战术指令解析器。"""
+"""基于 LLM 的命令解析器（复用共享的厂商无关 LLMClient，默认 DeepSeek）。
+
+输入任意自然语言指令与 UE 能力目录 ``context``，输出契约 v0.1 的判别联合
+``TacticalOrder``。实际网络调用通过 ``app.services.llm`` 的共享客户端完成；
+本模块负责：构造面向 UE 的 system prompt、严格校验返回 JSON(拒绝多余字段)、
+并按能力目录白名单校验 order 引用的每个 ID(防止越界)。任何失败统一抛
+``LLMError``(继承共享的 ``LLMClientError``)，由 facade 捕获后回退规则解析器。
+"""
+
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-import json
-
-import httpx
-from pydantic import TypeAdapter
-
-from app.config import get_llm_api_key, get_llm_base_url, get_llm_model, get_llm_timeout
-from app.schemas.tactical_order import ParseCommandResponse, TacticalOrder
-from app.services.parsers.base import CommandParser
-from app.services.llm.client import LLMClient, LLMClientError
+from app.schemas.tactical_order import (
+    DEFAULT_CONTEXT,
+    ParseCommandContext,
+    ParseCommandResponse,
+)
+from app.services.llm.client import LLMClientError
 from app.services.llm.factory import create_llm_client
+from app.services.parsers.base import CommandParser
+
+if TYPE_CHECKING:
+    from app.services.llm.client import LLMClient
 
 
-class LLMError(Exception):
-    """LLM 解析链路中的任何失败（配置缺失、网络、非法输出）。"""
+class LLMError(LLMClientError):
+    """LLM 解析链路中的任何失败（配置缺失、网络、非法输出、目录越界）。"""
 
 
-class LLMNotConfiguredError(LLMError):
-    """未配置 LLM API key 时抛出。"""
+def _build_system_prompt(context: ParseCommandContext) -> str:
+    """把 UE 能力目录的稳定 ID 喂给 LLM，并给出契约 v0.1 输出结构。"""
+    agents = "\n".join(
+        f"- agent {a.id!r} 可用技能: " + ", ".join(repr(x) for x in a.ability_ids)
+        for a in context.agents
+    )
+    selectors = ", ".join(repr(x) for x in context.target_selectors)
+    states = ", ".join(repr(x) for x in context.state_tags)
+
+    return (
+        "你是一名游戏《Aesir》的战术指令解析器。玩家指令都发给队友。"
+        "请把中文自然语言指令解析为受限 JSON，只输出 JSON，不要任何解释、代码块或说明。\n\n"
+        "能力目录（只许使用这里的 ID，禁止发明、禁止用中文显示名）：\n"
+        f"agents:\n{agents}\n"
+        f"target_selectors: [{selectors}]\n"
+        f"state_tags: [{states}]\n\n"
+        "输出对象结构：\n"
+        '{"recognized":true,"order":{...},"message":"..."} 或无法识别时 '
+        '{"recognized":false,"order":null,"message":"..."}\n'
+        "order 结构（按 intent 判别）：\n"
+        '通用字段：order_id 由服务端生成、不用输出；agent_id 取自目录；priority 为 0..100 整数；'
+        'expires 固定 {"type":"encounter_end"}。\n'
+        "1. conditional_cast（条件满足时施法一次）："
+        'when={"type":"state_entered","subject":"<目标选择器>","tag":"<状态tag>"}，'
+        'then={"type":"cast_ability","ability_id":"<技能ID>","target":"<目标选择器> 或 {"ref":"when.subject"}"}。\n'
+        "2. hold_ability：when=null，"
+        'then={"type":"hold_ability","ability_id":"<技能ID>","active":true}。\n'
+        "3. prioritize_attack：when=null，then={\"type\":\"set_priority\",\"mode\":\"basic_attack_first\"}。\n"
+        "4. follow_keep_distance：when=null，"
+        'then={"type":"follow","target":"party.player","keep_distance":true}。\n'
+        "5. retreat：when=null，then={\"type\":\"retreat\"}。\n\n"
+        "只有一条要求必须严格遵守：order 里引用的每个 ID 都必须来自上面的能力目录，"
+        "否则这次解析无效。语气要符合战术指挥。"
+    )
 
 
-# 系统提示：把手写的白名单契约喂给 LLM，并要求只输出 JSON。
-SYSTEM_PROMPT = """你是一名游戏《Aesir》的战术指令解析器。玩家的指令都发给队友艾琳（Eirin）。
-请把中文自然语言指令解析为受限的 JSON 对象，只输出 JSON，不要任何解释或代码块围栏。
+def _validate_catalog(context: ParseCommandContext, order: Any) -> None:
+    """校验 order 引用的 ID 是否都落在目录内；越界抛 LLMError。"""
+    agent_by_id = {a.id: a for a in context.agents}
+    selectors = set(context.target_selectors)
+    states = set(context.state_tags)
 
-输出对象结构：
-{"recognized": true, "order": {"protocol_version": "1.0", "agent": "Eirin", "priority": "high", "expires_on": "EncounterEnd", "intent": "<intent>", ...按意图填字段}, "message": "简短英文说明"}
-无法识别为任何意图时输出 {"recognized": false, "order": null, "message": "Command not recognized."}
+    agent = agent_by_id.get(order.agent_id)
+    if agent is None:
+        raise LLMError(f"Agent {order.agent_id!r} not in catalog.")
 
-intent 及对应字段（所有值必须严格使用枚举白名单，不能发明）：
-1. conditional_cast :
-   {"intent": "conditional_cast", "trigger": {"target": "Boss", "state": "Stunned"}, "action": {"type": "CastAbility", "ability_id": "Explosion"}}
-   适用：当 Boss 眩晕/被控时施放技能。
-2. hold_ability :
-   {"intent": "hold_ability", "action": {"type": "HoldAbility", "ability_id": "Explosion"}}
-   适用：暂时保留/不用某个技能。
-3. retreat :
-   {"intent": "retreat", "action": {"type": "Retreat"}}
-   适用：撤退、后撤、优先保命。
-4. follow_keep_distance :
-   {"intent": "follow_keep_distance", "action": {"type": "Follow", "target": "Player", "keep_distance": true}}
-   适用：跟随并保持距离。
-5. prioritize_attack :
-   {"intent": "prioritize_attack", "action": {"type": "Attack"}}
-   适用：优先普通攻击/平A。
+    then = order.then
+    # 有 ability_id 的动作，必须属于该 agent 的能力目录
+    if getattr(then, "ability_id", None) is not None:
+        if then.ability_id not in agent.ability_ids:
+            raise LLMError(f"Ability {then.ability_id!r} not in agent catalog.")
 
-protocol_version/agent/priority/expires_on 均固定，勿改。agent 只接受 Eirin。
-target 只接受 "Boss" 或 "Player"；state 只接受 "Stunned"；ability_id 只接受 "Explosion"。"""
+    if order.when is not None:
+        if order.when.subject not in selectors:
+            raise LLMError(f"when.subject {order.when.subject!r} not in catalog.")
+        if order.when.tag not in states:
+            raise LLMError(f"when.tag {order.when.tag!r} not in catalog.")
 
-
-_order_adapter = TypeAdapter(TacticalOrder)
+    # then.target 可能是选择器字符串或 TargetRef；字符串必须命中选择器
+    target = getattr(then, "target", None)
+    if isinstance(target, str) and target not in selectors:
+        raise LLMError(f"then.target {target!r} not in catalog.")
 
 
 class LLMCommandParser(CommandParser):
-    """将自然语言转换为受现有 TacticalOrder Schema 限制的 JSON。"""
+    """基于 LLM 的解析器。构造时可注入共享 ``LLMClient`` 便于测试。"""
 
-    def __init__(self, client: LLMClient | None = None) -> None:
-        self._client = client or create_llm_client()
+    def __init__(self, client=None) -> None:
+        # 业务层只依赖 LLMClient 协议；缺省用运行时配置创建。
+        from app.services.llm.client import LLMClient
 
-    def __init__(self, client: httpx.Client | None = None) -> None:
-        self._owns_client = client is None
-        self._client = client or httpx.Client(timeout=get_llm_timeout())
+        if client is None:
+            self._client: LLMClient = create_llm_client()
+        else:
+            self._client = client
 
-    def _build_messages(self, text: str) -> list[dict[str, str]]:
-        return [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"玩家指令：{text}"},
-        ]
-
-    def parse(self, text: str) -> ParseCommandResponse:
+    def parse(
+        self,
+        text: str,
+        context: ParseCommandContext = DEFAULT_CONTEXT,
+        request_id=None,
+    ) -> ParseCommandResponse:
         payload = self._client.generate_json(
-            system_prompt=(
-                "You convert Chinese ARPG tactical commands into JSON. "
-                "Return only a JSON object with exactly: recognized, order, message. "
-                "Use only the supported agent Eirin, target Boss, ability Explosion, and existing "
-                "TacticalOrder intent/action values. Unknown commands must return recognized=false, "
-                "order=null, and a short message."
-            ),
-            user_prompt=text,
+            system_prompt=_build_system_prompt(context),
+            user_prompt=f"玩家指令：{text}",
             temperature=0.0,
         )
         try:
             response = ParseCommandResponse.model_validate(payload)
-        except ValidationError as error:
-            raise LLMClientError("LLM tactical response does not match TacticalOrder schema.") from error
+        except (ValidationError, TypeError, ValueError) as exc:
+            raise LLMError(f"LLM output failed validation: {exc}") from exc
 
-        # 来源由服务端决定，不能相信 LLM 自行声明的来源。
-        return response.model_copy(update={"source": "llm"})
+        if response.order is not None:
+            _validate_catalog(context, response.order)
+
+        # 来源由服务端决定，不能轻信 LLM 自报；request_id 回显调用方。
+        return response.model_copy(update={"source": "llm", "request_id": request_id})

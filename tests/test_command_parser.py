@@ -24,20 +24,33 @@ def test_rule_parser_rejects_unknown_safely() -> None:
     assert result.order is None
 
 
-def test_facade_defaults_to_rule_backend() -> None:
-    # No AESIR_PARSER_BACKEND set → rule backend.
+def test_rule_parser_echoes_request_id() -> None:
+    import uuid
+
+    rid = uuid.uuid4()
+    result = RuleCommandParser().parse("艾琳，撤退并优先保命", request_id=rid)
+    assert result.request_id == rid
+
+
+def test_facade_defaults_to_rule_backend(monkeypatch) -> None:
+    # 明确强制 rule 后端，避免被开发者本机 .env 的 AESIR_PARSER_BACKEND=llm 干扰。
+    monkeypatch.delenv("AESIR_PARSER_BACKEND", raising=False)
     result = parse_command("艾琳，撤退并优先保命")
     assert result.recognized is True
     assert result.order.intent == "retreat"
     assert result.source == "rule"
+    # 已识别 order → facade 挂上由人设配置生成的队友确认回应
+    assert result.companion_reply is not None
+    assert result.companion_reply.reply_text
 
 
 def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
-    # LLM 未配置时，facade 必须回退到规则解析器；测试不能读取开发者本机的 API 配置。
+    # 后端被设为 llm，但适配器调用失败；facade 必须回退到规则解析器，
+    # 指令仍然能被解析出来，并标记来源为 rule_fallback。
     monkeypatch.setenv("AESIR_PARSER_BACKEND", "llm")
     monkeypatch.delenv("LLM_API_KEY", raising=False)
-    monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
 
     result = parse_command("艾琳，撤退并优先保命")
     assert result.recognized is True
@@ -47,3 +60,4 @@ def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
     unknown = parse_command("艾琳，马上释放不存在的技能")
     assert unknown.recognized is False
     assert unknown.order is None
+    assert unknown.companion_reply is None

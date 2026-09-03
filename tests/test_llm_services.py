@@ -71,7 +71,7 @@ def test_tactical_llm_parser_rejects_extra_fields() -> None:
         )
     )
 
-    with pytest.raises(LLMClientError, match="does not match TacticalOrder schema"):
+    with pytest.raises(LLMClientError, match="failed validation"):
         parser.parse("做一个不存在的动作")
 
 
