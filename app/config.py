@@ -34,6 +34,16 @@ def get_companion_backend() -> str:
     return os.environ.get("AESIR_COMPANION_BACKEND", "mock")
 
 
+def get_asr_backend() -> str:
+    """返回当前生效的语音转写后端：mock（默认，固定文本）或 faster_whisper（待接入）。"""
+    return os.environ.get("AESIR_ASR_BACKEND", "mock")
+
+
+def get_asr_mock_text() -> str:
+    """mock 转写后端返回的固定文本；留空则视为没转出命令（recognized:false）。"""
+    return os.environ.get("AESIR_ASR_MOCK_TEXT", "")
+
+
 def get_llm_settings() -> LLMSettings:
     """读取两个业务链路共用的 LLM Provider 配置。"""
     return LLMSettings(
