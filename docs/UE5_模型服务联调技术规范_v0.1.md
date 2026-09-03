@@ -248,6 +248,8 @@ Content-Type: multipart/form-data
 
 UE 收到转写后再调用 `/v1/commands/parse`。两步请求便于单独调试 ASR 和 LLM；后期若需要压缩调用，可由 Python 添加组合端点，但不得删除这两个基础端点。
 
+> **现状（mock 阶段）**：已实现组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`），内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。当前 `AESIR_ASR_BACKEND=mock` 只回固定文本（`AESIR_ASR_MOCK_TEXT`），用于全链路打通；非空的专用 `POST /v1/speech/transcribe` 与真实 faster-whisper 转写留待阶段 3。
+
 ## 7. TacticalOrder 语义
 
 第一阶段正式支持下列意图；字段相同但 `when`/`then` 按意图增减。
