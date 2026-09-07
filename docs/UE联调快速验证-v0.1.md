@@ -61,6 +61,19 @@ $env:AESIR_ASR_BACKEND = "faster_whisper"
 `docs/启动说明.md` §5.4），UE 侧真实快照采集到位后再联调。接口测试项见
 `UE侧接入测试清单-v0.1.md`。
 
+### 3.2 执行回执（v0.2 草案 §7，服务端已实现）
+
+UE 对每个 `order_id` 回传执行结果，服务端落 `data/rl/executions/` 按天 JSONL：
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/tactical/executions `
+  -ContentType "application/json" `
+  -Body '{"receipt":{"order_id":"527b4c0d-0fe1-4e4c-9057-3c991ba1616c","result":"executed","encounter_id":"encounter.20260907.001"}}'
+# result ∈ accepted/executed/rejected/expired/cancelled；预期 202 {"stored":true,...}
+```
+
+回执仅用于观察与后续评测数据集（**不自动用于训练**，草案 §7）；批量上传待 v0.2 定稿。
+
 ## 4. 逐项测试清单
 
 按阶段（P2 文本 → P3 战斗闭环 → P4 语音）的 21 条验收测试项见

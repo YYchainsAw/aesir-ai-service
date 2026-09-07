@@ -20,9 +20,11 @@ class ExecutionReceipt(BaseModel):
     order_id: str = Field(min_length=1)
     result: ReceiptResult
     encounter_id: str = Field(min_length=1)
+    request_id: str = ""  # 草案 §7 示例含此字段；UE 可选回填
     reason_code: str = ""  # UE 侧失败原因，如 UE_EXECUTOR_BUSY / UE_CAST_INTERRUPTED
     agent_id: str = ""
     ability_id: str | None = None
-    received_at: str = ""  # ISO-8601 UTC；缺省时由服务端补
+    reported_at: str = ""  # UE 侧报告时间（ISO-8601 UTC），可选
+    received_at: str = ""  # 服务端受理时间；缺省时由服务端补
     policy_revision: str = ""  # UE 侧可选回填，便于区分 rule/rl 数据
     sequence: int | None = Field(default=None, ge=0)

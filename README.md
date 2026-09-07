@@ -24,6 +24,7 @@
 | `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
 | `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
 | `POST` | `/v1/tactical/resolve` | v0.2 预览：意图 + 战斗快照 → 上下文决策（规则策略） |
+| `POST` | `/v1/tactical/executions` | v0.2 草案 §7：UE 执行回执（202 受理，落 JSONL） |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
@@ -60,6 +61,19 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 ~~真人声调优~~（已取消：无真人录音样本；`scripts/asr_eval.py` 评测脚手架保留备用）。
 
+## RL 实验（可选，Phase 4）
+
+Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/资源管理」策略与规则基线 A/B。**不影响服务运行时**——不装依赖全量测试仍全绿：
+
+```powershell
+.\.venv\Scripts\python -m pip install -r requirements-rl.txt      # gymnasium/sb3/torch(CPU)
+.\.venv\Scripts\python scripts\rl_train.py --timesteps 20000      # 冒烟训练
+.\.venv\Scripts\python scripts\rl_eval.py --episodes 50 --agents rule,models/rl/ppo_bossfight
+```
+
+组件可训性评级、奖励设计、sim-to-real 风险与上线判定标准见
+`docs/RL可行性分析与框架设计.md`。RL 目前不接服务路径（`AESIR_TACTICAL_POLICY=rl` 为占位，恒回退规则）。
+
 ## 测试
 
 ```powershell
@@ -67,7 +81,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve 与回归评测等（169 通过 + 2 条冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions、Boss 战模拟器与 RL 环境等（197 通过 + 3 条冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
 
 ## 调试
 
