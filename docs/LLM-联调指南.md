@@ -114,3 +114,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 
 - `LLM_API_KEY` 只写进被 `.gitignore` 忽略的 `.env`，**绝不提交到仓库、不写进文档/测试**。
 - 若密钥曾在不可信环境（录屏/转发）出现过，建议在 DeepSeek 控制台轮换一次。
+---
+
+> 注：v0.2 的 `/v1/tactical/resolve` 当前为纯规则策略（`source` 固定 `rule`），
+> 不经 LLM；LLM 接入策略层待后续规划（届时将新增后端选型配置）。

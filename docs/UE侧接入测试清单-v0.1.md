@@ -70,3 +70,11 @@
 - `then.target` 的合法形态：目标选择器 ID 字符串，或 `{"ref":"when.subject"}`
   对象（见协议契约 §7.2，**不允许**裸字符串 `"when.subject"`）。
 - UE 启动时记录支持的 `protocol_version` 与 `catalog_revision`，便于版本对账。
+
+---
+
+## 附：v0.2 端点测试清单（待补）
+
+`/v1/tactical/resolve`（规则策略 v1）已实现：CombatContext 上传、意图传递、
+决策四态（actionable / advisory / not_actionable / clarification_needed）、
+reason_codes 解析、companion_reply 展示等测试项将在 UE 快照采集就绪后补充。

@@ -282,11 +282,11 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 
 ### 阶段 2：上下文感知指令落地（核心亮点）
 
-- [ ] 建立 `TacticalIntent`、`CombatContext`、`TacticalDecision` schema。
-- [ ] 实现治疗、爆发、撤退三类策略及 `reason_codes`。
-- [ ] 将旧 `/v1/commands/parse` 保持为兼容入口；新增 `/v1/tactical/resolve`。
-- [ ] UE 对返回动作执行二次校验并回传 `execution_result`。
-- [ ] 编写不少于 20 条指令 × 4 类战况的回归/评测样本。
+- [x] 建立 `TacticalIntent`、`CombatContext`、`TacticalDecision` schema。（Python 侧已完成，2026-09-07）
+- [x] 实现治疗、爆发、撤退三类策略及 `reason_codes`。（规则策略 v1，Python 侧已完成）
+- [x] 将旧 `/v1/commands/parse` 保持为兼容入口；新增 `/v1/tactical/resolve`。（已实现）
+- [ ] UE 对返回动作执行二次校验并回传 `execution_result`。（待 UE 侧）
+- [x] 编写不少于 20 条指令 × 4 类战况的回归/评测样本。（85 例回归，含安全性断言）
 
 **验收：** 相同的“帮我回一下血”在至少三种不同状态下输出不同、合法、可解释的决策；服务不可用时 UE 能安全退化。
 
@@ -356,8 +356,8 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 
 1. UE 先完成文本聊天输入框与 `/v1/companion/chat` 的显示闭环。
 2. UE 实现 Boss 眩晕事件、玩家低血事件、状态快照生成与本地防抖。
-3. Python 按 v0.2 草案实现战斗事件端点，再完成两端联调。
-4. 实现上下文策略与可观察字段，建立测试集。
-5. 最后接入真实 ASR、用户词典和可选 RL。
+3. Python 实现 `/v1/combat/events` 与 `/v1/tactical/executions` 端点（resolve 已完成），再完成两端联调。
+4. ~~实现上下文策略与可观察字段，建立测试集。~~（resolve 规则策略 v1 + 85 例回归已完成，2026-09-07）
+5. 最后接入真实 ASR、用户词典和可选 RL。（真人声调优已取消；RL 可先做 Python 侧模拟器）
 
 不要先做复杂长期记忆或 RL；先把一名队友、一只 Boss、两类事件、三类战术选择做成稳定且可演示的闭环。

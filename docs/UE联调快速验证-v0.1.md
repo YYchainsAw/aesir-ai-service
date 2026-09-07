@@ -48,11 +48,18 @@ $env:HF_ENDPOINT = "https://hf-mirror.com"      # 首次下载模型
 $env:AESIR_ASR_BACKEND = "faster_whisper"
 ```
 
-用真人录音（「艾莉，撤退并优先保命」等）替换 mock 文本验证。转写质量调优见
-`scripts/asr_eval.py`（样本放 `data/asr_samples/`，文件名即期望文本）。
+用真人录音（「艾莉，撤退并优先保命」等）替换 mock 文本验证。真人声调优已取消，
+`scripts/asr_eval.py` 评测脚手架保留备用。
 
 验收：一句指令端到端 < 3s（`small` 模型本机约 0.5s）；识别错句时确认走
 `recognized:false` 而非报错。
+
+## 3.1 第四步（可选）：v0.2 战术决策端点
+
+`POST /v1/tactical/resolve` 已实现（规则策略 v1）：UE 传语义意图 + 战斗快照，
+返回带 `reason_codes` 的上下文决策。可先用手写快照 JSON 验证（示例见
+`docs/启动说明.md` §5.4），UE 侧真实快照采集到位后再联调。接口测试项见
+`UE侧接入测试清单-v0.1.md`。
 
 ## 4. 逐项测试清单
 

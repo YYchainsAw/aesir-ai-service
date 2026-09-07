@@ -1,6 +1,6 @@
 # Aesir AI Service
 
-为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON（契约 v0.1）。解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。
+为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON（契约 v0.1），并提供 v0.2 上下文感知战术决策 `/v1/tactical/resolve`。解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。
 
 详细设计见 `docs/项目介绍.md`；UE 侧通信契约见 `docs/UE5-协议格式契约-v0.1.md`。
 
@@ -58,7 +58,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 默认 `AESIR_ASR_BACKEND=mock` 返回 `AESIR_ASR_MOCK_TEXT` 固定文本，用于无模型环境自测。
 
-真人声调优：录音（文件名即期望文本）放 `data/asr_samples/`，跑 `.\.venv\Scripts\python scripts\asr_eval.py` 对比模型/beam/VAD 组合的 CER 与耗时（详见 `docs/启动说明.md` §5.3.2）。
+~~真人声调优~~（已取消：无真人录音样本；`scripts/asr_eval.py` 评测脚手架保留备用）。
 
 ## 测试
 
@@ -67,7 +67,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退等（50 通过 + 2 条真机 ASR 冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve 与回归评测等（169 通过 + 2 条冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
 
 ## 调试
 
