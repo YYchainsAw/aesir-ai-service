@@ -60,11 +60,11 @@ def _build_system_prompt(context: ParseCommandContext) -> str:
         'then={"type":"follow","target":"party.player","keep_distance":true}。\n'
         "5. retreat：when=null，then={\"type\":\"retreat\"}。\n\n"
         "golden 示例（用上目录的 ID 替换占位；message 用简洁中文）：\n"
-        '1. conditional_cast → {"recognized":true,"message":"好，等Boss眩晕时释放爆裂魔法。","order":{"agent_id":"companion.eirin","intent":"conditional_cast","priority":80,"when":{"type":"state_entered","subject":"encounter.primary_hostile","tag":"state.stunned"},"then":{"type":"cast_ability","ability_id":"ability.eirin.explosion","target":{"ref":"when.subject"}}}}；\n'
-        '2. hold_ability → {"recognized":true,"message":"明白，保留爆裂魔法。","order":{"agent_id":"companion.eirin","intent":"hold_ability","priority":60,"when":null,"then":{"type":"hold_ability","ability_id":"ability.eirin.explosion","active":true}}}；\n'
-        '3. prioritize_attack → {"recognized":true,"message":"了解，优先普攻。","order":{"agent_id":"companion.eirin","intent":"prioritize_attack","priority":50,"when":null,"then":{"type":"set_priority","mode":"basic_attack_first"}}}；\n'
-        '4. follow_keep_distance → {"recognized":true,"message":"好，跟上你并保持距离。","order":{"agent_id":"companion.eirin","intent":"follow_keep_distance","priority":40,"when":null,"then":{"type":"follow","target":"party.player","keep_distance":true}}}；\n'
-        '5. retreat → {"recognized":true,"message":"知道了，先撤，优先保命。","order":{"agent_id":"companion.eirin","intent":"retreat","priority":90,"when":null,"then":{"type":"retreat"}}}\n'
+        '1. conditional_cast → {"recognized":true,"message":"好，等Boss眩晕时释放爆裂魔法。","order":{"agent_id":"companion.alice","intent":"conditional_cast","priority":80,"when":{"type":"state_entered","subject":"encounter.primary_hostile","tag":"state.stunned"},"then":{"type":"cast_ability","ability_id":"ability.alice.explosion","target":{"ref":"when.subject"}}}}；\n'
+        '2. hold_ability → {"recognized":true,"message":"明白，保留爆裂魔法。","order":{"agent_id":"companion.alice","intent":"hold_ability","priority":60,"when":null,"then":{"type":"hold_ability","ability_id":"ability.alice.explosion","active":true}}}；\n'
+        '3. prioritize_attack → {"recognized":true,"message":"了解，优先普攻。","order":{"agent_id":"companion.alice","intent":"prioritize_attack","priority":50,"when":null,"then":{"type":"set_priority","mode":"basic_attack_first"}}}；\n'
+        '4. follow_keep_distance → {"recognized":true,"message":"好，跟上你并保持距离。","order":{"agent_id":"companion.alice","intent":"follow_keep_distance","priority":40,"when":null,"then":{"type":"follow","target":"party.player","keep_distance":true}}}；\n'
+        '5. retreat → {"recognized":true,"message":"知道了，先撤，优先保命。","order":{"agent_id":"companion.alice","intent":"retreat","priority":90,"when":null,"then":{"type":"retreat"}}}\n'
         "只有一条要求必须严格遵守：order 里引用的每个 ID 都必须来自上面的能力目录，"
         "否则这次解析无效。语气要符合战术指挥。"
     )

@@ -43,9 +43,9 @@ LLM_API_KEY=sk-xxxxxx
 from app.services.command_parser import parse_command
 
 for text in [
-    "艾琳，等 Boss 血量低于一半就开大",   # 规则里没有的新指令
-    "艾琳，敌人超过三个就先撤",           # 规则里没有的新指令
-    "艾琳，撤退并优先保命",               # 已知指令
+    "艾莉，等 Boss 血量低于一半就开大",   # 规则里没有的新指令
+    "艾莉，敌人超过三个就先撤",           # 规则里没有的新指令
+    "艾莉，撤退并优先保命",               # 已知指令
 ]:
     r = parse_command(text)
     print(text, "=>", r.recognized, "|", r.order.intent if r.order else r.message)
@@ -66,7 +66,7 @@ for text in [
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
   -ContentType "application/json" `
-  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾琳，等 Boss 血量低于一半就开大","context":{"catalog_revision":"dev-001","locale":"zh-CN","agents":[{"id":"companion.eirin","ability_ids":["ability.eirin.explosion","ability.eirin.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
+  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，等 Boss 血量低于一半就开大","context":{"catalog_revision":"dev-001","locale":"zh-CN","agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
 
 > 新指令能返回合法 `order`（如 `conditional_cast`）即联调通过。
@@ -76,7 +76,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 > ```powershell
 > Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
 >   -ContentType "application/json" `
->   -Body '{"text":"艾琳，等 Boss 血量低于一半就开大"}'
+>   -Body '{"text":"艾莉，等 Boss 血量低于一半就开大"}'
 > ```
 
 ---
@@ -85,9 +85,9 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 
 | 输入 | intent | 说明 |
 | --- | --- | --- |
-| 艾琳，等 Boss 血量低于一半就开大 | `conditional_cast` | 规则认不出，LLM 成功解析 |
-| 艾琳，敌人超过三个就先撤 | `retreat` | 新指令成功 |
-| 艾琳，撤退并优先保命 | `retreat` | 已知指令 |
+| 艾莉，等 Boss 血量低于一半就开大 | `conditional_cast` | 规则认不出，LLM 成功解析 |
+| 艾莉，敌人超过三个就先撤 | `retreat` | 新指令成功 |
+| 艾莉，撤退并优先保命 | `retreat` | 已知指令 |
 
 延迟约 0.6–1.4s/次（取决于网络与模型）。
 

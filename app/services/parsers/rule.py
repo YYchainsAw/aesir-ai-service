@@ -58,7 +58,7 @@ class _Catalog:
         selectors = set(context.target_selectors)
         states = set(context.state_tags)
 
-        # agent 已在目录：艾琳可控
+        # agent 已在目录：艾莉可控
         self.has_agent = AGENT in agent_ability_ids
         # 目录允许「爆裂魔法」这一技能
         self.has_explosion = ABILITY_EXPLOSION in agent_ability_ids.get(AGENT, set())
@@ -81,7 +81,7 @@ class RuleCommandParser(CommandParser):
     ) -> ParseCommandResponse:
         t = _normalize(text)
 
-        if not _has_any(t, "艾琳", "eirin"):
+        if not _has_any(t, "艾莉", "艾琳", "alice", "eirin"):
             return ParseCommandResponse(
                 request_id=request_id,
                 recognized=False,

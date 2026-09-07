@@ -48,7 +48,7 @@ def test_legacy_conditional_cast() -> None:
 
     order = body["order"]
     assert order["intent"] == "conditional_cast"
-    assert order["agent_id"] == "companion.eirin"
+    assert order["agent_id"] == "companion.alice"
     assert order["priority"] == 80
     assert order["when"] == {
         "type": "state_entered",
@@ -57,7 +57,7 @@ def test_legacy_conditional_cast() -> None:
     }
     assert order["then"] == {
         "type": "cast_ability",
-        "ability_id": "ability.eirin.explosion",
+        "ability_id": "ability.alice.explosion",
         "target": {"ref": "when.subject"},
     }
     # order_id 由 schema 生成，必须是合法 UUID 字符串
@@ -71,7 +71,7 @@ def test_legacy_hold_ability() -> None:
     assert _order_intent(response.json()) == "hold_ability"
     assert response.json()["order"]["then"] == {
         "type": "hold_ability",
-        "ability_id": "ability.eirin.explosion",
+        "ability_id": "ability.alice.explosion",
         "active": True,
     }
 
@@ -103,6 +103,13 @@ def test_legacy_retreat() -> None:
     assert _order_intent(response.json()) == "retreat"
     assert response.json()["order"]["then"] == {"type": "retreat"}
     assert response.json()["order"]["priority"] == 90
+
+
+def test_display_name_alias_alice_is_recognized() -> None:
+    """统一到 companion.alice/艾莉 后，旧名「艾琳」仍作为别名被识别（向后兼容）。"""
+    response = client.post("/parse-command", json={"text": "艾莉，撤退并优先保命"})
+
+    assert _order_intent(response.json()) == "retreat"
 
 
 def test_unknown_command_is_rejected_safely() -> None:
@@ -156,12 +163,12 @@ def test_golden_contract_per_section_8() -> None:
             "tag": "state.stunned",
         }, {
             "type": "cast_ability",
-            "ability_id": "ability.eirin.explosion",
+            "ability_id": "ability.alice.explosion",
             "target": {"ref": "when.subject"},
         }),
         "艾琳，这一整场都不要放爆裂魔法。": (60, None, {
             "type": "hold_ability",
-            "ability_id": "ability.eirin.explosion",
+            "ability_id": "ability.alice.explosion",
             "active": True,
         }),
         "艾琳，优先普通攻击。": (50, None, {
@@ -186,7 +193,7 @@ def test_golden_contract_per_section_8() -> None:
         assert body["recognized"] is True
         assert body["request_id"] == rid
         order = body["order"]
-        assert order["agent_id"] == "companion.eirin"
+        assert order["agent_id"] == "companion.alice"
         assert order["priority"] == priority
         assert order["when"] == when
         assert order["then"] == then
@@ -207,8 +214,8 @@ def test_v1_parse_rejects_catalog_oob_ability() -> None:
             "locale": "zh-CN",
             "agents": [
                 {
-                    "id": "companion.eirin",
-                    "ability_ids": ["ability.eirin.basic_attack"],
+                    "id": "companion.alice",
+                    "ability_ids": ["ability.alice.basic_attack"],
                 }
             ],
             "target_selectors": ["encounter.primary_hostile"],

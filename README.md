@@ -30,11 +30,11 @@
 
 | 指令 | intent | 动作 `then.type` |
 | --- | --- | --- |
-| 艾琳，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `cast_ability` |
-| 艾琳，保留爆裂魔法 | `hold_ability` | `hold_ability` |
-| 艾琳，撤退并优先保命 | `retreat` | `retreat` |
-| 艾琳，跟随我并保持距离 | `follow_keep_distance` | `follow` |
-| 艾琳，优先普通攻击 | `prioritize_attack` | `set_priority` |
+| 艾莉，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `cast_ability` |
+| 艾莉，保留爆裂魔法 | `hold_ability` | `hold_ability` |
+| 艾莉，撤退并优先保命 | `retreat` | `retreat` |
+| 艾莉，跟随我并保持距离 | `follow_keep_distance` | `follow` |
+| 艾莉，优先普通攻击 | `prioritize_attack` | `set_priority` |
 
 不识别的文本会明确返回 `recognized: false` 且 `order: null`，UE 端可安全忽略。
 
@@ -43,7 +43,7 @@
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
   -ContentType "application/json" `
-  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾琳，撤退并优先保命","context":{"agents":[{"id":"companion.eirin","ability_ids":["ability.eirin.explosion","ability.eirin.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
+  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，撤退并优先保命","context":{"agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
 
 ### 语音（真实 ASR）

@@ -10,7 +10,7 @@
 
 典型体验：
 
-> “艾琳，等 Boss 眩晕时使用爆裂魔法。”
+> “艾莉，等 Boss 眩晕时使用爆裂魔法。”
 
 ```text
 语音（可选） → ASR 转写 → LLM/规则解析 → TacticalOrder JSON
@@ -101,7 +101,7 @@ UE 再校验 → TacticalOrderComponent → BT/StateTree → GAS/技能系统
 ### 5.1 核心原则
 
 1. **LLM 输出不可信。** Python 和 UE 都必须校验。
-2. **显示名不进入协议。** 协议只使用稳定 ID；“艾琳”“爆裂魔法”只用于 UI 与 Prompt 映射。
+2. **显示名不进入协议。** 协议只使用稳定 ID；“艾莉”“爆裂魔法”只用于 UI 与 Prompt 映射。
 3. **能力目录与命令结构分离。** Schema 定义字段；UE 能力目录决定哪些 ID 当前可用。
 4. **低频命令、事件驱动执行。** 仅在按住说话结束或文本提交时请求服务，禁止 Tick 请求。
 5. **UE 最终裁决。** 即使命令合法，也必须检查目标存活、距离、资源、冷却和角色状态。
@@ -111,9 +111,9 @@ UE 再校验 → TacticalOrderComponent → BT/StateTree → GAS/技能系统
 所有 ID 使用小写英文与点号分层：
 
 ```text
-角色：companion.eirin
-技能：ability.eirin.explosion
-技能：ability.eirin.basic_attack
+角色：companion.alice
+技能：ability.alice.explosion
+技能：ability.alice.basic_attack
 状态：state.stunned
 状态：state.phase_two
 目标选择器：encounter.primary_hostile
@@ -155,16 +155,16 @@ Content-Type: application/json
 {
   "protocol_version": "0.1",
   "request_id": "1fad2e69-4a2d-4308-ad4f-2f8abb338b89",
-  "text": "艾琳，等 Boss 眩晕时使用爆裂魔法。",
+  "text": "艾莉，等 Boss 眩晕时使用爆裂魔法。",
   "context": {
     "catalog_revision": "dev-001",
     "locale": "zh-CN",
     "agents": [
       {
-        "id": "companion.eirin",
+        "id": "companion.alice",
         "ability_ids": [
-          "ability.eirin.explosion",
-          "ability.eirin.basic_attack"
+          "ability.alice.explosion",
+          "ability.alice.basic_attack"
         ]
       }
     ],
@@ -181,10 +181,10 @@ Content-Type: application/json
   "protocol_version": "0.1",
   "request_id": "1fad2e69-4a2d-4308-ad4f-2f8abb338b89",
   "recognized": true,
-  "message": "艾琳将在主要敌人眩晕时施放爆裂魔法。",
+  "message": "艾莉将在主要敌人眩晕时施放爆裂魔法。",
   "order": {
     "order_id": "ea876be5-d861-4064-8f64-4ccb8a74db99",
-    "agent_id": "companion.eirin",
+    "agent_id": "companion.alice",
     "intent": "conditional_cast",
     "when": {
       "type": "state_entered",
@@ -193,7 +193,7 @@ Content-Type: application/json
     },
     "then": {
       "type": "cast_ability",
-      "ability_id": "ability.eirin.explosion",
+      "ability_id": "ability.alice.explosion",
       "target": { "ref": "when.subject" }
     },
     "priority": 80,
@@ -240,7 +240,7 @@ Content-Type: multipart/form-data
 ```json
 {
   "request_id": "1fad2e69-4a2d-4308-ad4f-2f8abb338b89",
-  "text": "艾琳，等 Boss 眩晕时使用爆裂魔法。",
+  "text": "艾莉，等 Boss 眩晕时使用爆裂魔法。",
   "language": "zh"
 }
 ```
@@ -369,7 +369,7 @@ TacticalOrder（等待眩晕施法）
 
 ### P1：冻结联调协议（已完成 ✅）
 
-- 按第 6 节将现有硬编码 `Eirin/Boss/Explosion` 的 `Literal` Schema 改为 ID 字符串。
+- 按第 6 节将现有硬编码占位符的 `Literal` Schema 改为 ID 字符串。
 - 增加 `request_id`、`catalog_revision`、`context` 与 `order_id`。
 - 新增 `/v1/commands/parse`，原 `/parse-command` 暂作兼容入口。
 - 为协议示例、非法 ID、未知 ID、版本不支持增加测试。
@@ -390,7 +390,7 @@ TacticalOrder（等待眩晕施法）
 - 接入真实 `LLMCommandParser`，但保留规则解析器回退。（已接入并实测，见 `docs/LLM-联调指南.md`）
 - 建立至少 30 条中文有效/无效战术命令测试集。（待建；现有 pytest 已覆盖 golden 正/负例）
 
-**验收：** 文本“艾琳，等 Boss 眩晕时使用爆裂魔法”能被模型正确转换、UE 验证、队友执行；模型不可用时规则命令仍可执行。
+**验收：** 文本“艾莉，等 Boss 眩晕时使用爆裂魔法”能被模型正确转换、UE 验证、队友执行；模型不可用时规则命令仍可执行。
 
 ### P4：Push-to-Talk 与 ASR（Python 侧已打通组合端点，UE 侧待做）
 

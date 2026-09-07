@@ -175,8 +175,8 @@
     "locale": "zh-CN",
     "agents": [
       {
-        "id": "companion.eirin",
-        "ability_ids": ["ability.eirin.explosion", "ability.eirin.basic_attack"]
+        "id": "companion.alice",
+        "ability_ids": ["ability.alice.explosion", "ability.alice.basic_attack"]
       }
     ],
     "target_selectors": ["encounter.primary_hostile", "party.player"],
@@ -187,14 +187,14 @@
 
 ### 8.1 `conditional_cast`（唯一带 `when` 的意图）
 
-**请求 text：** `艾琳，等 Boss 眩晕时使用爆裂魔法。`
+**请求 text：** `艾莉，等 Boss 眩晕时使用爆裂魔法。`
 
 **响应 order：**
 
 ```json
 {
   "order_id": "ea876be5-d861-4064-8f64-4ccb8a74db99",
-  "agent_id": "companion.eirin",
+  "agent_id": "companion.alice",
   "intent": "conditional_cast",
   "when": {
     "type": "state_entered",
@@ -203,7 +203,7 @@
   },
   "then": {
     "type": "cast_ability",
-    "ability_id": "ability.eirin.explosion",
+    "ability_id": "ability.alice.explosion",
     "target": { "ref": "when.subject" }
   },
   "priority": 80,
@@ -213,19 +213,19 @@
 
 ### 8.2 `hold_ability`
 
-**请求 text：** `艾琳，这一整场都不要放爆裂魔法。`
+**请求 text：** `艾莉，这一整场都不要放爆裂魔法。`
 
 **响应 order：**
 
 ```json
 {
   "order_id": "9f1b8c3a-c2d4-4f6e-8a0b-5e3d7f9c11a2",
-  "agent_id": "companion.eirin",
+  "agent_id": "companion.alice",
   "intent": "hold_ability",
   "when": null,
   "then": {
     "type": "hold_ability",
-    "ability_id": "ability.eirin.explosion",
+    "ability_id": "ability.alice.explosion",
     "active": true
   },
   "priority": 60,
@@ -235,14 +235,14 @@
 
 ### 8.3 `prioritize_attack`
 
-**请求 text：** `艾琳，优先普通攻击。`
+**请求 text：** `艾莉，优先普通攻击。`
 
 **响应 order：**
 
 ```json
 {
   "order_id": "4d7a2ef1-9b3c-4c5d-8e6f-0a2b4c6d8e10",
-  "agent_id": "companion.eirin",
+  "agent_id": "companion.alice",
   "intent": "prioritize_attack",
   "when": null,
   "then": {
@@ -256,14 +256,14 @@
 
 ### 8.4 `follow_keep_distance`
 
-**请求 text：** `艾琳，跟着我并保持距离。`
+**请求 text：** `艾莉，跟着我并保持距离。`
 
 **响应 order：**
 
 ```json
 {
   "order_id": "b1c2d3e4-5f67-489a-bcde-f01234567890",
-  "agent_id": "companion.eirin",
+  "agent_id": "companion.alice",
   "intent": "follow_keep_distance",
   "when": null,
   "then": {
@@ -278,14 +278,14 @@
 
 ### 8.5 `retreat`
 
-**请求 text：** `艾琳，撤退并优先保命。`
+**请求 text：** `艾莉，撤退并优先保命。`
 
 **响应 order：**
 
 ```json
 {
   "order_id": "c3d4e5f6-7089-4bcd-ef01-234567890123",
-  "agent_id": "companion.eirin",
+  "agent_id": "companion.alice",
   "intent": "retreat",
   "when": null,
   "then": {

@@ -10,7 +10,7 @@ from app.services.parsers.llm import LLMCommandParser, LLMError
 # 一个合法的 v0.1 conditional_cast order（全部 ID 命中 DEFAULT_CONTEXT 目录）
 VALID_ORDER = {
     "order": {
-        "agent_id": "companion.eirin",
+        "agent_id": "companion.alice",
         "priority": 80,
         "intent": "conditional_cast",
         "when": {
@@ -20,7 +20,7 @@ VALID_ORDER = {
         },
         "then": {
             "type": "cast_ability",
-            "ability_id": "ability.eirin.explosion",
+            "ability_id": "ability.alice.explosion",
             "target": {"ref": "when.subject"},
         },
     }
@@ -78,7 +78,7 @@ def test_out_of_catalog_ability_raises_llm_error() -> None:
     # 能力目录里没有该技能 → 目录越界校验拒绝
     bad = {
         "order": {
-            "agent_id": "companion.eirin",
+            "agent_id": "companion.alice",
             "intent": "conditional_cast",
             "when": {
                 "type": "state_entered",
@@ -87,7 +87,7 @@ def test_out_of_catalog_ability_raises_llm_error() -> None:
             },
             "then": {
                 "type": "cast_ability",
-                "ability_id": "ability.eirin.nuke",  # 不在白名单
+                "ability_id": "ability.alice.nuke",  # 不在白名单
                 "target": {"ref": "when.subject"},
             },
         },
@@ -104,7 +104,7 @@ def test_unknown_agent_raises_llm_error() -> None:
             "agent_id": "companion.not_here",
             "intent": "hold_ability",
             "when": None,
-            "then": {"type": "hold_ability", "ability_id": "ability.eirin.explosion"},
+            "then": {"type": "hold_ability", "ability_id": "ability.alice.explosion"},
         },
     }
     parser = LLMCommandParser(StubLLMClient(_payload(**bad)))

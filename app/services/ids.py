@@ -4,9 +4,9 @@
 能力目录是否允许某条命令，LLM 解析器据此校验响应是否越界。
 """
 
-AGENT = "companion.eirin"
-ABILITY_EXPLOSION = "ability.eirin.explosion"
-ABILITY_BASIC_ATTACK = "ability.eirin.basic_attack"
+AGENT = "companion.alice"
+ABILITY_EXPLOSION = "ability.alice.explosion"
+ABILITY_BASIC_ATTACK = "ability.alice.basic_attack"
 
 SELECTOR_PRIMARY_HOSTILE = "encounter.primary_hostile"
 SELECTOR_PLAYER = "party.player"

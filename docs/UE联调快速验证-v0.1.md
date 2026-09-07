@@ -27,7 +27,7 @@
 `.env` 或环境变量（也可不设，mock 为默认）：
 
 ```powershell
-$env:AESIR_ASR_MOCK_TEXT = "艾琳，撤退并优先保命"
+$env:AESIR_ASR_MOCK_TEXT = "艾莉，撤退并优先保命"
 ```
 
 UE 上传任意 WAV（16kHz/单声道/16bit，内容不重要）到：
@@ -48,7 +48,7 @@ $env:HF_ENDPOINT = "https://hf-mirror.com"      # 首次下载模型
 $env:AESIR_ASR_BACKEND = "faster_whisper"
 ```
 
-用真人录音（「艾琳，撤退并优先保命」等）替换 mock 文本验证。转写质量调优见
+用真人录音（「艾莉，撤退并优先保命」等）替换 mock 文本验证。转写质量调优见
 `scripts/asr_eval.py`（样本放 `data/asr_samples/`，文件名即期望文本）。
 
 验收：一句指令端到端 < 3s（`small` 模型本机约 0.5s）；识别错句时确认走

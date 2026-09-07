@@ -44,8 +44,8 @@ DEFAULT_CONTEXT = ParseCommandContext(
     locale="zh-CN",
     agents=[
         ContextAgent(
-            id="companion.eirin",
-            ability_ids=["ability.eirin.explosion", "ability.eirin.basic_attack"],
+            id="companion.alice",
+            ability_ids=["ability.alice.explosion", "ability.alice.basic_attack"],
         )
     ],
     target_selectors=["encounter.primary_hostile", "party.player"],
@@ -131,7 +131,7 @@ class _OrderBase(BaseModel):
 
 
 class ConditionalCast(_OrderBase):
-    """1. 艾琳，等 Boss 眩晕时使用爆裂魔法。"""
+    """1. 艾莉，等 Boss 眩晕时使用爆裂魔法。"""
 
     intent: Literal["conditional_cast"] = "conditional_cast"
     when: WhenStateEntered
@@ -139,7 +139,7 @@ class ConditionalCast(_OrderBase):
 
 
 class HoldAbility(_OrderBase):
-    """2. 艾琳，保留爆裂魔法。"""
+    """2. 艾莉，保留爆裂魔法。"""
 
     intent: Literal["hold_ability"] = "hold_ability"
     when: None = None
@@ -147,7 +147,7 @@ class HoldAbility(_OrderBase):
 
 
 class PrioritizeAttack(_OrderBase):
-    """3. 艾琳，优先普通攻击。"""
+    """3. 艾莉，优先普通攻击。"""
 
     intent: Literal["prioritize_attack"] = "prioritize_attack"
     when: None = None
@@ -155,7 +155,7 @@ class PrioritizeAttack(_OrderBase):
 
 
 class FollowKeepDistance(_OrderBase):
-    """4. 艾琳，跟随我并保持距离。"""
+    """4. 艾莉，跟随我并保持距离。"""
 
     intent: Literal["follow_keep_distance"] = "follow_keep_distance"
     when: None = None
@@ -163,7 +163,7 @@ class FollowKeepDistance(_OrderBase):
 
 
 class Retreat(_OrderBase):
-    """5. 艾琳，撤退并优先保命。"""
+    """5. 艾莉，撤退并优先保命。"""
 
     intent: Literal["retreat"] = "retreat"
     when: None = None
