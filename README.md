@@ -66,7 +66,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退等（44 通过 + 2 条真机 ASR 冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
+覆盖契约 v0.1、语音链路、LLM 回退等（50 通过 + 2 条真机 ASR 冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`。
 
 ## 调试
 

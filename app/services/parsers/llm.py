@@ -37,6 +37,21 @@ def _build_system_prompt(context: ParseCommandContext) -> str:
     selectors = ", ".join(repr(x) for x in context.target_selectors)
     states = ", ".join(repr(x) for x in context.state_tags)
 
+    # golden 示例的 ID 必须取自本次请求的目录（而非硬编码），否则目录不含
+    # 默认 agent 时示例会误导 LLM 输出越界 ID。目录为空时退化为占位说明。
+    if context.agents and context.agents[0].ability_ids and context.target_selectors:
+        ex_agent = context.agents[0].id
+        ex_ability = context.agents[0].ability_ids[0]
+        ex_selector = context.target_selectors[0]
+        # follow 示例优先用玩家侧选择器，语义更自然
+        ex_player = next(
+            (s for s in context.target_selectors if "player" in s),
+            context.target_selectors[0],
+        )
+        ex_state = context.state_tags[0] if context.state_tags else "state.stunned"
+    else:
+        ex_agent = ex_ability = ex_selector = ex_player = ex_state = "<目录中的ID>"
+
     return (
         "你是一名游戏《Aesir》的战术指令解析器。玩家指令都发给队友。"
         "请把中文自然语言指令解析为受限 JSON，只输出 JSON，不要任何解释、代码块或说明。\n\n"
@@ -59,14 +74,15 @@ def _build_system_prompt(context: ParseCommandContext) -> str:
         "4. follow_keep_distance：when=null，"
         'then={"type":"follow","target":"party.player","keep_distance":true}。\n'
         "5. retreat：when=null，then={\"type\":\"retreat\"}。\n\n"
-        "golden 示例（用上目录的 ID 替换占位；message 用简洁中文）：\n"
-        '1. conditional_cast → {"recognized":true,"message":"好，等Boss眩晕时释放爆裂魔法。","order":{"agent_id":"companion.alice","intent":"conditional_cast","priority":80,"when":{"type":"state_entered","subject":"encounter.primary_hostile","tag":"state.stunned"},"then":{"type":"cast_ability","ability_id":"ability.alice.explosion","target":{"ref":"when.subject"}}}}；\n'
-        '2. hold_ability → {"recognized":true,"message":"明白，保留爆裂魔法。","order":{"agent_id":"companion.alice","intent":"hold_ability","priority":60,"when":null,"then":{"type":"hold_ability","ability_id":"ability.alice.explosion","active":true}}}；\n'
-        '3. prioritize_attack → {"recognized":true,"message":"了解，优先普攻。","order":{"agent_id":"companion.alice","intent":"prioritize_attack","priority":50,"when":null,"then":{"type":"set_priority","mode":"basic_attack_first"}}}；\n'
-        '4. follow_keep_distance → {"recognized":true,"message":"好，跟上你并保持距离。","order":{"agent_id":"companion.alice","intent":"follow_keep_distance","priority":40,"when":null,"then":{"type":"follow","target":"party.player","keep_distance":true}}}；\n'
-        '5. retreat → {"recognized":true,"message":"知道了，先撤，优先保命。","order":{"agent_id":"companion.alice","intent":"retreat","priority":90,"when":null,"then":{"type":"retreat"}}}\n'
+        "golden 示例（ID 取自本次请求的能力目录；message 用简洁中文）：\n"
+        f'1. conditional_cast → {{"recognized":true,"message":"好，等Boss眩晕时释放爆裂魔法。","order":{{"agent_id":"{ex_agent}","intent":"conditional_cast","priority":80,"when":{{"type":"state_entered","subject":"{ex_selector}","tag":"{ex_state}"}},"then":{{"type":"cast_ability","ability_id":"{ex_ability}","target":{{"ref":"when.subject"}}}}}}}}；\n'
+        f'2. hold_ability → {{"recognized":true,"message":"明白，保留技能。","order":{{"agent_id":"{ex_agent}","intent":"hold_ability","priority":60,"when":null,"then":{{"type":"hold_ability","ability_id":"{ex_ability}","active":true}}}}}}；\n'
+        f'3. prioritize_attack → {{"recognized":true,"message":"了解，优先普攻。","order":{{"agent_id":"{ex_agent}","intent":"prioritize_attack","priority":50,"when":null,"then":{{"type":"set_priority","mode":"basic_attack_first"}}}}}}；\n'
+        f'4. follow_keep_distance → {{"recognized":true,"message":"好，跟上你并保持距离。","order":{{"agent_id":"{ex_agent}","intent":"follow_keep_distance","priority":40,"when":null,"then":{{"type":"follow","target":"{ex_player}","keep_distance":true}}}}}}；\n'
+        f'5. retreat → {{"recognized":true,"message":"知道了，先撤，优先保命。","order":{{"agent_id":"{ex_agent}","intent":"retreat","priority":90,"when":null,"then":{{"type":"retreat"}}}}}}\n'
         "只有一条要求必须严格遵守：order 里引用的每个 ID 都必须来自上面的能力目录，"
-        "否则这次解析无效。语气要符合战术指挥。"
+        "否则这次解析无效。玩家指令提到的技能或目标不在能力目录中时，"
+        "必须返回 recognized:false，不得用目录中的其他技能替代。语气要符合战术指挥。"
     )
 
 

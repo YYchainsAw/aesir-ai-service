@@ -37,7 +37,7 @@
 - `LLMCommandParser`：共享 OpenAI 兼容 `LLMClient`（默认 DeepSeek），输出严格 Pydantic 校验 + 目录越界拦截；失败/不确定时回退规则解析器（`source: rule_fallback`）。
 - `POST /v1/voice/command` 组合端点：音频 → ASR → 同一解析层；`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper（`small` 模型，已端到端验证），`mock` 返回固定文本。
 - `POST /v1/companion/chat` 非战斗陪伴对话（mock / llm 后端，YAML 人设）。
-- pytest 全绿：44 通过 + 2 条真机 ASR 冒烟（`AESIR_ASR_SMOKE=1` 门控，默认跳过）。
+- pytest 全绿：50 通过 + 2 条真机 ASR 冒烟（`AESIR_ASR_SMOKE=1` 门控，默认跳过）。
 - `.env.example`、运行时/ML/开发测试依赖拆分、接口测试与中文文档。
 
 ### 当前阻塞
@@ -47,8 +47,7 @@
 ### 尚未开始
 
 - UE 侧 HTTP 客户端、`FTacticalOrder`、队友任务组件与 Boss 状态事件。
-- 专用 `POST /v1/speech/transcribe` 端点（组合端点已可用，见 §6.3）。
-- 真实中文人声的 ASR 命中率与延迟调优（当前仅验证到正弦波端到端降级路径）。
+- ~~真实中文人声的 ASR 命中率与延迟调优~~（已取消，见开发记录 2026-09-07）。
 - 模型评测集（≥30 条中文有效/无效战术命令）。
 - RL 训练环境、奖励函数、ONNX 导出与 UE 推理。
 
@@ -365,7 +364,7 @@ TacticalOrder（等待眩晕施法）
 - 为现有 `/health` 和 `/parse-command` 保留回归测试。
 - 在 README 记录本地启动、测试和 `.env` 使用方式。
 
-**验收（已达成）：** `pytest -q` 44 通过 + 2 条真机冒烟跳过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
+**验收（已达成）：** `pytest -q` 50 通过 + 2 条真机冒烟跳过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
 
 ### P1：冻结联调协议（已完成 ✅）
 

@@ -24,7 +24,7 @@ AESIR_PARSER_BACKEND=llm
 # DeepSeek（OpenAI 兼容）。换 Qwen/Ark 只需改下面两项
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
-LLM_TIMEOUT_SECONDS=30
+LLM_TIMEOUT_SECONDS=15
 
 # 你的真实 key（必填）
 LLM_API_KEY=sk-xxxxxx

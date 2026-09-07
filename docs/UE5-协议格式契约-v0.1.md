@@ -36,7 +36,9 @@
   "request_id": "<uuid4 回显，来自请求>",
   "recognized": true,
   "message": "<给 UE HUD 的中文说明，仅展示用途，不作为逻辑字段>",
-  "order": { "order_id": "<uuid4>", "...see §3" }
+  "source": "rule | llm | rule_fallback",
+  "order": { "order_id": "<uuid4>", "...see §3" },
+  "companion_reply": { "reply_text": "...", "emotion_id": "..." }
 }
 ```
 
@@ -46,7 +48,9 @@
 | `request_id` | string(uuid4) | 必须原样回显请求的 `request_id`；格式校验失败按 422 |
 | `recognized` | boolean | `false` 时 `order` 必须为 `null`，且仍 HTTP 200 |
 | `message` | string | 仅 UI 用，不含可被 UE/LLM 逻辑依赖的内容 |
+| `source` | string | `rule` / `llm` / `rule_fallback`（LLM 失败回退规则的标记），供 UE 日志与降级观测 |
 | `order` | order 判别联合 \| null | `recognized=false` 时必为 `null` |
+| `companion_reply` | object \| null | 队友人设确认回复 `{reply_text, emotion_id}`（见 `data/companions/` YAML）；`recognized=false` 时为 `null`。UE 可仅取 `reply_text`/`emotion_id` 做字幕与表情 |
 
 ---
 
