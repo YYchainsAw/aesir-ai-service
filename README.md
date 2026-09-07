@@ -22,6 +22,7 @@
 | --- | --- | --- |
 | `POST` | `/v1/commands/parse` | 契约 v0.1：文本 + 能力目录 `context` + `request_id` |
 | `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
+| `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
@@ -55,6 +56,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 ```
 
 默认 `AESIR_ASR_BACKEND=mock` 返回 `AESIR_ASR_MOCK_TEXT` 固定文本，用于无模型环境自测。
+
+真人声调优：录音（文件名即期望文本）放 `data/asr_samples/`，跑 `.\.venv\Scripts\python scripts\asr_eval.py` 对比模型/beam/VAD 组合的 CER 与耗时（详见 `docs/启动说明.md` §5.3.2）。
 
 ## 测试
 

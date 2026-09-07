@@ -194,7 +194,7 @@ Content-Type: application/json
     "then": {
       "type": "cast_ability",
       "ability_id": "ability.eirin.explosion",
-      "target": "when.subject"
+      "target": { "ref": "when.subject" }
     },
     "priority": 80,
     "expires": {
@@ -247,7 +247,7 @@ Content-Type: multipart/form-data
 
 UE 收到转写后再调用 `/v1/commands/parse`。两步请求便于单独调试 ASR 和 LLM；后期若需要压缩调用，可由 Python 添加组合端点，但不得删除这两个基础端点。
 
-> **现状**：已实现组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`），内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。`AESIR_ASR_BACKEND=faster_whisper` 时走真实本机 Whisper 转写（默认 `small` 模型，已端到端验证），`mock` 返回固定文本用于自测。专用 `POST /v1/speech/transcribe` 端点尚未实现（待办）。
+> **现状**：已实现组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`），内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。`AESIR_ASR_BACKEND=faster_whisper` 时走真实本机 Whisper 转写（默认 `small` 模型，已端到端验证），`mock` 返回固定文本用于自测。专用 `POST /v1/speech/transcribe` 已实现（multipart 字段 `audio` + 可选 `request_id`/`locale`，返回 `{request_id, text, language}`），与组合端点并存，长期保留。
 
 ## 7. TacticalOrder 语义
 
@@ -395,7 +395,7 @@ TacticalOrder（等待眩晕施法）
 ### P4：Push-to-Talk 与 ASR（Python 侧已打通组合端点，UE 侧待做）
 
 - UE Audio Capture 采集与 WAV 编码。（待 UE 侧）
-- `/v1/speech/transcribe` 和 ASR Adapter。（ASR 已接线 faster-whisper；专用 `/v1/speech/transcribe` 端点待做，组合端点 `/v1/voice/command` 已可用）
+- `/v1/speech/transcribe` 和 ASR Adapter。（ASR 已接线 faster-whisper；专用 `/v1/speech/transcribe` 端点已实现，组合端点 `/v1/voice/command` 已可用）
 - HUD 显示录音中、转写文本、解析中、命令已接受/拒绝。（待 UE 侧）
 
 **验收：** 按住说话到命令入队全链路不阻塞游戏主线程；失败能给出可理解反馈。
