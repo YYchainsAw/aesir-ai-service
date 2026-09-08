@@ -129,6 +129,40 @@ tactical_acknowledgements:
     reply_text: "跟紧你就行，放心，我会留好施法距离。"
     emotion_id: emotion.bright
 
+# v0.2 /v1/combat/events 的战斗事件反应（草案 §6）。由服务端按 event_type
+# 读取；ID 必须在下方三个白名单内，否则服务端回退到安全默认反应。
+combat_event_reactions:
+  player_hp_critical:
+    reply_text: "撑住！我这就把你拉回来！"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.concerned
+  boss_stun_near:
+    reply_text: "快了快了，再控一下它就要露出破绽了！"
+    emotion_id: emotion.excited
+    gesture_id: gesture.enthusiastic_nod
+    facial_expression_id: face.excited
+  boss_stunned:
+    reply_text: "就是现在！它动不了了，我们一起解决它！"
+    emotion_id: emotion.excited
+    gesture_id: gesture.enthusiastic_nod
+    facial_expression_id: face.excited
+  boss_enraged:
+    reply_text: "小心！它狂暴了，先稳住别硬拼！"
+    emotion_id: emotion.serious
+    gesture_id: gesture.fold_arms
+    facial_expression_id: face.serious
+  companion_mp_low:
+    reply_text: "我的蓝有点不够了，接下来省着点用。"
+    emotion_id: emotion.thoughtful
+    gesture_id: gesture.think
+    facial_expression_id: face.thoughtful
+  boss_defeated:
+    reply_text: "赢了！我就说我们可以的吧！"
+    emotion_id: emotion.excited
+    gesture_id: gesture.enthusiastic_nod
+    facial_expression_id: face.excited
+
 allowed_emotion_ids:
   - id: emotion.bright
     description: "默认的开朗、积极状态。"
