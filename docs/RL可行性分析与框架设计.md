@@ -50,7 +50,6 @@ rl/（顶层包，服务进程物理上不会 import）
   ├─ rewards.py       纯函数奖励
   ├─ features.py      CombatContext → 17 维观测（L2）
   ├─ env.py           AliceBossEnv（Gymnasium，L2）
-  ├─ storage.py       轨迹 JSONL（训练侧，与回执存储分离）
   └─ eval_utils.py    跑 N 局 + 指标聚合
 scripts/rl_train.py  PPO 训练（L3）
 scripts/rl_eval.py   A/B 评测（L3）
@@ -121,7 +120,6 @@ A/B 结论对它敏感**（信息不对称：规则基线知道的东西和线�
 | 通道 | 归属 | 格式 | 用途 |
 | --- | --- | --- | --- |
 | `POST /v1/tactical/executions` | 服务侧（UE 真实数据） | `data/rl/executions/{YYYYMMDD}.jsonl` | 未来 bandit/离线 RL 的原始信号；**不自动用于训练**（草案 §7） |
-| `TrajectoryWriter` | 训练侧（sim 数据） | `data/rl/trajectories/{YYYYMMDD}.jsonl` | 训练过程记录；`.gitignore` 不入库 |
 
 回执数据使用纪律（继承草案 §7）：必须经**筛选和人工评测**才能进训练集；
 `policy_revision` 字段贯穿决策与回执，可区分 rule/rl 来源。

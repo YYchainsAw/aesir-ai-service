@@ -40,8 +40,7 @@ _TYPE_TO_ACTION = {"retreat": ACTION_RETREAT, "follow": ACTION_NOOP, "hold_abili
 class RulePolicyAdapter:
     """A/B 的规则基线：直接复用生产 resolver，无任何 RL 依赖。"""
 
-    def _intent_for(self, state: SimState) -> str:
-        ctx = state.to_context()
+    def _intent_for(self, state: SimState, ctx) -> str:
         if state.player_hp <= PLAYER_HP_CRITICAL:
             return "support_heal_player"
         if state.boss_stunned:
@@ -53,13 +52,17 @@ class RulePolicyAdapter:
         return "focus_fire_boss"
 
     def select_action(self, obs, state: SimState) -> int:
-        """obs 忽略（规则策略读状态而非观测向量）；PPO 侧同样签名，eval 可互换。"""
+        """obs 忽略（规则策略读状态而非观测向量）；PPO 侧同样签名，eval 可互换。
+
+        每次调用只构造一份 CombatContext：意图映射与 resolver 共用。
+        """
+        ctx = state.to_context()
         intent = TacticalIntent(
-            intent_id=self._intent_for(state),  # type: ignore[arg-type]
+            intent_id=self._intent_for(state, ctx),  # type: ignore[arg-type]
             target_id="party.player",
             parse_confidence=1.0,
         )
-        decision = resolve_intent(intent, state.to_context())
+        decision = resolve_intent(intent, ctx)
         action = decision.action
         if action is None or decision.status != "actionable":
             return ACTION_BASIC_ATTACK  # 无事可做时保持输出（积累眩晕）

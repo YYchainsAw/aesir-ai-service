@@ -51,7 +51,16 @@ def main() -> None:
         verbose=0,
     )
 
-    # 分段 learn：每段之间打印一次规则基线对照分（A/B 的训练期参考）
+    # 规则基线是确定性的、训练期间不变：只测一次作为对照锚点。
+    baseline = evaluate_policy(BossSim(seed=args.seed), RulePolicyAdapter(), episodes=args.eval_episodes)
+    print(
+        f"规则基线：mean_reward={baseline.mean_reward:.2f} win_rate={baseline.win_rate:.2f} "
+        f"mean_ticks={baseline.mean_ticks:.1f} stun_burst_rate={baseline.explosion_in_stun_rate:.2f}"
+    )
+
+    # 分段 learn：每段之间评测当前 PPO（训练期进度可见；正式 A/B 用 scripts/rl_eval.py）
+    from scripts.rl_eval import _PPOPolicyAdapter
+
     remaining = args.timesteps
     done_steps = 0
     while remaining > 0:
@@ -59,23 +68,17 @@ def main() -> None:
         model.learn(total_timesteps=chunk, reset_num_timesteps=False, progress_bar=False)
         done_steps += chunk
         remaining -= chunk
-        report = evaluate_policy(BossSim(seed=args.seed), RulePolicyAdapter(), episodes=args.eval_episodes)
+        report = evaluate_policy(
+            BossSim(seed=args.seed), _PPOPolicyAdapter(model), episodes=args.eval_episodes
+        )
         print(
-            f"[{done_steps}/{args.timesteps}] 规则基线对照："
-            f"mean_reward={report.mean_reward:.2f} win_rate={report.win_rate:.2f} "
-            f"stun_burst_rate={report.explosion_in_stun_rate:.2f}"
+            f"[{done_steps}/{args.timesteps}] PPO 进度："
+            f"mean_reward={report.mean_reward:.2f} (基线 {baseline.mean_reward:.2f}) "
+            f"win_rate={report.win_rate:.2f} stun_burst_rate={report.explosion_in_stun_rate:.2f}"
         )
 
     model.save(str(model_path))
     print(f"模型已保存：{model_path}.zip")
-
-    # 训练后规则基线最终分（训练日志可见性兜底；正式 A/B 用 scripts/rl_eval.py）
-    report = evaluate_policy(BossSim(seed=args.seed), RulePolicyAdapter(), episodes=args.eval_episodes)
-    print(
-        f"规则基线最终分：mean_reward={report.mean_reward:.2f} "
-        f"win_rate={report.win_rate:.2f} mean_ticks={report.mean_ticks:.1f} "
-        f"stun_burst_rate={report.explosion_in_stun_rate:.2f}"
-    )
 
 
 if __name__ == "__main__":
