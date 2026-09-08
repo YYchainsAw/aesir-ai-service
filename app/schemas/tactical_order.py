@@ -18,11 +18,15 @@ PROTOCOL_VERSION = "0.1"
 # 请求：携带玩家文本与 UE 能力目录
 # ---------------------------------------------------------------------------
 class ContextAgent(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     id: str
     ability_ids: list[str]
 
 
 class ParseCommandContext(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     catalog_revision: str = "dev-001"
     locale: str = "zh-CN"
     agents: list[ContextAgent]
@@ -56,6 +60,8 @@ DEFAULT_CONTEXT = ParseCommandContext(
 # 引用对象：允许 then.target 引用已解析的 when.subject（契约 §7.2）
 # ---------------------------------------------------------------------------
 class TargetRef(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     ref: Literal["when.subject"]
 
 
@@ -63,6 +69,8 @@ class TargetRef(BaseModel):
 # when 判别联合（v0.1 只交付 state_entered）
 # ---------------------------------------------------------------------------
 class WhenStateEntered(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["state_entered"] = "state_entered"
     subject: str
     tag: str
@@ -74,29 +82,39 @@ When: TypeAlias = Annotated[WhenStateEntered, Field(discriminator="type")]
 # then 判别联合（与既有动作词表一比一映射）
 # ---------------------------------------------------------------------------
 class CastAbilityAction(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["cast_ability"] = "cast_ability"
     ability_id: str
     target: str | TargetRef
 
 
 class HoldAbilityAction(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["hold_ability"] = "hold_ability"
     ability_id: str
     active: bool = True
 
 
 class SetPriorityAction(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["set_priority"] = "set_priority"
     mode: Literal["basic_attack_first", "ability_first"] = "basic_attack_first"
 
 
 class FollowAction(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["follow"] = "follow"
     target: str
     keep_distance: bool = True
 
 
 class RetreatAction(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["retreat"] = "retreat"
 
 
@@ -115,6 +133,8 @@ Then: TypeAlias = Annotated[
 # expires 判别联合（v0.1 只交付 encounter_end）
 # ---------------------------------------------------------------------------
 class ExpiresEnd(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     type: Literal["encounter_end"] = "encounter_end"
 
 
@@ -124,6 +144,8 @@ Expires: TypeAlias = Annotated[ExpiresEnd, Field(discriminator="type")]
 # order 判别联合（按 intent）
 # ---------------------------------------------------------------------------
 class _OrderBase(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     order_id: UUID = Field(default_factory=uuid4)
     agent_id: str
     priority: int = Field(50, ge=0, le=100)
@@ -199,6 +221,8 @@ class ParseCommandResponse(BaseModel):
 
 
 class TacticalAcknowledgement(BaseModel):
+
+    model_config = ConfigDict(extra="forbid")
     """队友对已接受战术命令的短回应，由人设配置生成。"""
 
     reply_text: str

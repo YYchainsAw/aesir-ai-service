@@ -56,3 +56,27 @@ def test_companion_chat_requires_text() -> None:
     response = client.post("/v1/companion/chat", json={"text": ""})
 
     assert response.status_code == 422
+
+
+def test_corrupt_profile_yaml_returns_503_not_500(monkeypatch, tmp_path) -> None:
+    # 回归锁定（开发记录 2026-09-07 已知未修项）：YAML 损坏 → 503 配置错误，
+    # 而不是未捕获 CompanionProfileError 导致的 500。
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+    from app.services.companion import profile_repository as pr
+
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("identity: {id: [unclosed", encoding="utf-8")
+    # __init__ 的默认路径在 import 时已绑定，须替换构造逻辑指向坏文件。
+    monkeypatch.setattr(
+        pr.CompanionProfileRepository, "__init__", lambda self: setattr(self, "_profile_path", bad)
+    )
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post(
+        "/v1/companion/chat",
+        json={"text": "你好", "companion_id": "companion.alice", "game_state": "exploration"},
+    )
+    assert response.status_code == 503
+    assert "profile" in response.json()["detail"].lower()

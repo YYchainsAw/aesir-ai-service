@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aesir-ai-service"
+version = "0.1.0"
+description = "Local companion dialogue and tactical-command service for Aesir Combat Prototype"
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+include = ["app*", "rl*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

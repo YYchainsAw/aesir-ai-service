@@ -1,47 +1,23 @@
-from uuid import uuid4
+"""路由聚合器：全部子 router 在此注册，main.py 只 include 这一个。
+
+新增端点时：在 ``app/api/v1/`` 建路由文件并在此 include，不再改 main.py。
+"""
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
 
-from app.schemas.tactical_order import (
-    DEFAULT_CONTEXT,
-    PROTOCOL_VERSION,
-    ParseCommandRequest,
-    ParseCommandResponse,
-)
-from app.services.command_parser import parse_command
+from app.api.health import router as health_router
+from app.api.v1.combat import router as combat_router
+from app.api.v1.commands import router as commands_router
+from app.api.v1.companion import router as companion_router
+from app.api.v1.speech import router as speech_router
+from app.api.v1.tactical import router as tactical_router
+from app.api.v1.voice import router as voice_router
 
 router = APIRouter()
-
-
-@router.get("/health", tags=["system"])
-def health_check() -> dict[str, str]:
-    """Returns immediately so UE can verify that the local service is available."""
-    return {"status": "ok", "service": "aesir-ai-service", "protocol_version": PROTOCOL_VERSION}
-
-
-# 遗留别名：旧客户端只传 text，由服务端回填默认能力目录与 request_id。
-class _LegacyRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=500)
-
-
-@router.post(
-    "/parse-command",
-    response_model=ParseCommandResponse,
-    tags=["commands"],
-    description="遗留兼容入口：只传 text，内部回填默认能力目录。正式联调请用 /v1/commands/parse。",
-)
-def parse_tactical_command_legacy(request: _LegacyRequest) -> ParseCommandResponse:
-    """把纯文本指令按默认能力目录解析为 UE-safe tactical order。"""
-    return parse_command(request.text, DEFAULT_CONTEXT, uuid4())
-
-
-@router.post(
-    "/v1/commands/parse",
-    response_model=ParseCommandResponse,
-    tags=["commands"],
-    description="契约 v0.1：携带 UE 能力目录 context 与 request_id，解析战术指令。",
-)
-def parse_command_v1(request: ParseCommandRequest) -> ParseCommandResponse:
-    """把玩家文本指令、配合 UE 能力目录解析为受限 TacticalOrder。"""
-    return parse_command(request.text, request.context, request.request_id)
+router.include_router(health_router)
+router.include_router(commands_router)
+router.include_router(companion_router)
+router.include_router(voice_router)
+router.include_router(speech_router)
+router.include_router(tactical_router)
+router.include_router(combat_router)

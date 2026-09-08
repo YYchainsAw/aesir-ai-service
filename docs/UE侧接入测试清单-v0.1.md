@@ -78,3 +78,8 @@
 `/v1/tactical/resolve`（规则策略 v1）已实现：CombatContext 上传、意图传递、
 决策四态（actionable / advisory / not_actionable / clarification_needed）、
 reason_codes 解析、companion_reply 展示等测试项将在 UE 快照采集就绪后补充。
+
+`/v1/tactical/executions`（执行回执）服务端已实现（信封 `{receipt:{...}}`，
+单条，202 受理后按天落 JSONL；`result` 枚举与草案 §7 一致）：UE 侧测试项——
+resolve 返回的 `order_id` 回传后收到 202、非法 `result` 返回 422、
+批量上传待 v0.2 定稿后补充。

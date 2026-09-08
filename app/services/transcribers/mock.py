@@ -4,10 +4,10 @@
 没转出命令（下游走 ``recognized:false``）。
 """
 
-from app.config import get_asr_mock_text
+from app.config import get_settings
 from app.services.transcribers.base import ASRBackend
 
 
 class MockASRTranscriber(ASRBackend):
     def transcribe(self, audio: bytes) -> str:
-        return get_asr_mock_text()
+        return get_settings().asr_mock_text

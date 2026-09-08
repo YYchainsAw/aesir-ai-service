@@ -10,7 +10,7 @@ from app.schemas.companion_dialogue import (
 )
 from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
-from app.services.companion.profile_repository import CompanionProfile, CompanionProfileRepository
+from app.services.companion.profile_repository import CompanionProfile, get_profile
 
 
 class _DialoguePayload(BaseModel):
@@ -35,7 +35,7 @@ class LLMCompanionDialogueService:
         profile: CompanionProfile | None = None,
     ) -> None:
         self._client = client or create_llm_client()
-        self._profile = profile or CompanionProfileRepository().load_primary()
+        self._profile = profile or get_profile()
 
     def reply(self, request: CompanionDialogueRequest) -> CompanionDialogueResponse:
         payload = self._client.generate_json(

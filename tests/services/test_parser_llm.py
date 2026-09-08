@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from app.schemas.tactical_order import DEFAULT_CONTEXT
-from app.services.command_parser import parse_command
+from app.services.parsers.command_parser import parse_command
 from app.services.parsers.llm import LLMCommandParser, LLMError
 
 # 一个合法的 v0.1 conditional_cast order（全部 ID 命中 DEFAULT_CONTEXT 目录）

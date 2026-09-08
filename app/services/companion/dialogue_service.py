@@ -4,21 +4,24 @@ from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
     CompanionDialogueResponse,
 )
-from app.config import get_companion_backend
+from app.config import get_settings
 from app.services.companion.llm_dialogue_service import LLMCompanionDialogueService
-from app.services.companion.profile_repository import CompanionProfile, CompanionProfileRepository
+from app.services.companion.profile_repository import (
+    CompanionProfile,
+    UnknownCompanionError,
+    get_profile,
+)
 from app.services.llm.client import LLMClientError
 
 
-def create_dialogue_reply(
-    request: CompanionDialogueRequest,
-    *,
-    profile_repository: CompanionProfileRepository | None = None,
-) -> CompanionDialogueResponse:
+def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
     """按 YAML 人设选择 LLM；不可用时回退到 YAML 默认回复。"""
-    profile = (profile_repository or CompanionProfileRepository()).require_primary(request.companion_id)
+    # mtime 缓存读取人设；id 校验语义与 require_primary 一致（404 路径不变）。
+    profile = get_profile()
+    if profile.companion_id != request.companion_id:
+        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
 
-    if get_companion_backend() == "llm":
+    if get_settings().companion_backend == "llm":
         try:
             return LLMCompanionDialogueService(profile=profile).reply(request)
         except LLMClientError:

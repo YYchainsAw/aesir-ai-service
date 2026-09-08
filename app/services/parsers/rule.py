@@ -1,8 +1,11 @@
 """确定性规则解析器，覆盖第一批五条指令，输出契约 v0.1 的判别联合 order。
 
 它只在能力目录 ``context`` 允许时产出 order（尤其技能/目标/状态 ID 必须存在于
-目录），否则明确 ``recognized: false``，保证 UE 永不收到越界 ID。约束越强的
-指令越靠前判断，保证「最具体的意图」优先命中。
+目录），否则明确 ``recognized: false``，保证 UE 永不收到越界 ID。
+
+多意图冲突时按 order 的 ``priority`` 降序判断（撤退 90 > 条件施法 80 > 保留
+60 > 优先普攻 50 > 跟随 40），保证高优先级意图先命中——例如「别放爆裂魔法，
+快撤退保命」应产出 retreat 而非 hold。
 """
 
 from uuid import UUID
@@ -24,7 +27,7 @@ from app.schemas.tactical_order import (
     TargetRef,
     WhenStateEntered,
 )
-from app.services.ids import (
+from app.schemas.ids import (
     ABILITY_EXPLOSION,
     AGENT,
     SELECTOR_PRIMARY_HOSTILE,
@@ -90,7 +93,16 @@ class RuleCommandParser(CommandParser):
 
         cat = _Catalog(context)
 
-        # 1. 条件施法：Boss 眩晕时释放爆裂魔法。
+        # 1. 撤退（priority 90）：后撤并优先保命。
+        if cat.has_agent and _has_any(t, "撤退", "retreat", "保命", "撤离", "逃跑"):
+            return ParseCommandResponse(
+                request_id=request_id,
+                recognized=True,
+                order=Retreat(agent_id=AGENT, then=RetreatAction(), priority=90),
+                message="知道了，先撤，优先保命。",
+            )
+
+        # 2. 条件施法（priority 80）：Boss 眩晕时释放爆裂魔法。
         if (
             cat.has_agent
             and cat.has_explosion
@@ -115,7 +127,7 @@ class RuleCommandParser(CommandParser):
                 message="好，等 Boss 眩晕时释放爆裂魔法。",
             )
 
-        # 2. 保留技能：把爆裂魔法握在手里暂时不用。
+        # 3. 保留技能（priority 60）：把爆裂魔法握在手里暂时不用。
         #    覆盖契约 golden 示例「这一整场都不要放爆裂魔法」的「不要放」表达。
         if (
             cat.has_explosion
@@ -133,16 +145,7 @@ class RuleCommandParser(CommandParser):
                 message="明白，先把爆裂魔法保留住。",
             )
 
-        # 3. 撤退：后撤并优先保命。
-        if cat.has_agent and _has_any(t, "撤退", "retreat", "保命", "撤离", "逃跑"):
-            return ParseCommandResponse(
-                request_id=request_id,
-                recognized=True,
-                order=Retreat(agent_id=AGENT, then=RetreatAction(), priority=90),
-                message="知道了，先撤，优先保命。",
-            )
-
-        # 4. 跟随并保持距离。
+        # 4. 跟随并保持距离（priority 40）。
         if (
             cat.has_player
             and _has_any(t, "跟随", "跟着", "follow", "跟我")
@@ -159,7 +162,7 @@ class RuleCommandParser(CommandParser):
                 message="好，跟上你并保持施法距离。",
             )
 
-        # 5. 优先普通攻击。
+        # 5. 优先普通攻击（priority 50）。
         if cat.has_explosion and _has_any(t, "优先") and _has_any(
             t, "普通攻击", "普攻", "平a", "平砍", "attack"
         ):

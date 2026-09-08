@@ -275,7 +275,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 
 - [ ] UE 采集 `CombatContext`，实现 `encounter_id`、`snapshot_id` 与 `event_id`。
 - [ ] 仅实现 `player_hp_critical`、`boss_stunned` 两个事件。
-- [ ] Python 增加 `/v1/combat/events`（v0.2 草案），返回人设台词与建议。
+- [x] Python 增加 `/v1/combat/events`（v0.2 草案），返回人设台词与建议。（2026-09-08 已实现）
 - [ ] UE 实现事件去重、防抖、字幕和调试面板。
 
 **验收：** 玩家第一次低于 30% HP 时，艾莉只说一次关切台词；每次 Boss 眩晕时，她只触发一次集火反应。
