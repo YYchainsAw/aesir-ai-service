@@ -8,8 +8,8 @@
 >
 > 相关文档：
 >
-> - 当前已实现的格式基线：[UE5-协议格式契约-v0.1.md](UE5-协议格式契约-v0.1.md)
-> - 下一阶段战斗事件与状态决策协议：[战斗事件与上下文感知战术协议_v0.2-草案.md](战斗事件与上下文感知战术协议_v0.2-草案.md)
+> - 当前已实现的格式基线：[ue-protocol-contract-v0.1.md](../protocols/ue-protocol-contract-v0.1.md)
+> - 下一阶段战斗事件与状态决策协议：[combat-tactical-protocol-v0.2-draft.md](../protocols/combat-tactical-protocol-v0.2-draft.md)
 > - 人物唯一配置源：`data/companions/primary_companion.yaml`
 
 ---

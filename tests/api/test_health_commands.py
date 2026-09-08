@@ -154,7 +154,7 @@ def test_v1_parse_rejects_invalid_request_id() -> None:
 
 
 def test_golden_contract_per_section_8() -> None:
-    """契约《UE5-协议格式契约-v0.1.md》§8 的 5 份 golden 输入必须各自命中对应行。"""
+    """契约《docs/protocols/ue-protocol-contract-v0.1.md》§11 的 5 份 golden 输入必须各自命中对应行。"""
     rid = "1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
     golden = {
         "艾琳，等 Boss 眩晕时使用爆裂魔法。": (80, {

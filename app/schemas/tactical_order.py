@@ -1,6 +1,6 @@
 """Tactical order schemas shared by API routes and services.
 
-契约为《docs/UE5-协议格式契约-v0.1.md》：``order`` 按 ``intent`` 判别，
+契约为《docs/protocols/ue-protocol-contract-v0.1.md》：``order`` 按 ``intent`` 判别，
 ``when``/``then``/``expires`` 各按 ``type`` 判别。所有 ID 来自请求
 ``context`` 的能力目录，杜绝显示名/硬编码出协议。``ParseCommandResponse``
 携带 ``request_id``(回显) 与生成的 ``order_id``，便于跨端日志关联；同时

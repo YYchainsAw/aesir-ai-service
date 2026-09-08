@@ -59,7 +59,7 @@ def test_companion_chat_requires_text() -> None:
 
 
 def test_corrupt_profile_yaml_returns_503_not_500(monkeypatch, tmp_path) -> None:
-    # 回归锁定（开发记录 2026-09-07 已知未修项）：YAML 损坏 → 503 配置错误，
+    # 回归锁定（docs/logs/2026-09-07.md 已知未修项）：YAML 损坏 → 503 配置错误，
     # 而不是未捕获 CompanionProfileError 导致的 500。
     from fastapi.testclient import TestClient
 

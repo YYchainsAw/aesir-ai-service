@@ -2,7 +2,7 @@
 
 与组合端点 ``/v1/voice/command`` 并存：UE 可先调用本端点单独调试 ASR，
 拿到文本后再调 ``/v1/commands/parse``。两个基础端点长期保留，不得删除。
-请求/响应格式见 ``docs/UE5_模型服务联调技术规范_v0.1.md`` §6.3。
+请求/响应格式见 ``docs/protocols/ue-protocol-contract-v0.1.md`` §5.3。
 """
 
 from uuid import UUID, uuid4

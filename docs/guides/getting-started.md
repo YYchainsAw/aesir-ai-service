@@ -197,7 +197,7 @@ curl -X POST http://127.0.0.1:8000/v1/speech/transcribe -F "audio=@cmd.wav" -F "
 
 ### 5.4 v0.2 战术决策 `/v1/tactical/resolve`
 
-语义意图 + 战斗快照 → 上下文战术决策（规则策略 v1；协议详见 `docs/战斗事件与上下文感知战术协议_v0.2-草案.md` §5）：
+语义意图 + 战斗快照 → 上下文战术决策（规则策略 v1；协议详见 `../protocols/combat-tactical-protocol-v0.2-draft.md` §5）：
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/v1/tactical/resolve `

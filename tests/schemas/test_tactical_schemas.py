@@ -1,6 +1,6 @@
 """v0.2 Schema 层 golden 测试（草案 §3~§5）。
 
-golden 取自《战斗事件与上下文感知战术协议_v0.2-草案》的示例 JSON：
+golden 取自《docs/protocols/combat-tactical-protocol-v0.2-draft.md》的示例 JSON：
 正向用例验证结构可解析且字段语义正确；负向用例验证约束（百分比范围、
 枚举白名单、必填字段）按草案 §3.1 收口。
 """

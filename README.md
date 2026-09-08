@@ -1,8 +1,81 @@
 # Aesir AI Service
 
-为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON（契约 v0.1），并提供 v0.2 上下文感知战术决策 `/v1/tactical/resolve`。解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。
+为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON，并提供 v0.2 上下文感知战术决策。
 
-详细设计见 `docs/项目介绍.md`；UE 侧通信契约见 `docs/UE5-协议格式契约-v0.1.md`。
+解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。服务在本地运行，无外部依赖，UE 客户端通过 HTTP 直接调用。
+
+## 设计理念
+
+直接让 LLM 生成 UE 命令存在不可控风险（幻觉技能、非法参数、越权指令），因此采用「**受限协议 + 可替换解析器**」：
+
+- **协议层**：`TacticalOrder` 每个字段限定在严格白名单内；UE C++ 侧做 1:1 结构映射并二次校验。
+- **解析层**：规则 / LLM 解析器可替换，语音识别结果复用同一解析层。无论输入来源，输出协议不变。
+
+把风险收敛在解析层，UE 通信协议与校验逻辑不因接入 LLM 或语音而改变。
+
+## 技术栈
+
+| 组件 | 选型 | 说明 |
+| --- | --- | --- |
+| Web 框架 | FastAPI 0.141 | 轻量、自带 OpenAPI 文档 |
+| 数据校验 | Pydantic 2.13 | `Literal` / 判别联合实现协议白名单 |
+| ASGI 服务器 | Uvicorn 0.52 | 本地开发/运行 |
+| 测试 | pytest 9.1 + httpx | 基于 `TestClient` 的接口测试 |
+| 运行时 | Python 3.12 | — |
+| 语音转写 | faster-whisper / mock | 可插拔 ASR 后端 |
+
+## 目录结构
+
+```
+aesir-ai-service/
+├── app/
+│   ├── main.py                    # FastAPI 应用入口
+│   ├── config.py                  # pydantic-settings 环境变量解析
+│   ├── api/
+│   │   ├── health.py              # /health
+│   │   ├── routes.py              # 路由聚合器（include 全部子 router）
+│   │   └── v1/
+│   │       ├── commands.py        # /v1/commands/parse（遗留 /parse-command）
+│   │       ├── voice.py           # /v1/voice/command（音频→ASR→解析）
+│   │       ├── speech.py          # /v1/speech/transcribe（独立转写）
+│   │       ├── tactical.py        # /v1/tactical/resolve + executions
+│   │       ├── combat.py          # /v1/combat/events
+│   │       └── companion.py       # /v1/companion/chat
+│   ├── schemas/                   # 协议 schema：ids / tactical_order / combat_context …
+│   └── services/
+│       ├── parsers/               # rule / llm / command_parser（解析门面+回退）
+│       ├── transcribers/          # base / mock / faster_whisper / factory
+│       ├── tactical/              # resolver / event_policy / receipt_store / acknowledgement
+│       ├── companion/             # 对话服务 + 人设仓库
+│       └── llm/                   # client + factory（共享 LLM Client）
+├── rl/                            # RL 实验包（可选依赖；服务进程不会 import）
+│   ├── sim/                       # BossSim 模拟器内核 + 数值常量
+│   ├── policy/                    # ActingPolicy/TacticalPolicy 协议 + rule/ppo 基线
+│   ├── env.py / features.py       # Gymnasium 环境 + 观测提取
+│   └── rewards.py / eval_utils.py
+├── scripts/                       # rl_train.py / rl_eval.py / asr_eval.py
+├── data/
+│   ├── companions/                # 队友 YAML 人设（Alice）
+│   └── rl/                        # 运行数据（回执/轨迹 JSONL，gitignore 不入库）
+├── tests/                         # api / schemas / services / rl 测试
+├── docs/                          # 项目文档（planning/protocols/guides/design/logs）
+├── requirements*.txt              # 运行时 / ML / RL / 开发测试 依赖拆分
+└── CHANGELOG.md                   # 里程碑记录
+```
+
+## 文档导航
+
+| 请求 | 入口 |
+| --- | --- |
+| 项目总览 / 设计理念 | 本文档 |
+| **UE × 模型服务协议契约 v0.1**（API + 类型定义） | [`docs/protocols/ue-protocol-contract-v0.1.md`](docs/protocols/ue-protocol-contract-v0.1.md) |
+| **UE 侧接入指南 v0.1**（分步 + 验收清单） | [`docs/protocols/ue-integration-guide-v0.1.md`](docs/protocols/ue-integration-guide-v0.1.md) |
+| 战斗事件 / 上下文感知战术协议 v0.2（草案） | [`docs/protocols/combat-tactical-protocol-v0.2-draft.md`](docs/protocols/combat-tactical-protocol-v0.2-draft.md) |
+| 启动 / 安装 / 接口示例 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
+| LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
+| RL 可行性设计与框架 | [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md) |
+| 总策划书 v0.1 | [`docs/planning/game-design-doc-v0.1.md`](docs/planning/game-design-doc-v0.1.md) |
+| 全部文档索引 | [`docs/README.md`](docs/README.md) |
 
 ## 启动
 
@@ -25,6 +98,7 @@
 | `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
 | `POST` | `/v1/tactical/resolve` | v0.2 预览：意图 + 战斗快照 → 上下文决策（规则策略） |
 | `POST` | `/v1/tactical/executions` | v0.2 草案 §7：UE 执行回执（202 受理，落 JSONL） |
+| `POST` | `/v1/combat/events` | v0.2 草案 §6：战斗事件 → 艾莉反应/建议/候选动作 |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
@@ -61,6 +135,22 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 ~~真人声调优~~（已取消：无真人录音样本；`scripts/asr_eval.py` 评测脚手架保留备用）。
 
+## 核心设计
+
+`TacticalOrder` 由 `intent` 判别的联合类型；`when` / `then` / `expires` 又各自按 `type` 判别。完整类型定义、Golden JSON 与能力目录白名单见[协议契约](docs/protocols/ue-protocol-contract-v0.1.md)。
+
+解析流程：
+
+```
+玩家文本 / ASR 文本 → 后端选型（rule / llm）
+        → 规则解析器 _normalize（去空格/标点/大小写/全半角）
+        → 匹配 agent → 按「更具体优先」匹配 5 个意图
+        → 生成 TacticalOrder / recognized=false
+        → LLM 失败时回退到规则（rule_fallback → source 标记）
+```
+
+解析逻辑隔离在 `app/services/parsers/`，输出 `ParseCommandResponse` 由 schema 固定。`source` 字段标注最终实际来源（`rule` / `llm` / `rule_fallback`），供 UE 端日志与降级观测。
+
 ## RL 实验（可选，Phase 4）
 
 Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/资源管理」策略与规则基线 A/B。**不影响服务运行时**——不装依赖全量测试仍全绿：
@@ -72,7 +162,7 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 ```
 
 组件可训性评级、奖励设计、sim-to-real 风险与上线判定标准见
-`docs/RL可行性分析与框架设计.md`。RL 目前不接服务路径（`AESIR_TACTICAL_POLICY=rl` 为占位，恒回退规则）。
+ [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md)。RL 目前不接服务路径（`AESIR_TACTICAL_POLICY=rl` 为占位，恒回退规则）。
 
 ## 测试
 
@@ -81,7 +171,18 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions、Boss 战模拟器与 RL 环境等（197 通过 + 3 条冒烟默认跳过）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events、Boss 战模拟器与 RL 环境等（**208 通过 + 3 条冒烟默认跳过**）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+
+## 路线图
+
+- [x] 规则解析器：支持首批 5 条战术指令（契约 v0.1 判别联合）
+- [x] LLM 指令解析：`llm` 后端接入，失败回退规则（`source: rule_fallback`）
+- [x] 语音识别 mock 全链路：`/v1/voice/command` 音频 → ASR(mock) → 同一解析层
+- [x] 语音识别接入 faster-whisper：`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper
+- [x] 专用 `/v1/speech/transcribe` 端点，与组合端点并存
+- [x] v0.2 第一阶段：CombatContext/TacticalIntent/TacticalDecision schema + `/v1/tactical/resolve` 规则策略 v1 + 85 例回归评测
+- [x] `/v1/combat/events` 战斗事件端点 + `/v1/tactical/executions` 执行回执
+- [ ] 强化学习走位策略：为 AI 队友提供决策能力（Python 模拟器已就绪，待训练）
 
 ## 调试
 
