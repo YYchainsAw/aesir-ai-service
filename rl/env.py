@@ -10,9 +10,9 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from rl.features import OBS_DIM, extract_observation_from_state
+from rl.features import OBS_DIM, extract_observation
 from rl.rewards import compute_reward
-from rl.sim.constants import N_ACTIONS
+from rl.sim.constants import N_ACTIONS, SimConstants
 from rl.sim.core import BossSim
 
 
@@ -20,20 +20,26 @@ class AliceBossEnv(gym.Env):
     """单 Boss 单遭遇；动作 Discrete(7)，观测 Box[0,1]^17。
 
     ``reset(seed=...)`` 遵循 gymnasium 1.x 规范（``super().reset(seed=seed)``），
-    同 seed 可复现整局。
+    同 seed 可复现整局。``max_ticks`` 会注入到模拟器常量，决定超时截断。
     """
 
     metadata = {"render_modes": []}
 
     def __init__(self, seed: int = 0, max_ticks: int = 300):
         super().__init__()
-        self._sim = BossSim(seed=seed)
         self._max_ticks = max_ticks
+        self._sim = BossSim(seed=seed, constants=SimConstants(max_ticks=max_ticks))
         self.action_space = spaces.Discrete(N_ACTIONS)
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(OBS_DIM,), dtype=np.float32)
 
     def _obs(self) -> np.ndarray:
-        return extract_observation_from_state(self._sim.state)
+        return extract_observation(
+            self._sim.to_context(),
+            shield_active=self._sim.state.shield_active_ticks > 0,
+            retreat_active=self._sim.state.retreat_active_ticks > 0,
+            tick=self._sim.state.tick,
+            max_ticks=self._max_ticks,
+        )
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)

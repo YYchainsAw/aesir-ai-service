@@ -112,6 +112,7 @@ class SimConstants:
     boss_max_hp: float = BOSS_MAX_HP
     boss_base_damage: float = BOSS_BASE_DAMAGE
     player_auto_dps: float = PLAYER_AUTO_DPS
+    player_max_hp: float = PLAYER_MAX_HP
     companion_max_hp: float = COMPANION_MAX_HP
     companion_max_mp: float = COMPANION_MAX_MP
     mp_regen: float = MP_REGEN_PER_TICK
@@ -121,6 +122,10 @@ class SimConstants:
     quick_heal_amount: float = QUICK_HEAL_AMOUNT
     major_heal_amount: float = MAJOR_HEAL_AMOUNT
     specs: dict = field(default_factory=lambda: dict(ABILITY_SPECS))
+
+    def __post_init__(self) -> None:
+        # 动作 → 技能表索引只构建一次（step 每 tick 都要用，百万步训练下不值得重建）
+        self.specs_by_action = {s.action: s for s in self.specs.values()}
 
 
 DEFAULT_CONSTANTS = SimConstants()

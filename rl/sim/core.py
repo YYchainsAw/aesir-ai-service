@@ -82,8 +82,13 @@ class SimState:
     def boss_stunned(self) -> bool:
         return self.boss_stunned_remaining > 0
 
-    def to_context(self) -> CombatContext:
-        """导出为服务端同构快照（resolver / features 都吃这个形状）。"""
+    def to_context(self, constants: "SimConstants | None" = None) -> CombatContext:
+        """导出为服务端同构快照（resolver / features 都吃这个形状）。
+
+        HP/MP 字段为百分比口径（0-100），按 ``constants`` 的上限归一化；
+        不传时用默认常量（自定义 ``SimConstants`` 变体请经 ``BossSim.to_context()``）。
+        """
+        c = constants or DEFAULT_CONSTANTS
         ability_states: dict[str, str] = {}
         for ability_id in ABILITY_ACTIONS:
             if self.cooldowns.get(ability_id, 0.0) > 0:
@@ -100,20 +105,20 @@ class SimState:
             mode="combat",
             player=ContextPlayer(
                 id=PLAYER_ID,
-                hp_percent=max(0.0, self.player_hp),
+                hp_percent=max(0.0, self.player_hp) / c.player_max_hp * 100.0,
                 is_downed=self.player_downed,
                 distance_to_boss_m=8.0,
             ),
             companion=ContextCompanion(
                 id=AGENT,
-                hp_percent=max(0.0, self.companion_hp),
-                mp_percent=self.companion_mp,
+                hp_percent=max(0.0, self.companion_hp) / c.companion_max_hp * 100.0,
+                mp_percent=self.companion_mp / c.companion_max_mp * 100.0,
                 current_behavior="ranged_attack",
                 ability_states=ability_states,
             ),
             boss=ContextBoss(
                 id=BOSS_ID,
-                hp_percent=max(0.0, self.boss_hp),
+                hp_percent=max(0.0, self.boss_hp) / c.boss_max_hp * 100.0,
                 stun_percent=STUN_METER_MAX if self.boss_stunned else min(STUN_METER_MAX, self.boss_stun),
                 state_tags=tags,
                 stunned_remaining_seconds=self.boss_stunned_remaining or None,
@@ -129,6 +134,7 @@ class SimStepResult:
 
     action: int
     damage_to_boss: float = 0.0
+    companion_damage_to_boss: float = 0.0   # 同伴主动技能造成的部分（奖励计权只看它）
     damage_to_player: float = 0.0
     damage_to_companion: float = 0.0
     healed_player: float = 0.0
@@ -173,6 +179,10 @@ class BossSim:
     @property
     def done_reason(self) -> str | None:
         return self._env.done_reason
+
+    def to_context(self) -> CombatContext:
+        """按本局常量归一化导出快照（自定义 HP 上限的变体必须走这里）。"""
+        return self._env.state.to_context(self.constants)
 
     # -- 主循环 -------------------------------------------------------------
     def step(self, action: int) -> tuple[SimState, SimStepResult, str | None]:
@@ -235,7 +245,7 @@ class BossSim:
     # -- 内部 ---------------------------------------------------------------
     def _apply_action(self, action: int, events: SimStepResult) -> None:
         st, c = self._env.state, self.constants
-        spec_by_action = {s.action: s for s in c.specs.values()}
+        spec_by_action = c.specs_by_action
 
         if action == ACTION_RETREAT:
             st.retreat_active_ticks = RETREAT_TICKS
@@ -259,6 +269,7 @@ class BossSim:
             dmg = c.basic_attack_boss_damage * (STUNNED_TAKEN_MULT if st.boss_stunned else 1.0)
             self._damage_boss(dmg)
             events.damage_to_boss += dmg
+            events.companion_damage_to_boss += dmg
             events.boss_stunned_at_action = st.boss_stunned
             if not st.boss_stunned:
                 st.boss_stun = min(STUN_METER_MAX, st.boss_stun + COMPANION_ATTACK_STUN)
@@ -267,6 +278,7 @@ class BossSim:
             dmg = c.explosion_boss_damage * (STUNNED_TAKEN_MULT if st.boss_stunned else 1.0)
             self._damage_boss(dmg)
             events.damage_to_boss += dmg
+            events.companion_damage_to_boss += dmg
             if not st.boss_stunned:
                 st.boss_stun = min(STUN_METER_MAX, st.boss_stun + EXPLOSION_STUN)
         elif action == ACTION_QUICK_HEAL:

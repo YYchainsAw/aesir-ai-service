@@ -106,6 +106,28 @@ tactical_acknowledgements:
   retreat:
     reply_text: "知道了，先保命。别逞强，我可不想把你拖回来。"
     emotion_id: emotion.concerned
+  # v0.2 /v1/tactical/resolve 的语义意图回复（与上方 v0.1 命令回复分开展平）
+  support_heal_player:
+    reply_text: "别硬撑，我这就把你拉回来。"
+    emotion_id: emotion.concerned
+  support_protect_player:
+    reply_text: "护盾来了，撑住！"
+    emotion_id: emotion.serious
+  burst_boss:
+    reply_text: "交给我！这一击会送到位的。"
+    emotion_id: emotion.excited
+  prepare_burst_on_stun:
+    reply_text: "好，等它露出破绽我放大招。"
+    emotion_id: emotion.serious
+  focus_fire_boss:
+    reply_text: "明白，一起集火！"
+    emotion_id: emotion.excited
+  retreat_and_survive:
+    reply_text: "知道了，先保命。别逞强。"
+    emotion_id: emotion.concerned
+  follow_player:
+    reply_text: "跟紧你就行，放心，我会留好施法距离。"
+    emotion_id: emotion.bright
 
 allowed_emotion_ids:
   - id: emotion.bright

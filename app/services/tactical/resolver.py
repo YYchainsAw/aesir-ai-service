@@ -225,7 +225,7 @@ def _burst(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactical
 # ---------------------------------------------------------------------------
 # 撤退与跟随
 # ---------------------------------------------------------------------------
-def _retreat(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalDecision:
+def _retreat(intent: TacticalIntent, ctx: CombatContext, _mp_low: bool) -> TacticalDecision:
     return TacticalDecision(
         decision_id=str(uuid4()),
         status="actionable",
@@ -238,7 +238,7 @@ def _retreat(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactic
     )
 
 
-def _follow(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalDecision:
+def _follow(intent: TacticalIntent, ctx: CombatContext, _mp_low: bool) -> TacticalDecision:
     return TacticalDecision(
         decision_id=str(uuid4()),
         status="actionable",
