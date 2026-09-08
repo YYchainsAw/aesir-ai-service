@@ -61,3 +61,25 @@ def test_facade_falls_back_to_rule_when_llm_unimplemented(monkeypatch) -> None:
     assert unknown.recognized is False
     assert unknown.order is None
     assert unknown.companion_reply is None
+
+def test_rule_parser_intent_conflict_resolved_by_priority() -> None:
+    # 回归锁定（开发记录 2026-09-07 已知未修项）：撤退 priority 90 高于保留 60，
+    # 「别放爆裂魔法，快撤退保命」同时命中 hold 与 retreat 关键词时应产出 retreat。
+    result = RuleCommandParser().parse("艾琳，别放爆裂魔法，快撤退保命")
+    assert result.recognized is True
+    assert result.order is not None
+    assert result.order.intent == "retreat"
+
+
+def test_order_internal_models_reject_extra_fields() -> None:
+    # 回归锁定（开发记录 2026-09-07 已知未修项）：order 内部模型 extra=forbid，
+    # 调用方/LLM 传入未声明字段必须被拒绝而不是静默忽略。
+    import pytest
+    from pydantic import ValidationError
+
+    from app.schemas.tactical_order import CastAbilityAction, WhenStateEntered
+
+    with pytest.raises(ValidationError):
+        WhenStateEntered(subject="encounter.primary_hostile", tag="state.stunned", bogus=1)
+    with pytest.raises(ValidationError):
+        CastAbilityAction(ability_id="ability.alice.explosion", target="party.player", bogus=1)

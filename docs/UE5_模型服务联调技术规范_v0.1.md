@@ -38,7 +38,7 @@
 - `POST /v1/voice/command` 组合端点：音频 → ASR → 同一解析层；`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper（`small` 模型，已端到端验证），`mock` 返回固定文本。
 - `POST /v1/companion/chat` 非战斗陪伴对话（mock / llm 后端，YAML 人设）。
 - v0.2 第一阶段（2026-09-07）：`CombatContext`/`TacticalIntent`/`TacticalDecision` schema + `POST /v1/tactical/resolve` 规则策略 v1 + 85 例（20 意图 × 4 战况）回归评测集；详见 v0.2 草案文档。
-- pytest 全绿：197 通过 + 3 条冒烟跳过（`AESIR_ASR_SMOKE=1`/`AESIR_RL_SMOKE=1` 门控，默认跳过）。
+- pytest 全绿：200 通过 + 3 条冒烟跳过（`AESIR_ASR_SMOKE=1`/`AESIR_RL_SMOKE=1` 门控，默认跳过）。
 - `.env.example`、运行时/ML/开发测试依赖拆分、接口测试与中文文档。
 
 ### 当前阻塞
@@ -365,7 +365,7 @@ TacticalOrder（等待眩晕施法）
 - 为现有 `/health` 和 `/parse-command` 保留回归测试。
 - 在 README 记录本地启动、测试和 `.env` 使用方式。
 
-**验收（已达成）：** `pytest -q` 197 通过 + 3 条冒烟跳过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
+**验收（已达成）：** `pytest -q` 200 通过 + 3 条冒烟跳过；`GET /health` 返回 `ok`；五类规则命令及未知命令均有测试。
 
 ### P1：冻结联调协议（已完成 ✅）
 
