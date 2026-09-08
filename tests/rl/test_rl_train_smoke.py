@@ -42,8 +42,8 @@ def test_train_save_and_eval_smoke(tmp_path) -> None:
     rule_report = evaluate_policy(BossSim(seed=0), RulePolicyAdapter(), episodes=5)
     assert rule_report.episodes == 5
 
-    from scripts.rl_eval import _PPOPolicyAdapter
+    from rl.policy.ppo import PPOPolicyAdapter
 
     ppo_model = PPO.load(str(model_path), device="cpu")
-    ppo_report = evaluate_policy(BossSim(seed=0), _PPOPolicyAdapter(ppo_model), episodes=5)
+    ppo_report = evaluate_policy(BossSim(seed=0), PPOPolicyAdapter(ppo_model), episodes=5)
     assert ppo_report.episodes == 5

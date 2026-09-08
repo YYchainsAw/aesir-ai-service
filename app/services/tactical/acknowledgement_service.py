@@ -3,12 +3,12 @@
 from typing import Any
 
 from app.schemas.tactical_order import TacticalAcknowledgement
-from app.services.companion.profile_repository import CompanionProfileRepository
+from app.services.companion.profile_repository import get_profile
 
 
 def create_tactical_acknowledgement(intent: str) -> TacticalAcknowledgement | None:
     """为已识别的意图读取 YAML 中登记的短回复。"""
-    profile = CompanionProfileRepository().load_primary()
+    profile = get_profile()
     acknowledgements = profile.raw.get("tactical_acknowledgements")
     if not isinstance(acknowledgements, dict):
         return None

@@ -8,10 +8,7 @@
 """
 
 import argparse
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
@@ -19,6 +16,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from rl.env import AliceBossEnv
 from rl.eval_utils import evaluate_policy
+from rl.policy.ppo import PPOPolicyAdapter
 from rl.policy.rule import RulePolicyAdapter
 from rl.sim.core import BossSim
 
@@ -59,7 +57,6 @@ def main() -> None:
     )
 
     # 分段 learn：每段之间评测当前 PPO（训练期进度可见；正式 A/B 用 scripts/rl_eval.py）
-    from scripts.rl_eval import _PPOPolicyAdapter
 
     remaining = args.timesteps
     done_steps = 0
@@ -69,7 +66,7 @@ def main() -> None:
         done_steps += chunk
         remaining -= chunk
         report = evaluate_policy(
-            BossSim(seed=args.seed), _PPOPolicyAdapter(model), episodes=args.eval_episodes
+            BossSim(seed=args.seed), PPOPolicyAdapter(model), episodes=args.eval_episodes
         )
         print(
             f"[{done_steps}/{args.timesteps}] PPO 进度："

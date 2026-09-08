@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from app.config import get_asr_backend, get_asr_language
+from app.config import get_settings
 from app.services.transcribers.base import TranscriptionError
 from app.services.transcribers.factory import get_transcriber
 
@@ -57,5 +57,5 @@ def transcribe_speech(
     return TranscribeSpeechResponse(
         request_id=request_id,
         text=text,
-        language=get_asr_language(),
+        language=get_settings().asr_language,
     )

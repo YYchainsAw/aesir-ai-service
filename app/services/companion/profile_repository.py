@@ -42,7 +42,7 @@ class CompanionProfile:
 
 
 class CompanionProfileRepository:
-    """每次读取 YAML，确保人设资料是聊天服务的唯一静态来源。"""
+    """人设 YAML 的读取与校验；调用方一般走 ``get_profile()`` 的 mtime 缓存。"""
 
     def __init__(self, profile_path: Path = _PRIMARY_PROFILE_PATH) -> None:
         self._profile_path = profile_path
@@ -86,6 +86,36 @@ class CompanionProfileRepository:
         if companion_id != profile.companion_id:
             raise UnknownCompanionError(f"Unsupported companion_id: {companion_id}")
         return profile
+
+
+# ---------------------------------------------------------------------------
+# mtime 缓存 provider：YAML 是静态配置，文件未变时不必每请求重读重解析。
+# 文件变更（mtime 变化）自动失效重读，保留「YAML 是唯一静态来源」语义；
+# 解析失败不写缓存（损坏文件每次请求都如实报 503）。
+# ---------------------------------------------------------------------------
+_profile_cache: dict[Path, tuple[int, CompanionProfile]] = {}
+
+
+def get_profile(profile_path: Path | None = None) -> CompanionProfile:
+    """读取主队友人设（带 mtime 缓存）。
+
+    注意：测试 monkeypatch ``CompanionProfileRepository.__init__`` 指向坏文件时，
+    缓存 key 按构造时的实际路径计算，异常不落缓存，行为与每次直读一致。
+    """
+    repo = CompanionProfileRepository(profile_path) if profile_path is not None else CompanionProfileRepository()
+    path = repo._profile_path  # noqa: SLF001 - 同模块内访问
+    try:
+        mtime = path.stat().st_mtime_ns
+    except OSError:
+        _profile_cache.pop(path, None)
+        return repo.load_primary()  # 抛 CompanionProfileError → 503
+
+    cached = _profile_cache.get(path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    profile = repo.load_primary()
+    _profile_cache[path] = (mtime, profile)
+    return profile
 
 
 def _required_mapping(container: dict[str, Any], key: str) -> dict[str, Any]:

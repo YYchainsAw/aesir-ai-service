@@ -12,12 +12,7 @@ import io
 import logging
 from functools import lru_cache
 
-from app.config import (
-    get_asr_compute_type,
-    get_asr_device,
-    get_asr_language,
-    get_asr_model,
-)
+from app.config import get_settings
 from app.services.transcribers.base import ASRBackend, TranscriptionError
 
 logger = logging.getLogger(__name__)
@@ -32,10 +27,11 @@ def _load_model():
     """
     from faster_whisper import WhisperModel  # 延迟导入：无需 ML 栈也能跑服务
 
+    settings = get_settings()
     return WhisperModel(
-        get_asr_model(),
-        device=get_asr_device(),
-        compute_type=get_asr_compute_type(),
+        settings.asr_model,
+        device=settings.asr_device,
+        compute_type=settings.asr_compute_type,
     )
 
 
@@ -43,7 +39,7 @@ class FasterWhisperTranscriber(ASRBackend):
     """把音频 bytes 转写为文本。空音频直接返回空串，不触发模型加载。"""
 
     def __init__(self) -> None:
-        self.language = get_asr_language()
+        self.language = get_settings().asr_language
 
     def transcribe(self, audio: bytes) -> str:
         if not audio:

@@ -29,3 +29,4 @@ Thumbs.db
 
 # RL runtime data (receipts / trajectories)
 data/rl/
+aesir_ai_service.egg-info/

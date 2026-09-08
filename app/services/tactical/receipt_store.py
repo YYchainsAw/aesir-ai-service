@@ -19,9 +19,9 @@ def _day_file(directory: str | Path, day: datetime) -> Path:
 
 def append_receipt(receipt: ExecutionReceipt, *, directory: str | None = None) -> Path:
     """追加一条回执并返回写入的文件路径。父目录不存在时自动创建。"""
-    from app.config import get_receipts_dir
+    from app.config import get_settings
 
-    target_dir = Path(directory) if directory is not None else Path(get_receipts_dir())
+    target_dir = Path(directory) if directory is not None else Path(get_settings().receipts_dir)
     now = datetime.now(timezone.utc)
     path = _day_file(target_dir, now)
     path.parent.mkdir(parents=True, exist_ok=True)

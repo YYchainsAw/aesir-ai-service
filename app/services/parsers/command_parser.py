@@ -8,7 +8,7 @@
 
 from uuid import UUID
 
-from app.config import get_parser_backend
+from app.config import get_settings
 from app.schemas.tactical_order import DEFAULT_CONTEXT, ParseCommandContext, ParseCommandResponse
 from app.services.parsers.rule import RuleCommandParser
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
@@ -34,7 +34,7 @@ def parse_command(
     被安全解析。
     """
     response: ParseCommandResponse
-    if get_parser_backend() == "llm":
+    if get_settings().parser_backend == "llm":
         try:
             from app.services.parsers.llm import LLMCommandParser
 

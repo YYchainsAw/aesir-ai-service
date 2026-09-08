@@ -21,17 +21,14 @@ from app.schemas.combat_event import (
     EventObservability,
 )
 from app.schemas.tactical_decision import DecisionAction, Expires
-from app.services.companion.profile_repository import (
-    CompanionProfileRepository,
-    DialoguePresentation,
-)
+from app.services.companion.profile_repository import DialoguePresentation, get_profile
 from app.services.tactical.resolver import (
     ABIL_EXPLOSION,
     ABIL_MAJOR_HEAL,
     ABIL_QUICK_HEAL,
     ABIL_SHIELD,
     COMPANION_MP_LOW,
-    _is_ready,
+    is_ability_ready,
 )
 
 POLICY_REVISION = "event-policy-001"
@@ -46,7 +43,7 @@ _FALLBACK_REACTION = EventReaction(
 
 def _load_reaction(event_type: str) -> EventReaction:
     """从主队友 YAML 读取事件反应；配置缺失/越界时回退安全默认。"""
-    profile = CompanionProfileRepository().load_primary()
+    profile = get_profile()
     reactions = profile.raw.get("combat_event_reactions")
     if isinstance(reactions, dict):
         entry = reactions.get(event_type)
@@ -117,10 +114,10 @@ def _response(
 def _evt_player_hp_critical(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     action = None
     reasons = ["PLAYER_HP_CRITICAL"]
-    if _is_ready(ctx, ABIL_MAJOR_HEAL):
+    if is_ability_ready(ctx, ABIL_MAJOR_HEAL):
         action = _action(ctx, ability_id=ABIL_MAJOR_HEAL, target_id=ctx.player.id, priority=90)
         reasons.append("MAJOR_HEAL_READY")
-    elif _is_ready(ctx, ABIL_QUICK_HEAL):
+    elif is_ability_ready(ctx, ABIL_QUICK_HEAL):
         action = _action(ctx, ability_id=ABIL_QUICK_HEAL, target_id=ctx.player.id, priority=90)
         reasons.append("QUICK_HEAL_READY")
     else:
@@ -140,7 +137,7 @@ def _evt_player_hp_critical(request: CombatEventRequest, ctx: CombatContext) -> 
 
 def _evt_boss_stun_near(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     reasons = ["BOSS_STUN_NEAR"]
-    if _is_ready(ctx, ABIL_EXPLOSION):
+    if is_ability_ready(ctx, ABIL_EXPLOSION):
         reasons.append("EXPLOSION_READY")
     else:
         reasons.append("EXPLOSION_NOT_READY")
@@ -161,7 +158,7 @@ def _evt_boss_stun_near(request: CombatEventRequest, ctx: CombatContext) -> Comb
 def _evt_boss_stunned(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     reasons = ["BOSS_STUNNED", "BURST_WINDOW_OPEN"]
     action = None
-    if not _is_ready(ctx, ABIL_EXPLOSION):
+    if not is_ability_ready(ctx, ABIL_EXPLOSION):
         reasons.append("EXPLOSION_NOT_READY")
     elif ctx.companion.mp_percent < COMPANION_MP_LOW:
         reasons.append("COMPANION_MP_LOW")
@@ -192,7 +189,7 @@ def _evt_boss_stunned(request: CombatEventRequest, ctx: CombatContext) -> Combat
 def _evt_boss_enraged(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     reasons = ["BOSS_ENRAGED"]
     action = None
-    if _is_ready(ctx, ABIL_SHIELD):
+    if is_ability_ready(ctx, ABIL_SHIELD):
         action = _action(ctx, ability_id=ABIL_SHIELD, target_id=ctx.player.id, priority=70)
         reasons.append("SHIELD_READY")
     else:

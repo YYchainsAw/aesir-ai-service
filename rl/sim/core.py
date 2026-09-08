@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 import random
 
 from app.schemas.combat_context import CombatContext, ContextBoss, ContextCompanion, ContextPlayer
-from app.services.ids import AGENT, SELECTOR_PLAYER as PLAYER_ID, SELECTOR_PRIMARY_HOSTILE as BOSS_ID
+from app.schemas.ids import AGENT, SELECTOR_PLAYER as PLAYER_ID, SELECTOR_PRIMARY_HOSTILE as BOSS_ID
 
 from rl.sim.constants import (
     ABILITY_ACTIONS,

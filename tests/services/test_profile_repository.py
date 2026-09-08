@@ -23,10 +23,7 @@ def test_mock_reply_uses_profile_defaults(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("AESIR_COMPANION_BACKEND", "mock")
     profile = CompanionProfileRepository().load_primary()
 
-    response = create_dialogue_reply(
-        CompanionDialogueRequest(text="你好"),
-        profile_repository=CompanionProfileRepository(),
-    )
+    response = create_dialogue_reply(CompanionDialogueRequest(text="你好"))
 
     assert response.reply_text == profile.default_dialogue_response.reply_text
     assert response.gesture_id == profile.default_dialogue_response.gesture_id
@@ -62,3 +59,36 @@ default_dialogue_response:
 
     with pytest.raises(Exception, match="reply_text"):
         CompanionProfileRepository(profile_path).load_primary()
+
+
+def test_get_profile_caches_until_mtime_changes(tmp_path, monkeypatch) -> None:
+    # mtime 缓存：文件未变不重读（load 计数不增）；修改后自动失效重读。
+    from app.services.companion import profile_repository as pr
+
+    src = Path("data/companions/primary_companion.yaml").read_text(encoding="utf-8")
+    yaml_file = tmp_path / "profile.yaml"
+    yaml_file.write_text(src, encoding="utf-8")
+    monkeypatch.setattr(
+        pr.CompanionProfileRepository, "__init__", lambda self: setattr(self, "_profile_path", yaml_file)
+    )
+
+    calls = {"n": 0}
+    original_load = pr.CompanionProfileRepository.load_primary
+
+    def counting_load(self):
+        calls["n"] += 1
+        return original_load(self)
+
+    monkeypatch.setattr(pr.CompanionProfileRepository, "load_primary", counting_load)
+
+    first = pr.get_profile()
+    second = pr.get_profile()
+    assert first is second  # 命中缓存
+    assert calls["n"] == 1
+
+    # 触碰内容（mtime 变化）→ 重新解析
+    yaml_file.write_text(src.replace("display_name: Alice", "display_name: Alice2"), encoding="utf-8")
+    third = pr.get_profile()
+    assert third is not first
+    assert calls["n"] == 2
+    assert third.display_name == "Alice2"

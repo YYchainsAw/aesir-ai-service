@@ -1,4 +1,4 @@
-from app.services.command_parser import parse_command
+from app.services.parsers.command_parser import parse_command
 from app.services.parsers.rule import RuleCommandParser
 
 

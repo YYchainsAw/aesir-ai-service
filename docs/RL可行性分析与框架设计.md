@@ -47,12 +47,13 @@ rl/（顶层包，服务进程物理上不会 import）
   ├─ sim/constants.py 全部数值一处集中（治疗阈值直接引用 resolver 常量，保证同源）
   ├─ policy/base.py   ActingPolicy（环境层）/ TacticalPolicy（服务层接入占位）
   ├─ policy/rule.py   RulePolicyAdapter：包装生产 resolve_intent 作为基线
+  ├─ policy/ppo.py    PPOPolicyAdapter：sb3 模型 → ActingPolicy（训练/评测共用）
   ├─ rewards.py       纯函数奖励
   ├─ features.py      CombatContext → 17 维观测（L2）
   ├─ env.py           AliceBossEnv（Gymnasium，L2）
   └─ eval_utils.py    跑 N 局 + 指标聚合
-scripts/rl_train.py  PPO 训练（L3）
-scripts/rl_eval.py   A/B 评测（L3）
+scripts/rl_train.py  PPO 训练（L3，python -m scripts.rl_train）
+scripts/rl_eval.py   A/B 评测（L3，python -m scripts.rl_eval）
 ```
 
 依赖四层：L0 服务（requirements.txt）→ L1 模拟器+规则适配（纯标准库）→
@@ -154,7 +155,7 @@ A/B 结论对它敏感**（信息不对称：规则基线知道的东西和线�
 
 ## 8. A/B 方法论与 RL 上线判定
 
-`scripts/rl_eval.py --episodes N --agents rule,models/rl/xxx`，各 agent 用**同一
+`python -m scripts.rl_eval --episodes N --agents rule,models/rl/xxx`，各 agent 用**同一
 种子序列**保证可比。指标：mean_reward、win_rate（Boss 击杀率）、player_survival、
 mean_ticks、**stun_burst_rate**（眩晕窗口内爆裂施放占比）。
 
@@ -174,9 +175,9 @@ mean_ticks、**stun_burst_rate**（眩晕窗口内爆裂施放占比）。
 .\.venv\Scripts\python -m pytest tests/ -q
 # 装 RL 依赖 + 冒烟训练（~1-2 分钟）
 .\.venv\Scripts\python -m pip install -r requirements-rl.txt
-.\.venv\Scripts\python scripts\rl_train.py --timesteps 20000 --seed 0
+.\.venv\Scripts\python -m scripts.rl_train --timesteps 20000 --seed 0
 # A/B 评测
-.\.venv\Scripts\python scripts\rl_eval.py --episodes 50 --agents rule,models/rl/ppo_bossfight
+.\.venv\Scripts\python -m scripts.rl_eval --episodes 50 --agents rule,models/rl/ppo_bossfight
 # 训练冒烟测试
-$env:AESIR_RL_SMOKE = "1"; .\.venv\Scripts\python -m pytest tests/test_rl_train_smoke.py -q
+$env:AESIR_RL_SMOKE = "1"; .\.venv\Scripts\python -m pytest tests/rl/test_rl_train_smoke.py -q
 ```

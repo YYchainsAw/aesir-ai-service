@@ -14,7 +14,7 @@ from app.schemas.tactical_order import (
     ParseCommandContext,
     ParseCommandResponse,
 )
-from app.services.command_parser import parse_command
+from app.services.parsers.command_parser import parse_command
 from app.services.transcribers.base import TranscriptionError
 from app.services.transcribers.factory import get_transcriber
 

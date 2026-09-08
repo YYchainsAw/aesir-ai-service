@@ -31,7 +31,7 @@ COMPANION_MP_LOW = 20     # 艾莉蓝量低于此值走保守策略
 BOSS_MELEE_RANGE_M = 5.0  # 玩家贴脸判定（reason code 用）
 
 
-def _is_ready(ctx: CombatContext, ability_id: str) -> bool:
+def is_ability_ready(ctx: CombatContext, ability_id: str) -> bool:
     return ctx.companion.ability_states.get(ability_id) == "ready"
 
 
@@ -93,7 +93,7 @@ def _heal(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalD
     hp = ctx.player.hp_percent
     reasons: list[str] = []
 
-    if hp <= PLAYER_HP_CRITICAL and _is_ready(ctx, ABIL_MAJOR_HEAL):
+    if hp <= PLAYER_HP_CRITICAL and is_ability_ready(ctx, ABIL_MAJOR_HEAL):
         if ctx.player.distance_to_boss_m <= BOSS_MELEE_RANGE_M:
             reasons.append("BOSS_IN_MELEE_RANGE")
         reasons += ["PLAYER_HP_CRITICAL", "MAJOR_HEAL_READY"]
@@ -113,7 +113,7 @@ def _heal(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalD
             explanation="玩家生命值危急，强效治疗当前可用。",
         )
 
-    if hp <= PLAYER_HP_LOW and _is_ready(ctx, ABIL_QUICK_HEAL):
+    if hp <= PLAYER_HP_LOW and is_ability_ready(ctx, ABIL_QUICK_HEAL):
         return TacticalDecision(
             decision_id=str(uuid4()),
             status="actionable",
@@ -146,7 +146,7 @@ def _heal(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalD
 
 
 def _protect(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalDecision:
-    if not _is_ready(ctx, ABIL_SHIELD):
+    if not is_ability_ready(ctx, ABIL_SHIELD):
         return _not_actionable(
             intent.intent_id, ["SHIELD_NOT_READY"], "护盾技能当前不可用。"
         )
@@ -178,7 +178,7 @@ def _protect(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactic
 # 爆发
 # ---------------------------------------------------------------------------
 def _burst(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalDecision:
-    if not _is_ready(ctx, ABIL_EXPLOSION):
+    if not is_ability_ready(ctx, ABIL_EXPLOSION):
         return _not_actionable(
             intent.intent_id, ["EXPLOSION_NOT_READY"], "爆裂魔法当前不可用。"
         )

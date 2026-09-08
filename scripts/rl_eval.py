@@ -10,12 +10,10 @@ hacking，见 docs/RL可行性分析与框架设计.md §8）。
 """
 
 import argparse
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from rl.eval_utils import evaluate_policy
+from rl.policy.ppo import PPOPolicyAdapter
 from rl.policy.rule import RulePolicyAdapter
 from rl.sim.core import BossSim
 
@@ -40,18 +38,7 @@ def _load_policy(spec: str):
         ) from exc
     path = spec
     model = PPO.load(path, device="cpu")  # 缺 .zip 后缀时 sb3 自动补
-    return _PPOPolicyAdapter(model), f"ppo({spec})"
-
-
-class _PPOPolicyAdapter:
-    """sb3 模型 → ActingPolicy 适配器（ ActingPolicy 协议的 PPO 侧实现）。"""
-
-    def __init__(self, model):
-        self._model = model
-
-    def select_action(self, obs, state) -> int:
-        action, _ = self._model.predict(obs, deterministic=True)
-        return int(action)
+    return PPOPolicyAdapter(model), f"ppo({spec})"
 
 
 def main() -> None:

@@ -27,7 +27,7 @@ from app.schemas.tactical_order import (
     TargetRef,
     WhenStateEntered,
 )
-from app.services.ids import (
+from app.schemas.ids import (
     ABILITY_EXPLOSION,
     AGENT,
     SELECTOR_PRIMARY_HOSTILE,

@@ -2,11 +2,6 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router
-from app.api.v1.combat import router as combat_router
-from app.api.v1.companion import router as companion_router
-from app.api.v1.speech import router as speech_router
-from app.api.v1.tactical import router as tactical_router
-from app.api.v1.voice import router as voice_router
 from app.services.companion.profile_repository import CompanionProfileError
 
 app = FastAPI(
@@ -27,8 +22,3 @@ async def companion_profile_error_handler(_request, exc: CompanionProfileError) 
 
 
 app.include_router(router)
-app.include_router(companion_router)
-app.include_router(voice_router)
-app.include_router(speech_router)
-app.include_router(tactical_router)
-app.include_router(combat_router)

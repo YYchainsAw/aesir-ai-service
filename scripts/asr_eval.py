@@ -18,7 +18,7 @@ import argparse
 import time
 from pathlib import Path
 
-from app.config import get_asr_compute_type, get_asr_device, get_asr_language
+from app.config import get_settings
 from app.services.transcribers.faster_whisper import _load_model
 
 SAMPLES_DIR = Path("data/asr_samples")
@@ -67,9 +67,10 @@ def main() -> None:
         )
 
     model = _load_model()
-    language = get_asr_language()
+    settings = get_settings()
+    language = settings.asr_language
     print(
-        f"模型={get_asr_model()} 设备={get_asr_device()} 量化={get_asr_compute_type()} "
+        f"模型={settings.asr_model} 设备={settings.asr_device} 量化={settings.asr_compute_type} "
         f"beam={args.beam} vad={not args.no_vad} 语言={language} 样本数={len(samples)}\n"
     )
 
