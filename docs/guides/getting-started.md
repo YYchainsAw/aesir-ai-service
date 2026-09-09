@@ -84,7 +84,7 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 .\.venv\Scripts\python -m pytest
 ```
 
-测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况）、combat/events 幂等、策略 YAML 加载。测试数以 `pytest` 输出为准（2026-09-09：**218 通过 + 3 条冒烟默认跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
+测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况）、combat/events 幂等、策略 YAML 加载。测试数以 `pytest` 输出为准（2026-09-09：**224 通过 + 3 条冒烟默认跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
 
 另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions。
 
@@ -210,6 +210,14 @@ curl -X POST http://127.0.0.1:8000/v1/tactical/resolve `
 ```
 
 返回（节选）：`decision.status`（actionable / not_actionable）、`decision.action`（候选动作 + priority + expires）、`reason_codes`（可解释决策依据）。同一意图在不同快照（玩家濒危 / 健康 / Boss 眩晕 / 艾莉缺蓝）下产出不同决策；能力不可用时返回 `not_actionable`，绝不虚构动作。目前为纯规则策略（`source` 固定 `rule`），无 LLM 调用。
+
+组合端点 `POST /v1/tactical/command` 可省一次往返——把 `intent` 换成 `text` 即可（"艾莉，帮我回一下血"这类文本由服务端规则解析出意图再落地；不可识别时返回 `recognized:false` + 澄清台词）：
+
+```powershell
+curl -X POST http://127.0.0.1:8000/v1/tactical/command `
+  -H "Content-Type: application/json" `
+  -d '{\"protocol_version\": \"0.2\", \"request_id\": \"99d7e6b4-f4f2-4d39-8c96-a23d293882f6\", \"text\": \"艾莉，帮我回一下血\", \"combat_context\": {\"encounter_id\": \"encounter.001\", \"snapshot_id\": \"11111111-1111-1111-1111-111111111111\", \"captured_at\": \"2026-09-09T12:00:00Z\", \"mode\": \"combat\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 18, \"is_downed\": false, \"distance_to_boss_m\": 4.5}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 83, \"mp_percent\": 72, \"current_behavior\": \"ranged_attack\", \"ability_states\": {\"ability.alice.basic_attack\": \"ready\"}}, \"boss\": {\"id\": \"encounter.primary_hostile\", \"hp_percent\": 42, \"stun_percent\": 0, \"state_tags\": [], \"phase\": 1}}}'
+```
 
 ### 5.5 非战斗陪伴对话
 

@@ -64,6 +64,20 @@ class ResolveRequest(BaseModel):
     combat_context: CombatContext
 
 
+class TacticalCommandRequest(BaseModel):
+    """组合端点 ``/v1/tactical/command`` 请求：文本 + 快照一次到位。
+
+    内部先做 文本 → ``TacticalIntent``（规则，后续可接 LLM），再走
+    resolve 的上下文策略；等价于先调 ``/v1/commands/parse`` 出意图、
+    再调 ``/v1/tactical/resolve`` 落地，省一次 UE 往返。
+    """
+
+    protocol_version: Literal["0.2"] = PROTOCOL_VERSION_V02
+    request_id: str
+    text: str = Field(min_length=1)
+    combat_context: CombatContext
+
+
 class ResolveResponse(BaseModel):
     protocol_version: Literal["0.2"] = PROTOCOL_VERSION_V02
     request_id: str

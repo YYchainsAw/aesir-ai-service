@@ -120,6 +120,28 @@ def main(url: str) -> int:
         if label.startswith("A") and action:
             last_order_id = action["order_id"]
 
+    # 3b. 组合端点：文本 + 快照一次到位（UE 可省一次往返）
+    combo = client.post(
+        "/v1/tactical/command",
+        json={
+            "protocol_version": "0.2",
+            "request_id": _rid(),
+            "text": "艾莉，帮我回一下血",
+            "combat_context": json.loads(
+                (GOLDEN_DIR / "snapshot_a_critical.json").read_text(encoding="utf-8")
+            ),
+        },
+    )
+    body = combo.json()
+    decision = body.get("decision") or {}
+    action = decision.get("action")
+    print(
+        f"\n=== POST /v1/tactical/command（\"艾莉，帮我回一下血\" + 快照A）===\n"
+        f"    status={decision.get('status')}"
+        f"  action={action['ability_id'] if action else None}"
+        f"  reasons={decision.get('reason_codes')}"
+    )
+
     # 4. 战斗事件：Boss 眩晕 + 网络重试（幂等）
     stun_snapshot = json.loads(
         (GOLDEN_DIR / "snapshot_c_stun_window.json").read_text(encoding="utf-8")
