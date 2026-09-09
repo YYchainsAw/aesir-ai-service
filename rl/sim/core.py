@@ -101,7 +101,7 @@ class SimState:
         return CombatContext(
             encounter_id="sim.bossfight",
             snapshot_id=f"sim-tick-{self.tick}",
-            captured_at=f"sim-t{self.tick}",
+            captured_at=f"2026-01-01T00:{self.tick // 60:02d}:{self.tick % 60:02d}Z",
             mode="combat",
             player=ContextPlayer(
                 id=PLAYER_ID,

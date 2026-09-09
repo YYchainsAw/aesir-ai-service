@@ -7,14 +7,27 @@ UE 在状态边沿（Boss 眩晕、玩家血线危急等）上报事件，服务
 但绝不虚构可施放动作（与 resolve 同一原则）。
 """
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.combat_context import CombatContext
 from app.schemas.tactical_decision import DecisionAction
 
 PROTOCOL_VERSION_V02 = "0.2"
+
+
+def _validate_iso8601_utc(value: str) -> str:
+    """协议 §2.1：时间字段必须是 ISO-8601 UTC，非法按 422 拒绝。"""
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(
+            f"时间字段必须是 ISO-8601 UTC，例如 '2026-09-03T12:00:00Z'，收到：{value!r}"
+        ) from exc
+    return value
+
 
 # 草案 §6.1：首版固定六类事件
 EventType = Literal[
@@ -32,6 +45,11 @@ class CombatEvent(BaseModel):
     event_type: EventType
     occurred_at: str  # ISO-8601 UTC
     sequence: int = Field(ge=0)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _validate_occurred_at(cls, value: str) -> str:
+        return _validate_iso8601_utc(value)
 
 
 class CombatEventRequest(BaseModel):
@@ -74,3 +92,6 @@ class CombatEventResponse(BaseModel):
     recommendation: EventRecommendation | None = None
     companion_action: DecisionAction | None = None
     observability: EventObservability
+    # 幂等标记：同一 encounter_id+event_id 的重试回放首次响应时为 true。
+    # UE 可据此识别网络重试；回放保持同一 order_id，不会重复下发动作。
+    duplicate: bool = False

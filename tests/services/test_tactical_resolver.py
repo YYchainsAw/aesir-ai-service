@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.combat_context import make_combat_context
+from app.services.tactical.policy import get_policy
 
 client = TestClient(app)
 RID = "88d7e6b4-f4f2-4d39-8c96-a23d293882f6"
@@ -136,7 +137,7 @@ def test_response_envelope_fields() -> None:
     assert body["request_id"] == RID
     assert body["source"] == "rule"
     assert body["companion_reply"]["reply_text"]
-    assert body["observability"]["policy_revision"] == "support-policy-001"
+    assert body["observability"]["policy_revision"] == get_policy().revision
 
 
 def test_invalid_intent_id_returns_422() -> None:

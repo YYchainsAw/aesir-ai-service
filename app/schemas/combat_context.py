@@ -6,9 +6,10 @@
 之后若做 RL 另建低频观测接口，不污染本协议。
 """
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Percent = float  # [0, 100]；用 Field 约束在具体字段上
 
@@ -43,11 +44,26 @@ class CombatContext(BaseModel):
 
     encounter_id: str
     snapshot_id: str
-    captured_at: str  # ISO-8601 UTC；格式校验留给服务端策略层按需做
+    captured_at: str  # ISO-8601 UTC
     mode: Literal["combat"]
     player: ContextPlayer
     companion: ContextCompanion
     boss: ContextBoss
+
+    @field_validator("captured_at")
+    @classmethod
+    def _validate_captured_at(cls, value: str) -> str:
+        """快照时间必须是合法 ISO-8601（协议 §2.1）。
+
+        结构非法按 422 拒绝，避免错误时间戳混入回执/日志后才暴露。
+        """
+        try:
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(
+                f"captured_at 必须是 ISO-8601 UTC 时间，例如 '2026-09-03T12:00:00Z'，收到：{value!r}"
+            ) from exc
+        return value
 
 
 def make_combat_context(

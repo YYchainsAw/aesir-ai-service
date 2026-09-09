@@ -1,6 +1,6 @@
 """v0.2 Schema 层 golden 测试（草案 §3~§5）。
 
-golden 取自《docs/protocols/combat-tactical-protocol-v0.2-draft.md》的示例 JSON：
+golden 取自《docs/protocols/combat-tactical-protocol-v0.2.md》的示例 JSON：
 正向用例验证结构可解析且字段语义正确；负向用例验证约束（百分比范围、
 枚举白名单、必填字段）按草案 §3.1 收口。
 """
@@ -171,11 +171,20 @@ def _mutate(path: tuple, value) -> dict:
         (("player", "distance_to_boss_m"), -1),
         (("companion", "ability_states", "ability.alice.explosion"), "unknown_state"),
         (("mode",), "exploration"),        # 本协议仅 combat
+        (("captured_at",), "2026/09/03 12:00"),   # 非 ISO-8601 分隔符
+        (("captured_at",), "not-a-timestamp"),    # 完全非法
     ],
 )
 def test_combat_context_field_constraints(path, value) -> None:
     with pytest.raises(ValidationError):
         CombatContext.model_validate(_mutate(path, value))
+
+
+def test_captured_at_accepts_iso8601_variants() -> None:
+    """带 Z / 带时差的合法 ISO-8601 UTC 均可解析（协议 §2.1）。"""
+    for value in ("2026-09-03T12:00:00Z", "2026-09-03T12:00:00+00:00"):
+        ctx = CombatContext.model_validate(_mutate(("captured_at",), value))
+        assert ctx.captured_at == value
 
 
 @pytest.mark.parametrize(
