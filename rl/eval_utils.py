@@ -1,7 +1,7 @@
 """评测工具：跑 N 局、按指标聚合（rl_train / rl_eval 脚本共用）。
 
 核心盯防指标是「眩晕窗口 explosion 施放率」：奖励 hacking（noop 拖时间）
-主要靠它与胜率联合判定（详见 docs/RL可行性分析与框架设计.md §8）。
+主要靠它与胜率联合判定（详见 docs/design/rl-feasibility-design.md §8）。
 """
 
 import statistics

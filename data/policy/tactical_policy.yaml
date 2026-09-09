@@ -1,0 +1,28 @@
+# 上下文策略的阈值与优先级（策划书 §5.1 第 4 层 / §6.2「纯 Python + YAML policy」）。
+#
+# 试玩调参只改本文件，不改代码；修改后重启服务生效（uvicorn --reload 只监视 .py）。
+# 任何破坏性调整（阈值含义变化）应同步更新 revision，便于回执数据按策略版本归因。
+
+revision: support-policy-001
+event_revision: event-policy-001
+
+thresholds:
+  player_hp_critical: 30   # 低于此阈值用强效治疗
+  player_hp_low: 70        # 低于此阈值用快速治疗
+  companion_mp_low: 20     # 艾莉蓝量低于此值走保守策略
+  boss_melee_range_m: 5.0  # 玩家贴脸判定（reason code 用）
+
+priorities:
+  # /v1/tactical/resolve（玩家请求路径）
+  major_heal: 95
+  quick_heal: 85
+  shield: 80
+  burst: 85
+  burst_pending_stun: 80   # 等眩晕登记：到战斗结束前保持
+  retreat: 90
+  follow: 40
+  # /v1/combat/events（事件策略路径）
+  event_major_heal: 90
+  event_quick_heal: 90
+  event_shield: 70
+  event_burst: 85

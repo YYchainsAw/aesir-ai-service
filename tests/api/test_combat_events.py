@@ -1,12 +1,22 @@
 """`POST /v1/combat/events` 端点与事件策略测试（v0.2 草案 §6）。"""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.combat_context import make_combat_context
 from app.schemas.combat_event import CombatEvent, CombatEventRequest
+from app.services.tactical.event_policy import _reset_seen_events
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clean_event_cache():
+    """各测试独立：清空事件幂等缓存，避免用例间串扰。"""
+    _reset_seen_events()
+    yield
+    _reset_seen_events()
 
 
 def _request(event_type: str, *, context=None, event_id="event.encounter.001.test.001") -> dict:
@@ -123,3 +133,43 @@ def test_unknown_event_type_rejected_with_422() -> None:
     payload["event"]["event_type"] = "player_buffed"
     response = client.post("/v1/combat/events", json=payload)
     assert response.status_code == 422
+
+
+def test_duplicate_event_id_replays_first_response() -> None:
+    """策划书 §4.2：网络重试复用同一 event_id，服务端幂等回放。"""
+    context = make_combat_context(player_hp=60, stunned_remaining=4.0)
+    first = client.post("/v1/combat/events", json=_request("boss_stunned", context=context))
+    assert first.status_code == 200
+    first_body = first.json()
+    assert first_body["duplicate"] is False
+
+    retry = client.post("/v1/combat/events", json=_request("boss_stunned", context=context))
+    assert retry.status_code == 200
+    retry_body = retry.json()
+    # 回放标记：同一 order_id / 台词，不重复下发新动作
+    assert retry_body["duplicate"] is True
+    assert retry_body["companion_action"]["order_id"] == first_body["companion_action"]["order_id"]
+    assert retry_body["reaction"]["reply_text"] == first_body["reaction"]["reply_text"]
+
+
+def test_duplicate_event_id_across_encounters_is_independent() -> None:
+    """不同 encounter_id 的同 event_id 是两次独立事件，不作重放。"""
+    first = client.post(
+        "/v1/combat/events",
+        json=_request("boss_stunned", context=make_combat_context(player_hp=60, stunned_remaining=4.0)),
+    )
+    second = client.post(
+        "/v1/combat/events",
+        json=_request(
+            "boss_stunned",
+            context=make_combat_context(
+                player_hp=60, stunned_remaining=4.0, encounter_id="encounter.test.002"
+            ),
+        ),
+    )
+    assert first.json()["duplicate"] is False
+    assert second.json()["duplicate"] is False
+    assert (
+        second.json()["companion_action"]["order_id"]
+        != first.json()["companion_action"]["order_id"]
+    )

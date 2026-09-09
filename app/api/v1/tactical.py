@@ -17,6 +17,7 @@ from app.schemas.tactical_decision import (
 )
 from app.schemas.tactical_execution import ExecutionReceipt
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
+from app.services.tactical.policy import get_policy
 from app.services.tactical.receipt_store import append_receipt
 from app.services.tactical.resolver import resolve_intent
 
@@ -47,9 +48,12 @@ def resolve_tactical(request: ResolveRequest) -> ResolveResponse:
         },
         observability=Observability(
             normalized_text=request.intent.normalized_text,
-            # rl 后端请求但未接入时保留标记，便于在回执数据中区分
+            # rl 后端请求但未接入时保留标记，便于在回执数据中区分；
+            # 规则路径的版本号来自 data/policy/tactical_policy.yaml
             policy_revision=(
-                "support-policy-001-rl-pending" if policy_backend == "rl" else "support-policy-001"
+                f"{get_policy().revision}-rl-pending"
+                if policy_backend == "rl"
+                else get_policy().revision
             ),
             used_snapshot_id=request.combat_context.snapshot_id,
         ),

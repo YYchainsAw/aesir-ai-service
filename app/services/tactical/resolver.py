@@ -25,10 +25,16 @@ ABIL_QUICK_HEAL = "ability.alice.quick_heal"
 ABIL_SHIELD = "ability.alice.shield"
 ABIL_EXPLOSION = "ability.alice.explosion"
 
-PLAYER_HP_CRITICAL = 30   # 低于此阈值用强效治疗
-PLAYER_HP_LOW = 70        # 低于此阈值用快速治疗
-COMPANION_MP_LOW = 20     # 艾莉蓝量低于此值走保守策略
-BOSS_MELEE_RANGE_M = 5.0  # 玩家贴脸判定（reason code 用）
+# 阈值与优先级来自 data/policy/tactical_policy.yaml（策划书 §5.1/§6.2），
+# 进程启动时加载快照——改 YAML 后重启生效。保留原常量名供 rl/ 基线引用。
+from app.services.tactical.policy import get_policy  # noqa: E402
+
+_policy = get_policy()
+PLAYER_HP_CRITICAL = _policy.thresholds.player_hp_critical   # 低于此阈值用强效治疗
+PLAYER_HP_LOW = _policy.thresholds.player_hp_low             # 低于此阈值用快速治疗
+COMPANION_MP_LOW = _policy.thresholds.companion_mp_low       # 艾莉蓝量低于此值走保守策略
+BOSS_MELEE_RANGE_M = _policy.thresholds.boss_melee_range_m   # 玩家贴脸判定（reason code 用）
+POLICY_REVISION = _policy.revision
 
 
 def is_ability_ready(ctx: CombatContext, ability_id: str) -> bool:
@@ -106,7 +112,7 @@ def _heal(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalD
                 type_="cast_ability",
                 ability_id=ABIL_MAJOR_HEAL,
                 target_id=ctx.player.id,
-                priority=95,
+                priority=_policy.priorities.major_heal,
                 expires=Expires(type="immediate"),
             ),
             reason_codes=reasons,
@@ -123,7 +129,7 @@ def _heal(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> TacticalD
                 type_="cast_ability",
                 ability_id=ABIL_QUICK_HEAL,
                 target_id=ctx.player.id,
-                priority=85,
+                priority=_policy.priorities.quick_heal,
                 expires=Expires(type="immediate"),
             ),
             reason_codes=["PLAYER_HP_LOW", "QUICK_HEAL_READY"],
@@ -166,7 +172,7 @@ def _protect(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactic
             type_="cast_ability",
             ability_id=ABIL_SHIELD,
             target_id=ctx.player.id,
-            priority=80,
+            priority=_policy.priorities.shield,
             expires=Expires(type="immediate"),
         ),
         reason_codes=reasons,
@@ -199,7 +205,7 @@ def _burst(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactical
                 type_="cast_ability",
                 ability_id=ABIL_EXPLOSION,
                 target_id=ctx.boss.id,
-                priority=80,
+                priority=_policy.priorities.burst_pending_stun,
                 expires=Expires(type="encounter_end"),
             ),
             reason_codes=["EXPLOSION_READY", "BOSS_NOT_STUNNED_YET"],
@@ -214,7 +220,7 @@ def _burst(intent: TacticalIntent, ctx: CombatContext, mp_low: bool) -> Tactical
             type_="cast_ability",
             ability_id=ABIL_EXPLOSION,
             target_id=ctx.boss.id,
-            priority=85,
+            priority=_policy.priorities.burst,
             expires=Expires(type="immediate"),
         ),
         reason_codes=["EXPLOSION_READY"],
@@ -231,7 +237,7 @@ def _retreat(intent: TacticalIntent, ctx: CombatContext, _mp_low: bool) -> Tacti
         status="actionable",
         intent_id=intent.intent_id,
         action=_action(
-            ctx=ctx, type_="retreat", target_id=None, priority=90, expires=Expires(type="immediate")
+            ctx=ctx, type_="retreat", target_id=None, priority=_policy.priorities.retreat, expires=Expires(type="immediate")
         ),
         reason_codes=["RETREAT_REQUESTED"],
         explanation="知道了，先保命。",
@@ -247,7 +253,7 @@ def _follow(intent: TacticalIntent, ctx: CombatContext, _mp_low: bool) -> Tactic
             ctx=ctx,
             type_="follow",
             target_id=ctx.player.id,
-            priority=40,
+            priority=_policy.priorities.follow,
         ),
         reason_codes=["FOLLOW_REQUESTED"],
         explanation="好的，我跟上你并保持施法距离。",

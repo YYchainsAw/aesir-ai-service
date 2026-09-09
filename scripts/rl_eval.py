@@ -6,7 +6,7 @@
 
 输出对齐 scripts/asr_eval.py：逐 agent 汇总 markdown 表。核心盯防指标：
 stun_burst_rate（眩晕窗口 explosion 施放率）+ win_rate 联合判定（防 reward
-hacking，见 docs/RL可行性分析与框架设计.md §8）。
+hacking，见 docs/design/rl-feasibility-design.md §8）。
 """
 
 import argparse

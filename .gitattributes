@@ -1,0 +1,2 @@
+# Windows 批处理必须保持 CRLF，否则 cmd 解析中文行会损坏
+*.bat text eol=crlf

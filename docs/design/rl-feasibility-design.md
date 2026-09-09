@@ -1,9 +1,9 @@
 # RL 可行性分析与框架设计
 
 > 版本：v0.1（2026-09-07）
-> 依据：`AI队友系统总策划书_v0.1.md` §8（Phase 4 可选 RL）、
-> `战斗事件与上下文感知战术协议_v0.2-草案.md` §7（executions 回执）、
-> `开发记录_2026-09-02.md`（RL 缺件清单：Boss 状态、动作空间、奖励事件、可复现训练场）。
+> 依据：`game-design-doc-v0.1.md` §8（Phase 4 可选 RL）、
+> `combat-tactical-protocol-v0.2.md` §7（executions 回执）、
+> `logs/2026-09-02.md`（RL 缺件清单：Boss 状态、动作空间、奖励事件、可复现训练场）。
 > 本文回答两个问题：**哪些部分可以 RL？现在搭了什么？**
 
 ---
@@ -120,9 +120,9 @@ A/B 结论对它敏感**（信息不对称：规则基线知道的东西和线�
 
 | 通道 | 归属 | 格式 | 用途 |
 | --- | --- | --- | --- |
-| `POST /v1/tactical/executions` | 服务侧（UE 真实数据） | `data/rl/executions/{YYYYMMDD}.jsonl` | 未来 bandit/离线 RL 的原始信号；**不自动用于训练**（草案 §7） |
+| `POST /v1/tactical/executions` | 服务侧（UE 真实数据） | `data/rl/executions/{YYYYMMDD}.jsonl` | 未来 bandit/离线 RL 的原始信号；**不自动用于训练**（v0.2 §7） |
 
-回执数据使用纪律（继承草案 §7）：必须经**筛选和人工评测**才能进训练集；
+回执数据使用纪律（继承 v0.2 §7）：必须经**筛选和人工评测**才能进训练集；
 `policy_revision` 字段贯穿决策与回执，可区分 rule/rl 来源。
 
 ## 6. Sim-to-real 差距风险清单

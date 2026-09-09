@@ -9,6 +9,8 @@
   ID 不在白名单或配置缺失时回退到默认对话表现。
 """
 
+from collections import OrderedDict
+from threading import Lock
 from typing import Any
 
 from app.schemas.combat_context import CombatContext
@@ -22,6 +24,7 @@ from app.schemas.combat_event import (
 )
 from app.schemas.tactical_decision import DecisionAction, Expires
 from app.services.companion.profile_repository import DialoguePresentation, get_profile
+from app.services.tactical.policy import get_policy
 from app.services.tactical.resolver import (
     ABIL_EXPLOSION,
     ABIL_MAJOR_HEAL,
@@ -31,7 +34,9 @@ from app.services.tactical.resolver import (
     is_ability_ready,
 )
 
-POLICY_REVISION = "event-policy-001"
+# 阈值/优先级/版本号与 resolver 同源：data/policy/tactical_policy.yaml
+_policy = get_policy()
+POLICY_REVISION = _policy.event_revision
 
 _FALLBACK_REACTION = EventReaction(
     reply_text="收到，我看着呢。",
@@ -115,10 +120,16 @@ def _evt_player_hp_critical(request: CombatEventRequest, ctx: CombatContext) -> 
     action = None
     reasons = ["PLAYER_HP_CRITICAL"]
     if is_ability_ready(ctx, ABIL_MAJOR_HEAL):
-        action = _action(ctx, ability_id=ABIL_MAJOR_HEAL, target_id=ctx.player.id, priority=90)
+        action = _action(
+            ctx, ability_id=ABIL_MAJOR_HEAL, target_id=ctx.player.id,
+            priority=_policy.priorities.event_major_heal,
+        )
         reasons.append("MAJOR_HEAL_READY")
     elif is_ability_ready(ctx, ABIL_QUICK_HEAL):
-        action = _action(ctx, ability_id=ABIL_QUICK_HEAL, target_id=ctx.player.id, priority=90)
+        action = _action(
+            ctx, ability_id=ABIL_QUICK_HEAL, target_id=ctx.player.id,
+            priority=_policy.priorities.event_quick_heal,
+        )
         reasons.append("QUICK_HEAL_READY")
     else:
         reasons.append("HEAL_NOT_READY")
@@ -171,7 +182,8 @@ def _evt_boss_stunned(request: CombatEventRequest, ctx: CombatContext) -> Combat
             else Expires(type="immediate")
         )
         action = _action(
-            ctx, ability_id=ABIL_EXPLOSION, target_id=ctx.boss.id, priority=85, expires=expires
+            ctx, ability_id=ABIL_EXPLOSION, target_id=ctx.boss.id,
+            priority=_policy.priorities.event_burst, expires=expires,
         )
     return _response(
         request,
@@ -190,7 +202,10 @@ def _evt_boss_enraged(request: CombatEventRequest, ctx: CombatContext) -> Combat
     reasons = ["BOSS_ENRAGED"]
     action = None
     if is_ability_ready(ctx, ABIL_SHIELD):
-        action = _action(ctx, ability_id=ABIL_SHIELD, target_id=ctx.player.id, priority=70)
+        action = _action(
+            ctx, ability_id=ABIL_SHIELD, target_id=ctx.player.id,
+            priority=_policy.priorities.event_shield,
+        )
         reasons.append("SHIELD_READY")
     else:
         reasons.append("SHIELD_NOT_READY")
@@ -241,8 +256,48 @@ _HANDLERS = {
 
 
 def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
-    """按事件类型分发；与 resolver 一样保持可解释的决策表结构。"""
+    """按事件类型分发；与 resolver 一样保持可解释的决策表结构。
+
+    策划书 §4.2 要求 Python 也支持幂等：同一 ``encounter_id + event_id``
+    的网络重试回放首次响应（同一 ``order_id``、同一台词），并标记
+    ``duplicate: true``，防止艾莉重复说话或重复施法。
+    """
     handler = _HANDLERS.get(request.event.event_type)
     if handler is None:  # pragma: no cover - schema 已用 Literal 限定
         raise ValueError(f"Unsupported event_type: {request.event.event_type}")
-    return handler(request, request.combat_context)
+    response = handler(request, request.combat_context)
+    return _dedupe(request, response)
+
+
+# ---------------------------------------------------------------------------
+# 事件幂等缓存
+# ---------------------------------------------------------------------------
+
+_MAX_CACHE = 1024  # 有界缓存：单进程内存足够，防长会话膨胀
+
+_seen_events: "OrderedDict[tuple[str, str], CombatEventResponse]" = OrderedDict()
+_seen_events_lock = Lock()
+
+
+def _dedupe(
+    request: CombatEventRequest, response: CombatEventResponse
+) -> CombatEventResponse:
+    """首次见到的事件登记响应；重试时回放首次响应（回显新 request_id）。"""
+    key = (request.combat_context.encounter_id, request.event.event_id)
+    with _seen_events_lock:
+        cached = _seen_events.get(key)
+        if cached is not None:
+            replay = cached.model_copy(
+                update={"request_id": request.request_id, "duplicate": True}
+            )
+            return replay
+        _seen_events[key] = response
+        if len(_seen_events) > _MAX_CACHE:
+            _seen_events.popitem(last=False)  # 淘汰最旧事件
+    return response
+
+
+def _reset_seen_events() -> None:
+    """清空幂等缓存（仅测试用）。"""
+    with _seen_events_lock:
+        _seen_events.clear()

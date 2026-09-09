@@ -6,7 +6,7 @@ sim 状态先经启发式映射为 ``TacticalIntent``（危急→治疗、眩晕
 
 注意信息不对称：A/B 度量的是「意图映射 + 决策表」的合计行为，这与线上
 架构一致（LLM/规则出意图 → resolver 决策）。映射规则固定为本文件一版，
-A/B 结论对它敏感（详见 docs/RL可行性分析与框架设计.md §6）。
+A/B 结论对它敏感（详见 docs/design/rl-feasibility-design.md §6）。
 """
 
 from app.schemas.tactical_intent import TacticalIntent
