@@ -77,7 +77,7 @@ $env:AESIR_ASR_BACKEND = "faster_whisper"
 返回带 `reason_codes` 的上下文决策。可先用手写快照 JSON 验证（示例见
 [getting-started.md](../guides/getting-started.md) §5.4），UE 侧真实快照采集到位后再联调。
 
-### 4.1 执行回执（v0.2 草案 §7，服务端已实现）
+### 4.1 执行回执（v0.2 §7，服务端已实现）
 
 UE 对每个 `order_id` 回传执行结果，服务端落 `data/rl/executions/` 按天 JSONL：
 
@@ -88,7 +88,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/tactical/executions `
 # result ∈ accepted/executed/rejected/expired/cancelled；预期 202 {"stored":true,...}
 ```
 
-回执仅用于观察与后续评测数据集（**不自动用于训练**，草案 §7）；批量上传待 v0.2 定稿。
+回执仅用于观察与后续评测数据集（**不自动用于训练**，v0.2 §7）；批量上传留待 v0.3。
 
 ---
 
@@ -170,11 +170,20 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/tactical/executions `
 reason_codes 解析、companion_reply 展示等测试项将在 UE 快照采集就绪后补充。
 
 `/v1/tactical/executions`（执行回执）服务端已实现（信封 `{receipt:{...}}`，
-单条，202 受理后按天落 JSONL；`result` 枚举与草案 §7 一致）：UE 侧测试项——
+单条，202 受理后按天落 JSONL；`result` 枚举与 v0.2 §7 一致）：UE 侧测试项——
 resolve 返回的 `order_id` 回传后收到 202、非法 `result` 返回 422、
-批量上传待 v0.2 定稿后补充。
+批量上传留待 v0.3 后补充。
 
 `/v1/combat/events`（战斗事件）服务端已实现（六类 `event_type`：玩家血线危急、
 Boss 快眩晕、Boss 眩晕、Boss 狂暴、艾莉蓝量低、Boss 被击败）：UE 侧测试项——
 上传事件 → 拿 `companion_action`/`companion_reply` 展示，CD 中/蓝量不足时
-`companion_action` 为 `null` 而非虚构动作。
+`companion_action` 为 `null` 而非虚构动作；同一 `encounter_id + event_id` 重试
+会收到 `duplicate: true` 的幂等回放（同一 `order_id`，UE 去重显示即可）。
+
+## 附：联调资产（不写 C++ 也能先跑通）
+
+- **golden 快照**：`data/golden/` 下 A（濒危贴脸）/B（稳态消耗）/C（眩晕窗口）/D（资源枯竭）四份
+  `CombatContext` JSON，与回归评测集同源，可直接作为请求体 fixture。
+- **假 UE 全链路脚本**：`.\.venv\Scripts\python -m scripts.mock_ue_flow`——按总策划书 §9
+  伪流程跑 chat → parse → resolve（同一句治疗指令 × 四类战况）→ combat/events（含幂等
+  重试）→ executions，打印每步响应 JSON；写 C++ 前先跑一遍即可看到完整闭环的期望输出。

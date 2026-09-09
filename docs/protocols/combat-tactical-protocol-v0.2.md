@@ -1,10 +1,10 @@
-# 战斗事件与上下文感知战术协议 v0.2（草案）
+# 战斗事件与上下文感知战术协议 v0.2
 
-> 状态：**部分实现。** Schema 层（§3~§5）、`/v1/tactical/resolve`（规则策略 v1）、`/v1/tactical/executions`（回执落 JSONL）与 `/v1/combat/events`（事件策略 v1）均已实现并有测试。v0.1 端点全部保留可用。
+> 状态：**正式版（2026-09-09 定稿）。** Schema 层（§3~§5）、`/v1/tactical/resolve`（规则策略 v1）、`/v1/tactical/executions`（回执落 JSONL）与 `/v1/combat/events`（事件策略 v1 + `event_id` 幂等）均已实现并有测试。v0.1 端点全部保留可用。UE 侧可按本协议开发；字段删除或语义变化必须升级 `protocol_version`。
 >
 > 目标：在不破坏 v0.1 的前提下，增加战斗状态快照、自动事件、上下文战术决策、可观察字段和 UE 执行回执。
 >
-> 更新日期：2026-09-07
+> 更新日期：2026-09-09
 
 ---
 
@@ -18,8 +18,8 @@
 | `POST /v1/voice/command` | 已实现 v0.1 | multipart 音频 → mock/ASR → 基础战术订单 |
 | `POST /v1/speech/transcribe` | 已实现 | 单独转写音频，返回文本与语言 |
 | `POST /v1/tactical/resolve` | 已实现（规则策略 v1） | 语义意图 + 状态快照 → 上下文战术决策 |
-| `POST /v1/combat/events` | 已实现（事件策略 v1） | UE 关键事件 → 艾莉反应/建议/候选动作 |
-| `POST /v1/tactical/executions` | **本草案新增** | UE 回传接受、执行或拒绝原因 |
+| `POST /v1/combat/events` | 已实现（事件策略 v1 + 幂等） | UE 关键事件 → 艾莉反应/建议/候选动作 |
+| `POST /v1/tactical/executions` | 已实现 | UE 回传接受、执行或拒绝原因 |
 
 `/v1/commands/parse` 可以在 v0.2 中继续承担“文本到意图”的前半段；`/v1/tactical/resolve` 负责决定具体技能。首版可由 UE 先调用 parse，再调用 resolve；稳定后再提供服务端组合端点。
 
@@ -39,7 +39,7 @@
 | `decision_id` | Python | UUID v4；一次策略决策的关联 ID |
 | `ability_id` | UE DataAsset | 稳定白名单 ID，禁止使用中文名做逻辑键 |
 
-时间字段用 ISO-8601 UTC，例如 `2026-09-03T12:00:00Z`。游戏内时间或剩余秒数用 number（秒）。
+时间字段用 ISO-8601 UTC，例如 `2026-09-03T12:00:00Z`；格式非法按 HTTP 422 拒绝（`captured_at` 与 `occurred_at` 均校验）。游戏内时间或剩余秒数用 number（秒）。
 
 ### 2.2 状态快照不是指令
 
@@ -293,6 +293,15 @@
 
 `companion_action` 可为 `null`：例如艾莉蓝量低、爆裂 CD 中，服务仍可返回反应和建议，但不得虚构可施放动作。
 
+### 6.3 事件幂等
+
+服务端按 `encounter_id + event_id` 做幂等（总策划书 §4.2）：
+
+- 首次受理的事件正常返回，`duplicate: false`。
+- 同一 `encounter_id + event_id` 的网络重试**回放首次响应**：`request_id` 回显本次请求，但 `order_id`、台词、动作均与首次一致，并标记 `duplicate: true`。
+- UE 可据此识别重试（丢弃重放或仅去重显示）；回放不产生新的 `order_id`，因此不会重复施法。
+- 不同 `encounter_id` 下相同 `event_id` 是两次独立事件。
+
 ---
 
 ## 7. `POST /v1/tactical/executions`（服务端已实现）
@@ -301,7 +310,7 @@
 >（字段与本节示例一致，另含可选 `request_id`/`reported_at`/`policy_revision`/
 > `sequence`/`agent_id`/`ability_id`）；`reported_at` 由 UE 可选提供，服务端
 > 受理时间 `received_at` 自动补齐。成功返回 **202** + `{"stored": true, ...}`，
-> 按天落 `data/rl/executions/{YYYYMMDD}.jsonl`。批量上传待本协议定稿。
+> 按天落 `data/rl/executions/{YYYYMMDD}.jsonl`。批量上传留待 v0.3 再定。
 > 实现细节：`app/schemas/tactical_execution.py`、`app/services/tactical/receipt_store.py`。
 
 UE 的回执用于观察、异常反馈与后续评测，不能反向改变已经结算的战斗事实。
@@ -310,11 +319,13 @@ UE 的回执用于观察、异常反馈与后续评测，不能反向改变已�
 {
   "protocol_version": "0.2",
   "request_id": "88d7e6b4-f4f2-4d39-8c96-a23d293882f6",
-  "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
-  "encounter_id": "encounter.20260903.001",
-  "result": "rejected",
-  "reason_code": "ABILITY_ENTERED_COOLDOWN",
-  "reported_at": "2026-09-03T12:00:01Z"
+  "receipt": {
+    "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
+    "encounter_id": "encounter.20260903.001",
+    "result": "rejected",
+    "reason_code": "ABILITY_ENTERED_COOLDOWN",
+    "reported_at": "2026-09-03T12:00:01Z"
+  }
 }
 ```
 

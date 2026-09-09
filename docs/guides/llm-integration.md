@@ -40,7 +40,7 @@ LLM_API_KEY=sk-xxxxxx
 
 ```python
 # 文件：scripts/llm_smoke.py 或直接 python -c
-from app.services.command_parser import parse_command
+from app.services.parsers.command_parser import parse_command
 
 for text in [
     "艾莉，等 Boss 血量低于一半就开大",   # 规则里没有的新指令

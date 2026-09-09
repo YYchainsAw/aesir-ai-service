@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | [ue-protocol-contract-v0.1.md](protocols/ue-protocol-contract-v0.1.md) | **契约 v0.1**：API + `TacticalOrder` 类型定义 + Golden JSON + 能力目录白名单 | UE / Python |
 | [ue-integration-guide-v0.1.md](protocols/ue-integration-guide-v0.1.md) | UE 侧接入指南：分步操作 + 21 条验收清单 | UE |
-| [combat-tactical-protocol-v0.2-draft.md](protocols/combat-tactical-protocol-v0.2-draft.md) | 战斗事件与上下文感知战术协议 **v0.2（草案）** | UE / Python |
+| [combat-tactical-protocol-v0.2.md](protocols/combat-tactical-protocol-v0.2.md) | 战斗事件与上下文感知战术协议 **v0.2（正式版）** | UE / Python |
 
 ## guides — 操作指南
 

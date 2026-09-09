@@ -53,9 +53,11 @@ aesir-ai-service/
 │   ├── policy/                    # ActingPolicy/TacticalPolicy 协议 + rule/ppo 基线
 │   ├── env.py / features.py       # Gymnasium 环境 + 观测提取
 │   └── rewards.py / eval_utils.py
-├── scripts/                       # rl_train.py / rl_eval.py / asr_eval.py
+├── scripts/                       # rl_train.py / rl_eval.py / asr_eval.py / mock_ue_flow.py
 ├── data/
 │   ├── companions/                # 队友 YAML 人设（Alice）
+│   ├── policy/                    # 战术策略阈值/优先级（tactical_policy.yaml，试玩调参只改这里）
+│   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）
 │   └── rl/                        # 运行数据（回执/轨迹 JSONL，gitignore 不入库）
 ├── tests/                         # api / schemas / services / rl 测试
 ├── docs/                          # 项目文档（planning/protocols/guides/design/logs）
@@ -70,7 +72,7 @@ aesir-ai-service/
 | 项目总览 / 设计理念 | 本文档 |
 | **UE × 模型服务协议契约 v0.1**（API + 类型定义） | [`docs/protocols/ue-protocol-contract-v0.1.md`](docs/protocols/ue-protocol-contract-v0.1.md) |
 | **UE 侧接入指南 v0.1**（分步 + 验收清单） | [`docs/protocols/ue-integration-guide-v0.1.md`](docs/protocols/ue-integration-guide-v0.1.md) |
-| 战斗事件 / 上下文感知战术协议 v0.2（草案） | [`docs/protocols/combat-tactical-protocol-v0.2-draft.md`](docs/protocols/combat-tactical-protocol-v0.2-draft.md) |
+| 战斗事件 / 上下文感知战术协议 v0.2（正式版） | [`docs/protocols/combat-tactical-protocol-v0.2.md`](docs/protocols/combat-tactical-protocol-v0.2.md) |
 | 启动 / 安装 / 接口示例 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
 | LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
 | RL 可行性设计与框架 | [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md) |
@@ -97,8 +99,8 @@ aesir-ai-service/
 | `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
 | `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
 | `POST` | `/v1/tactical/resolve` | v0.2 预览：意图 + 战斗快照 → 上下文决策（规则策略） |
-| `POST` | `/v1/tactical/executions` | v0.2 草案 §7：UE 执行回执（202 受理，落 JSONL） |
-| `POST` | `/v1/combat/events` | v0.2 草案 §6：战斗事件 → 艾莉反应/建议/候选动作 |
+| `POST` | `/v1/tactical/executions` | v0.2 §7：UE 执行回执（202 受理，落 JSONL） |
+| `POST` | `/v1/combat/events` | v0.2 §6：战斗事件 → 艾莉反应/建议/候选动作 |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
@@ -171,7 +173,16 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events、Boss 战模拟器与 RL 环境等（**208 通过 + 3 条冒烟默认跳过**）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-09：**218 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+
+### UE 联调前预演（不写一行 C++ 也能看到全链路）
+
+```powershell
+.\.venv\Scripts\python -m uvicorn app.main:app --reload          # 终端 1：起服务
+.\.venv\Scripts\python -m scripts.mock_ue_flow                    # 终端 2：假 UE 全链路
+```
+
+脚本按策划书 §9 的 UE 伪流程依次调用 chat → parse → resolve（同一句治疗指令 × A/B/C/D 四类战况，见 `data/golden/`）→ combat/events（含同一 `event_id` 重试的幂等回放）→ executions 回执，全部打印响应 JSON，可直接作为 UE 侧开发与答辩演示素材。
 
 ## 路线图
 
@@ -182,6 +193,8 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 - [x] 专用 `/v1/speech/transcribe` 端点，与组合端点并存
 - [x] v0.2 第一阶段：CombatContext/TacticalIntent/TacticalDecision schema + `/v1/tactical/resolve` 规则策略 v1 + 85 例回归评测
 - [x] `/v1/combat/events` 战斗事件端点 + `/v1/tactical/executions` 执行回执
+- [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
+- [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/mock_ue_flow.py` 全链路演示（2026-09-09）
 - [ ] 强化学习走位策略：为 AI 队友提供决策能力（Python 模拟器已就绪，待训练）
 
 ## 调试

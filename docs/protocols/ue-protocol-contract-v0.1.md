@@ -6,7 +6,7 @@
 
 本文由原《协议格式契约》与《UE5 × 模型服务联调技术规范》合并而成，只保留**类型穷尽定义**与**两端共同契约**，删除会随进度过期的「进度/目标」章节。
 
-> **实现状态说明：** 本文是当前代码已经实现的 v0.1 格式基线。战斗状态快照、自动事件、上下文技能选择、执行回执不属于本版本；请参见设计草案《[战斗事件与上下文感知战术协议 v0.2](combat-tactical-protocol-v0.2-draft.md)》。v0.2 中 `/v1/tactical/resolve`（规则策略 v1）、`/v1/combat/events`、`/v1/tactical/executions` 均已在 Python 侧实现。
+> **实现状态说明：** 本文是当前代码已经实现的 v0.1 格式基线。战斗状态快照、自动事件、上下文技能选择、执行回执不属于本版本；请参见《[战斗事件与上下文感知战术协议 v0.2(combat-tactical-protocol-v0.2.md)》。v0.2 中 `/v1/tactical/resolve`（规则策略 v1）、`/v1/combat/events`、`/v1/tactical/executions` 均已在 Python 侧实现。
 
 ---
 
