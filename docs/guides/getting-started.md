@@ -63,6 +63,8 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
+或直接双击项目根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
+
 - `--reload`：代码改动后自动重启，仅开发环境使用。
 - 默认监听 `127.0.0.1:8000`。
 

@@ -86,6 +86,8 @@ aesir-ai-service/
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
+或直接双击根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
+
 服务启动后访问：
 
 - `http://127.0.0.1:8000/health`：健康检查（返回 `protocol_version: "0.1"`）
