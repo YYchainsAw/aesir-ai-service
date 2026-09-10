@@ -46,7 +46,7 @@ def test_companion_chat_mock_fallback_is_deterministic_per_text() -> None:
     assert other["reply_text"] != "我在呢。想聊什么？"
 
 
-def test_companion_chat_mock_tactical_request_is_redirected() -> None:
+def test_companion_chat_mock_tactical_request_is_redirected_in_character() -> None:
     response = client.post(
         "/v1/companion/chat",
         json={"text": "帮我打那个 Boss！", "game_state": "exploration", "companion_id": "companion.alice"},
@@ -54,7 +54,9 @@ def test_companion_chat_mock_tactical_request_is_redirected() -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert "战术指令" in body["reply_text"]
+    # 人设纪律：拒绝战斗请求必须以角色口吻，不得出现「指令」「频道」等出戏术语。
+    for jargon in ("指令", "频道", "接口", "协议", "系统"):
+        assert jargon not in body["reply_text"]
     assert body["emotion_id"] in {"emotion.playfully_annoyed", "emotion.serious"}
 
 
