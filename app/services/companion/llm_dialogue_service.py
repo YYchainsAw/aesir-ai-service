@@ -11,6 +11,7 @@ from app.schemas.companion_dialogue import (
 from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
+from app.services.companion.session_memory import DialogueTurn
 
 
 class _DialoguePayload(BaseModel):
@@ -37,10 +38,16 @@ class LLMCompanionDialogueService:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
 
-    def reply(self, request: CompanionDialogueRequest) -> CompanionDialogueResponse:
+    def reply(
+        self,
+        request: CompanionDialogueRequest,
+        *,
+        history: tuple[DialogueTurn, ...] = (),
+    ) -> CompanionDialogueResponse:
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
+                history=history,
             ),
             user_prompt=request.text,
         )
@@ -59,6 +66,7 @@ class LLMCompanionDialogueService:
 
         return CompanionDialogueResponse(
             companion_id=request.companion_id,
+            session_id=request.session_id,
             reply_text=response_payload.reply_text,
             emotion_id=response_payload.emotion_id,
             gesture_id=response_payload.gesture_id,
@@ -70,6 +78,8 @@ class LLMCompanionDialogueService:
 
 def _build_system_prompt(
     profile: CompanionProfile,
+    *,
+    history: tuple[DialogueTurn, ...] = (),
 ) -> str:
     identity = profile.raw.get("identity", {})
     persona = profile.raw.get("persona", {})
@@ -98,6 +108,13 @@ def _build_system_prompt(
     lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
+
+    if history:
+        lines.append(
+            "Recent conversation with the player (oldest first; continue naturally "
+            "from it, do not repeat yourself):\n"
+            + "\n".join(f"Player: {t.user_text}\n{profile.display_name}: {t.reply_text}" for t in history)
+        )
 
     examples = _format_dialogue_examples(profile)
     if examples:

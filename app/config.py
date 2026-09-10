@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     asr_backend: str = "mock"                   # mock | faster_whisper
     tactical_policy: str = "rule"               # rule | rl（rl 仅占位，见总策划书 Phase 4）
     intent_backend: str = "rule"                # rule | llm（/v1/tactical/command 的意图解析后端）
+    dialogue_history_turns: int = 10            # 会话记忆滚动窗口（session_id 维度，0 = 关闭记忆）
 
     # -- ASR ----------------------------------------------------------------
     asr_mock_text: str = ""                      # mock 转写固定文本；空 = 没转出命令

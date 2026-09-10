@@ -72,6 +72,31 @@ def test_companion_chat_mock_unmatched_text_returns_default() -> None:
     assert body["source"] == "mock"
 
 
+def test_companion_chat_accepts_and_echoes_session_id() -> None:
+    response = client.post(
+        "/v1/companion/chat",
+        json={
+            "text": "天气不错",
+            "companion_id": "companion.alice",
+            "game_state": "exploration",
+            "session_id": "ue-session-42",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session_id"] == "ue-session-42"
+    assert body["reply_text"] == "我在呢。想聊什么？"
+
+
+def test_companion_chat_rejects_blank_session_id() -> None:
+    response = client.post(
+        "/v1/companion/chat",
+        json={"text": "你好", "session_id": ""},
+    )
+    assert response.status_code == 422
+
+
 def test_companion_chat_rejects_combat_state() -> None:
     response = client.post(
         "/v1/companion/chat",

@@ -221,15 +221,16 @@ curl -X POST http://127.0.0.1:8000/v1/tactical/command `
 
 ### 5.5 非战斗陪伴对话
 
-`POST /v1/companion/chat`（仅 `exploration` / `conversation` 状态；后端由 `AESIR_COMPANION_BACKEND` 决定，默认 `mock`，LLM 故障时回退 YAML 默认回复）：
+`POST /v1/companion/chat`（仅 `exploration` / `conversation` 状态；后端由 `AESIR_COMPANION_BACKEND` 决定，默认 `mock`，LLM 故障时回退 YAML 分类候选回复）：
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/v1/companion/chat `
   -H "Content-Type: application/json" `
-  -d '{\"text\": \"艾莉，今天心情怎么样？\", \"companion_id\": \"companion.alice\", \"game_state\": \"conversation\"}'
+  -d '{\"text\": \"艾莉，今天心情怎么样？\", \"companion_id\": \"companion.alice\", \"game_state\": \"conversation\", \"session_id\": \"ue-session-42\"}'
 ```
 
-未登记的 `companion_id` 返回 `404`。
+- `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文；缺省时请求完全无状态。记忆在进程内存中，重启即清空。
+- 未登记的 `companion_id` 返回 `404`。
 
 ## 6. 常见问题
 

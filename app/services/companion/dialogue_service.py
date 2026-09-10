@@ -13,23 +13,31 @@ from app.services.companion.profile_repository import (
     UnknownCompanionError,
     get_profile,
 )
+from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
 
 
 def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
-    """按 YAML 人设选择 LLM；不可用时回退到 YAML 默认回复。"""
+    """按 YAML 人设选择 LLM；不可用时回退到 YAML 分类候选回复。"""
     # mtime 缓存读取人设；id 校验语义与 require_primary 一致（404 路径不变）。
     profile = get_profile()
     if profile.companion_id != request.companion_id:
         raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
 
+    memory = get_session_memory(get_settings().dialogue_history_turns)
+    history = memory.history(request.session_id) if request.session_id else ()
+
     if get_settings().companion_backend == "llm":
         try:
-            return LLMCompanionDialogueService(profile=profile).reply(request)
+            response = LLMCompanionDialogueService(profile=profile).reply(request, history=history)
         except LLMClientError:
-            return _create_mock_dialogue_reply(request, profile=profile, source="fallback")
+            response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
+    else:
+        response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
 
-    return _create_mock_dialogue_reply(request, profile=profile, source="mock")
+    if request.session_id:
+        memory.record(request.session_id, request.text, response.reply_text)
+    return response
 
 
 def _create_mock_dialogue_reply(
@@ -45,6 +53,7 @@ def _create_mock_dialogue_reply(
     presentation = _select_fallback_presentation(request.text, profile)
     return CompanionDialogueResponse(
         companion_id=request.companion_id,
+        session_id=request.session_id,
         reply_text=presentation.reply_text,
         emotion_id=presentation.emotion_id,
         gesture_id=presentation.gesture_id,

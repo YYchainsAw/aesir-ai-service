@@ -87,6 +87,33 @@ def test_companion_llm_prompt_injects_full_persona_and_examples() -> None:
     assert "emotion.shy" in prompt
 
 
+def test_companion_llm_prompt_injects_conversation_history() -> None:
+    """方案 B 回归：session 历史以对话块形式进入系统提示。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "那就接着说。",
+            "emotion_id": "emotion.bright",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.bright_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="刚说到哪了？", session_id="s1"),
+        history=(DialogueTurn(user_text="我们出发吧。", reply_text="当然可以。"),),
+    )
+
+    prompt = stub.system_prompt
+    assert "Recent conversation" in prompt
+    assert "Player: 我们出发吧。" in prompt
+    assert "Alice: 当然可以。" in prompt
+    assert stub.user_prompt == "刚说到哪了？"
+
+
 def test_tactical_llm_parser_rejects_extra_fields() -> None:
     parser = LLMCommandParser(
         StubLLMClient(

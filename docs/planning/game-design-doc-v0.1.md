@@ -363,7 +363,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 5. 最后接入用户词典和可选 RL。（真人声调优已取消；RL 可先做 Python 侧模拟器）
 6. **陪伴对话质量三阶段**（2026-09-10 立项，A 已落地）：
    - ~~A：人设深度 + few-shot 语料 + 回退多样化~~（已完成，2026-09-10：YAML `dialogue_examples` + `fallback_dialogue_responses`，LLM prompt 全量注入人设，无 LLM 时按关键词分类回复并稳定轮换候选）。
-   - B：短期对话记忆——请求加 `session_id`，服务端维护最近 N 轮滚动窗口注入 prompt；**需 UE 传参、进 v0.3 协议，UE 启动前不实施**；同步修订 YAML `runtime_state_policy`。
+   - B：短期对话记忆——~~请求加 `session_id`，服务端维护最近 N 轮滚动窗口注入 prompt~~（服务端已实现，2026-09-10：`session_id` 选填向后兼容、`session_memory.py` 滚动窗口、prompt 注入历史、YAML `runtime_state_policy` 升级 v0.3 语义；**UE 传参即可启用，无需再改服务端**）。
    - C：agent/skill 化——LLM 工具调用（查世界设定知识库、查 `CombatContext` 战况快照），让设定/战况类问答有据可依；复用 tactical LLM 的 JSON 白名单+回退模式；A/B 稳定后按需做。
 
 不要先做复杂长期记忆或 RL；先把一名队友、一只 Boss、两类事件、三类战术选择做成稳定且可演示的闭环。

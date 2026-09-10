@@ -2,7 +2,29 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**242 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**250 通过 + 3 冒烟跳过**）。
+
+## 2026-09-10 — 陪伴对话质量方案 B（短期会话记忆）+ RL 100 万步多种子训练
+
+### 方案 B：短期会话记忆（服务端先行，向后兼容）
+
+- **`session_id`（选填）**：`/v1/companion/chat` 请求新增；响应同步回显。不传时行为与 v0.1 完全一致（无状态）。
+- **滚动窗口记忆**：`app/services/companion/session_memory.py`——按 `session_id` 维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10，0 = 关闭）「玩家输入 + 艾莉回复」，线程安全、进程内存、重启即清空；刻意不做长期记忆/玩家画像。
+- **LLM prompt 注入对话历史**：历史以「Player:/Alice:」对话块进入系统提示，角色可接续上文；mock/回退路径不受影响但同样记录（后端切换不断档）。
+- **YAML `runtime_state_policy` 修订**：v0.1 无状态条款升级为 v0.3 会话记忆语义（含「未携带 session_id 时无状态」）。
+- **测试**：新增 8 例（记忆读写/淘汰/隔离/关闭、历史注入 prompt、session_id 回显与 422 校验、mock 记录集成）。**250 通过 + 3 冒烟跳过**。
+
+### RL：3 种子 × 100 万步 PPO 训练与 A/B 评测（结论：2/3 种子达标）
+
+| agent | mean_reward | win_rate | stun_burst_rate |
+| --- | --- | --- | --- |
+| rule 基线 | 17.62 | 1.00 | 0.00 |
+| ppo seed 0 | 15.11 | 1.00 | 0.00（训练后期震荡，最终 checkpoint 恰在坏相位） |
+| ppo seed 1 | 21.76 | 1.00 | **1.00** |
+| ppo seed 2 | 21.76 | 1.00 | **1.00** |
+
+- seed 1/2 稳定学到「眩晕窗口施放爆裂」（reward +23%），**满足 §8 上线判定**（win_rate 不降且 stun_burst_rate 显著更高）；seed 0 训练后期在两解间震荡且无中间 checkpoint 保留——后续训练应按评测选优保存 checkpoint，而非只存最终点。
+- 模型与日志：`models/rl/ppo_bossfight_seed{0,1,2}.zip`、`models/rl/train_multi_seed.log`、`models/rl/eval_multi_seed.log`。
 
 ## 2026-09-10 — 陪伴对话质量方案 A（人设深度 + 语料样例 + 回退多样化）
 
