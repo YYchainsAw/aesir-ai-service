@@ -91,3 +91,35 @@ def test_empty_text_rejected_with_422() -> None:
         json=_payload("", make_combat_context(player_hp=50)),
     )
     assert resp.status_code == 422
+
+
+def test_llm_backend_without_config_falls_back_to_rule(monkeypatch) -> None:
+    """AESIR_INTENT_BACKEND=llm 但 LLM 未配置（无 key）→ 回退规则，source 标记。
+
+    注意 .env 里可能存在真实 key（load_dotenv 注入进程环境），测试必须
+    显式清空，否则会发真实 LLM 请求。
+    """
+    monkeypatch.setenv("AESIR_INTENT_BACKEND", "llm")
+    monkeypatch.setenv("LLM_API_KEY", "")
+    resp = client.post(
+        "/v1/tactical/command",
+        json=_payload("艾莉，帮我回一下血", make_combat_context(player_hp=18)),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["recognized"] is True
+    assert body["source"] == "rule_fallback"
+    assert body["decision"]["action"]["ability_id"] == "ability.alice.major_heal"
+
+
+def test_llm_backend_misconfigured_text_unrecognized(monkeypatch) -> None:
+    """LLM 不可用且规则也不识别 → 澄清回复，source 仍是 rule_fallback。"""
+    monkeypatch.setenv("AESIR_INTENT_BACKEND", "llm")
+    monkeypatch.setenv("LLM_API_KEY", "")
+    resp = client.post(
+        "/v1/tactical/command",
+        json=_payload("今天天气不错", make_combat_context(player_hp=50)),
+    )
+    body = resp.json()
+    assert body["recognized"] is False
+    assert body["source"] == "rule_fallback"

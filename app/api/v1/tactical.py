@@ -18,7 +18,7 @@ from app.schemas.tactical_decision import (
 )
 from app.schemas.tactical_execution import ExecutionReceipt
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
-from app.services.tactical.intent_parser import parse_text_to_intent
+from app.services.tactical.llm_intent import parse_intent_with_source
 from app.services.tactical.policy import get_policy
 from app.services.tactical.receipt_store import append_receipt
 from app.services.tactical.resolver import resolve_intent
@@ -26,7 +26,9 @@ from app.services.tactical.resolver import resolve_intent
 router = APIRouter(prefix="/v1/tactical", tags=["tactical"])
 
 
-def _resolve_response(request_id: str, intent, combat_context) -> ResolveResponse:
+def _resolve_response(
+    request_id: str, intent, combat_context, source: str = "rule"
+) -> ResolveResponse:
     """resolve 与组合端点共用的响应组装（决策 + 人设回复 + 观察字段）。"""
     decision: TacticalDecision = resolve_intent(intent, combat_context)
     policy_backend = get_settings().tactical_policy
@@ -38,7 +40,7 @@ def _resolve_response(request_id: str, intent, combat_context) -> ResolveRespons
         protocol_version=PROTOCOL_VERSION_V02,
         request_id=request_id,
         recognized=decision is not None,
-        source="rule",
+        source=source,
         decision=decision,
         companion_reply={
             "reply_text": ack.reply_text if ack else "收到。",
@@ -71,17 +73,17 @@ def resolve_tactical(request: ResolveRequest) -> ResolveResponse:
 def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
     """组合端点：文本 + 战斗快照 → 上下文战术决策（一次调用）。
 
-    文本先经规则意图解析出 ``TacticalIntent``（后续可接 LLM），再走
-    resolve 的上下文策略；不可识别时按策划书 §5.2 回复澄清——不猜测、
-    不施放。
+    文本先解析出 ``TacticalIntent``（后端由 ``AESIR_INTENT_BACKEND`` 决定：
+    规则 / LLM，LLM 失败自动回退规则），再走 resolve 的上下文策略；
+    不可识别时按策划书 §5.2 回复澄清——不猜测、不施放。
     """
-    intent = parse_text_to_intent(request.text)
+    intent, source = parse_intent_with_source(request.text)
     if intent is None:
         return ResolveResponse(
             protocol_version=PROTOCOL_VERSION_V02,
             request_id=request.request_id,
             recognized=False,
-            source="rule",
+            source=source,
             decision=None,
             companion_reply={
                 "reply_text": "我没听清你想让我做什么，能再说一遍吗？",
@@ -93,7 +95,9 @@ def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
                 used_snapshot_id=request.combat_context.snapshot_id,
             ),
         )
-    return _resolve_response(request.request_id, intent, request.combat_context)
+    return _resolve_response(
+        request.request_id, intent, request.combat_context, source=source
+    )
 
 
 class ExecutionReceiptRequest(BaseModel):

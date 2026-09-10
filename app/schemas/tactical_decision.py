@@ -67,7 +67,8 @@ class ResolveRequest(BaseModel):
 class TacticalCommandRequest(BaseModel):
     """组合端点 ``/v1/tactical/command`` 请求：文本 + 快照一次到位。
 
-    内部先做 文本 → ``TacticalIntent``（规则，后续可接 LLM），再走
+    内部先做 文本 → ``TacticalIntent``（规则 / LLM 后端由 ``AESIR_INTENT_BACKEND``
+    决定，LLM 失败回退规则），再走
     resolve 的上下文策略；等价于先调 ``/v1/commands/parse`` 出意图、
     再调 ``/v1/tactical/resolve`` 落地，省一次 UE 往返。
     """

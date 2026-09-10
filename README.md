@@ -176,7 +176,7 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-09：**224 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-10：**236 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
 
 ### UE 联调前预演（不写一行 C++ 也能看到全链路）
 

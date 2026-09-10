@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     companion_backend: str = "mock"             # mock | llm
     asr_backend: str = "mock"                   # mock | faster_whisper
     tactical_policy: str = "rule"               # rule | rl（rl 仅占位，见总策划书 Phase 4）
+    intent_backend: str = "rule"                # rule | llm（/v1/tactical/command 的意图解析后端）
 
     # -- ASR ----------------------------------------------------------------
     asr_mock_text: str = ""                      # mock 转写固定文本；空 = 没转出命令
