@@ -4,6 +4,7 @@ import pytest
 
 from app.services.companion.dialogue_service import create_dialogue_reply
 from app.services.companion.profile_repository import (
+    CompanionProfileError,
     CompanionProfileRepository,
     UnknownCompanionError,
 )
@@ -92,3 +93,47 @@ def test_get_profile_caches_until_mtime_changes(tmp_path, monkeypatch) -> None:
     assert third is not first
     assert calls["n"] == 2
     assert third.display_name == "Alice2"
+
+
+def test_profile_parses_dialogue_examples_and_fallback_categories() -> None:
+    # 方案 A 回归：dialogue_examples / fallback_dialogue_responses 解析进快照，
+    # 回退类别保持 YAML 出现顺序（tactical_redirect 判序最高）。
+    profile = CompanionProfileRepository().load_primary()
+
+    categories = [c.name for c in profile.fallback_reply_categories]
+    assert categories[0] == "tactical_redirect"
+    assert all(c.replies for c in profile.fallback_reply_categories)
+    assert any(e.category == "praised" for e in profile.dialogue_examples)
+
+
+def test_profile_rejects_unregistered_id_in_dialogue_example(tmp_path) -> None:
+    profile_path = tmp_path / "profile.yaml"
+    profile_path.write_text(
+        """
+identity:
+  id: companion.alice
+  display_name: Alice
+allowed_emotion_ids:
+  - id: emotion.bright
+allowed_gesture_ids:
+  - id: gesture.cheerful_idle
+allowed_facial_expression_ids:
+  - id: face.bright_smile
+default_dialogue_response:
+  reply_text: hi
+  emotion_id: emotion.bright
+  gesture_id: gesture.cheerful_idle
+  facial_expression_id: face.bright_smile
+dialogue_examples:
+  - category: smalltalk
+    player: hi
+    reply_text: yo
+    emotion_id: emotion.not_registered
+    gesture_id: gesture.cheerful_idle
+    facial_expression_id: face.bright_smile
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CompanionProfileError, match="dialogue example"):
+        CompanionProfileRepository(profile_path).load_primary()

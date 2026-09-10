@@ -76,17 +76,55 @@ def _build_system_prompt(
     speaking_style = profile.raw.get("speaking_style", {})
     rules = profile.raw.get("conversation_rules", {}).get("response_rules", [])
 
-    return "\n".join(
-        [
-            "You are a non-combat game companion. Reply in Chinese.",
-            f"Character: {profile.display_name}.",
-            f"Persona: {persona.get('background', '')}",
-            f"Speaking style: {speaking_style.get('tone', '')}",
-            "Response rules: " + " ".join(str(rule) for rule in rules),
-            "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible.",
-            f"Allowed emotion_id values: {sorted(profile.allowed_emotion_ids)}.",
-            f"Allowed gesture_id values: {sorted(profile.allowed_gesture_ids)}.",
-            f"Allowed facial_expression_id values: {sorted(profile.allowed_facial_expression_ids)}.",
-            "Do not issue combat commands, describe game mechanics, or invent IDs.",
-        ]
-    )
+    lines = [
+        "You are a non-combat game companion. Reply in Chinese.",
+        f"Character: {profile.display_name}.",
+        f"Short description: {identity.get('short_description', '')}",
+        f"Persona: {persona.get('background', '')}",
+        f"Core traits: {', '.join(str(t) for t in persona.get('core_traits', []))}.",
+        f"Values: {', '.join(str(v) for v in persona.get('values', []))}.",
+        f"Dislikes: {', '.join(str(d) for d in persona.get('dislikes', []))}.",
+    ]
+
+    relationship = persona.get("relationship_to_player", {})
+    if relationship:
+        lines.append(f"Relationship surface: {relationship.get('surface', '')}")
+        lines.append(f"Relationship subtext: {relationship.get('subtext', '')}")
+        lines.append(
+            "Relationship behavior rules: " + " ".join(str(r) for r in relationship.get("behavior_rules", []))
+        )
+
+    lines.append(f"Speaking tone: {speaking_style.get('tone', '')}")
+    lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
+    lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
+    lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
+
+    examples = _format_dialogue_examples(profile)
+    if examples:
+        lines.append(
+            "Example exchanges (match this pattern of matching reply style and emotion "
+            "to the type of player input; do not reuse the literal sentences):\n" + examples
+        )
+
+    lines += [
+        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible.",
+        f"Allowed emotion_id values: {sorted(profile.allowed_emotion_ids)}.",
+        f"Allowed gesture_id values: {sorted(profile.allowed_gesture_ids)}.",
+        f"Allowed facial_expression_id values: {sorted(profile.allowed_facial_expression_ids)}.",
+        "Do not issue combat commands, describe game mechanics, or invent IDs.",
+    ]
+    return "\n".join(lines)
+
+
+def _format_dialogue_examples(profile: CompanionProfile) -> str:
+    """把 YAML few-shot 样例格式化为示范对话块。"""
+    blocks = []
+    for example in profile.dialogue_examples:
+        presentation = example.presentation
+        blocks.append(
+            f"[{example.category}] Player: {example.player}\n"
+            f"{profile.display_name}: {presentation.reply_text} "
+            f"(emotion={presentation.emotion_id}, gesture={presentation.gesture_id}, "
+            f"face={presentation.facial_expression_id})"
+        )
+    return "\n".join(blocks)

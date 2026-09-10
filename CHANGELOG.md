@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**236 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**242 通过 + 3 冒烟跳过**）。
+
+## 2026-09-10 — 陪伴对话质量方案 A（人设深度 + 语料样例 + 回退多样化）
+
+- **背景**：对话链路此前只把 background/tone 注入 prompt，YAML 人设大半没被模型看到；无 few-shot 语料；无 LLM 时回退是单句静态「我在呢。想聊什么？」——表现为复读机。
+- **YAML 新增 `dialogue_examples`**：8 组 few-shot 示范（smalltalk/question/praised/cared_for/lore_question/tactical_redirect），示范「同类输入 → 对应风格与情绪 ID」模式；ID 受白名单校验。
+- **YAML 新增 `fallback_dialogue_responses`**：按类别的多条回退候选（tactical_redirect/praise/concern/question），关键词命中选类、组内按输入的稳定哈希轮换（CRC32，跨进程重启恒定）。
+- **LLM prompt 全量注入**：core_traits / values / dislikes / relationship（surface+subtext+behavior_rules）/ speaking habits / avoid 全部进系统提示 + few-shot 块。
+- **profile_repository** 解析并校验两个新字段（示例/候选 ID 不在白名单 → 503 配置错误）。
+- **测试**：新增 6 例（分类命中、确定性、战术引导、未命中回默认、prompt 注入断言、YAML 解析校验）；全链路 `mock_ue_flow` 已验证。**242 通过 + 3 冒烟跳过**。
+- **后续路线（已写入策划书 §11）**：B = 短期对话记忆（需 `session_id`，v0.3 协议、待 UE）；C = 工具调用 + 世界观知识库（查设定/查战况，按需做）。
 
 ## 2026-09-10 — 战术指令 LLM 意图解析
 
