@@ -18,6 +18,7 @@
 | `POST /v1/voice/command` | 已实现 v0.1 | multipart 音频 → mock/ASR → 基础战术订单 |
 | `POST /v1/speech/transcribe` | 已实现 | 单独转写音频，返回文本与语言 |
 | `POST /v1/tactical/resolve` | 已实现（规则策略 v1） | 语义意图 + 状态快照 → 上下文战术决策 |
+| `POST /v1/tactical/command` | 已实现（规则意图解析 v1） | **组合端点**：文本 + 状态快照 → 上下文战术决策，一次调用 |
 | `POST /v1/combat/events` | 已实现（事件策略 v1 + 幂等） | UE 关键事件 → 艾莉反应/建议/候选动作 |
 | `POST /v1/tactical/executions` | 已实现 | UE 回传接受、执行或拒绝原因 |
 
@@ -224,6 +225,29 @@
 | `clarification_needed` | 指令歧义较大 | 请求玩家重述或提供候选 |
 
 `authority` 为 `player_requested` 或 `event_policy`。无论其值是什么，UE 均拥有最终否决权。
+
+### 5.4 `POST /v1/tactical/command`（组合端点，已实现）
+
+等价于「文本 → 意图 → resolve」的**一次调用**版本，UE 可省一次往返。请求把
+`intent` 字段换成 `text`：
+
+```json
+{
+  "protocol_version": "0.2",
+  "request_id": "<uuid4>",
+  "text": "艾莉，帮我回一下血",
+  "combat_context": { "...": "见第 3 节" }
+}
+```
+
+- 响应结构与 `/v1/tactical/resolve` 完全一致（`ResolveResponse`）。
+- 文本先经规则意图解析（`app/services/tactical/intent_parser.py`，关键词
+  白名单映射到 §4 的 7 个 `intent_id`，要求 wake 词「艾莉/艾琳/alice/eirin」），
+  再走同一份上下文策略；后续可接 LLM 意图解析（回退规则）。
+- 文本不可识别时按策划书 §5.2 回复澄清：HTTP 200 + `recognized:false` +
+  `decision:null` + 澄清台词——不猜测、不施放。
+- 多意图冲突按意图优先级判序（撤退 > 等眩晕爆发 > 治疗 > 保护 > 爆发 > 集火 > 跟随），
+  与 v0.1 规则解析器同一纪律。
 
 ---
 

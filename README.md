@@ -101,6 +101,7 @@ aesir-ai-service/
 | `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
 | `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
 | `POST` | `/v1/tactical/resolve` | v0.2 预览：意图 + 战斗快照 → 上下文决策（规则策略） |
+| `POST` | `/v1/tactical/command` | v0.2 组合端点：文本 + 战斗快照 → 上下文决策，一次调用 |
 | `POST` | `/v1/tactical/executions` | v0.2 §7：UE 执行回执（202 受理，落 JSONL） |
 | `POST` | `/v1/combat/events` | v0.2 §6：战斗事件 → 艾莉反应/建议/候选动作 |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
@@ -175,7 +176,7 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-09：**218 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-10：**236 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
 
 ### UE 联调前预演（不写一行 C++ 也能看到全链路）
 
@@ -197,6 +198,7 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 - [x] `/v1/combat/events` 战斗事件端点 + `/v1/tactical/executions` 执行回执
 - [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
 - [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/mock_ue_flow.py` 全链路演示（2026-09-09）
+- [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
 - [ ] 强化学习走位策略：为 AI 队友提供决策能力（Python 模拟器已就绪，待训练）
 
 ## 调试

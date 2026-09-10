@@ -2,7 +2,13 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-09，**218 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**236 通过 + 3 冒烟跳过**）。
+
+## 2026-09-10 — 战术指令 LLM 意图解析
+
+- **LLM 意图解析后端**：`app/services/tactical/llm_intent.py`——组合端点 `/v1/tactical/command` 的意图解析按 `AESIR_INTENT_BACKEND` 选 rule / LLM；LLM 输出严格 JSON 的 `TacticalIntent`（`intent_id` 受 Literal 白名单约束），任何失败（配置缺失、网络、非法输出）回退规则解析器。
+- **降级可观测**：`source` 字段标记实际来源（`rule` / `llm` / `rule_fallback`），供 UE 端降级观测。
+- 测试：**236 通过 + 3 冒烟跳过**。
 
 ## 2026-09-09 — v0.2 定稿 + 全项目审查整改
 
@@ -13,7 +19,8 @@
 - **v0.2 协议定稿**：`combat-tactical-protocol-v0.2-draft.md` → `combat-tactical-protocol-v0.2.md`，状态改正式版；全部端点 Python 侧已实现并有测试。
 - **UE 联调支持资产**：`data/golden/` 四类战况 golden 快照（与回归集 A/B/C/D 同源）+ `scripts/mock_ue_flow.py` 假 UE 全链路演示（chat → parse → resolve×4 → events 幂等 → executions），已端到端验证。
 - **文档体系整改**：策划书成为进度勾选唯一来源（README 路线图只做版本级摘要）；阶段验收统一标注「待 UE」；§11 下一步清单更新；新增 §12 风险登记。
-- 测试：**218 通过 + 3 冒烟跳过**。
+- **组合端点 `POST /v1/tactical/command`**：文本 + 快照 → 上下文决策一次到位。新增规则意图解析器 `intent_parser.py`（关键词白名单 → 7 个 `intent_id`，wake 词与 v0.1 一致，多意图按优先级判序），不可识别回复澄清（`recognized:false` + `decision:null`）；`mock_ue_flow` 演示同步覆盖。
+- 测试：**224 通过 + 3 冒烟跳过**。
 
 ## 2026-09-08 — 契约 v0.1 收尾 + RL 训练前清理 + 结构重构
 

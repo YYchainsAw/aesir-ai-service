@@ -21,6 +21,9 @@
 # 命令解析后端切到 LLM
 AESIR_PARSER_BACKEND=llm
 
+# 战术指令意图解析切到 LLM（/v1/tactical/command 组合端点）
+AESIR_INTENT_BACKEND=llm
+
 # DeepSeek（OpenAI 兼容）。换 Qwen/Ark 只需改下面两项
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
@@ -115,6 +118,14 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 - `LLM_API_KEY` 只写进被 `.gitignore` 忽略的 `.env`，**绝不提交到仓库、不写进文档/测试**。
 - 若密钥曾在不可信环境（录屏/转发）出现过，建议在 DeepSeek 控制台轮换一次。
 ---
+
+## 8. v0.2 战术指令的 LLM 意图解析
+
+组合端点 `POST /v1/tactical/command` 的意图解析也支持 LLM 后端：在 `.env` 加
+`AESIR_INTENT_BACKEND=llm`（默认 `rule`）。与上面命令解析同一套回退模式——LLM
+输出严格 JSON 的 `TacticalIntent`（`intent_id` 受 7 值白名单约束），配置缺失、
+网络失败、输出非法时自动回退规则解析器，`source` 字段标记实际来源
+（`rule` / `llm` / `rule_fallback`），UE 端可据此做降级观测。
 
 > 注：v0.2 的 `/v1/tactical/resolve` 当前为纯规则策略（`source` 固定 `rule`），
 > 不经 LLM；LLM 接入策略层待后续规划（届时将新增后端选型配置）。
