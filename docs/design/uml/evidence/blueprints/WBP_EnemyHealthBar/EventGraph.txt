@@ -1,0 +1,2 @@
+PASTE_WBP_EnemyHealthBar_EventGraph_CLIPBOARD_EXPORT_HERE
+

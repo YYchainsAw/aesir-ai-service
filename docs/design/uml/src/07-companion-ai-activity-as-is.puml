@@ -1,0 +1,63 @@
+@startuml 07-companion-ai-activity-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' Evidence: UE-ALICE-BT-001, UE-ALICE-BT-SELECTOR-001,
+'           UE-ALICE-BT-FOLLOW-001, UE-ALICE-BT-WAIT-001,
+'           UE-ALICE-BT-MOVE-001, UE-ALICE-BT-SERVICE-001,
+'           UE-ALICE-BT-DECORATOR-001, UE-ALICE-BTS-001,
+'           UE-ALICE-BB-001
+
+title Alice 同伴 AI 当前活动流程（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam activity {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  DiamondBackgroundColor #FFF1CC
+  DiamondBorderColor #9A6700
+  FontColor #172554
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+  FontColor #3F3308
+}
+
+start
+
+partition "BTS_AliceUpdateTarget\n每 0.25 秒，偏差 0.0 秒" {
+  :触发 ReceiveTickAI\n[05BCAEA041A96991283E559D2839E38E];
+  :调用 GetPlayerController(0)\n[4AF241CA4CA9B5D3903FCA919BCED409];
+  :Set Blackboard Value as Object\nTargetActor = PlayerController(0)\n[66FCB0A24C4B1FF05FEE02907B632C0F];
+}
+
+partition "BT_Alice / Alice Decision" {
+  if (TargetActor Is Set?) then (是)
+    :进入 Follow Player Sequence\n[BB4C88B74EDC95F30D9209BB7F4DB715];
+    :Wait 0.5 秒\n[497D033949530D198B55D782E0773503];
+    :Move To TargetActor\nAcceptable Radius = 250\nObserve Blackboard Value = true\n[4D981A5441A9B31177AF359D3A2DE97C];
+  else (否)
+    :Follow Player 分支失败;
+  endif
+}
+
+note right
+  Decorator：TargetActor Is Set
+  Notify Observer：On Value Change
+  Observer Aborts：Both
+  NodeGuid：0C8F1D8E469F9FE688CA778BF6CBBB44
+end note
+
+note bottom
+  当前行为树只有跟随分支。
+  没有战术订单、攻击、治疗、施法或撤退节点。
+end note
+
+stop
+
+@enduml

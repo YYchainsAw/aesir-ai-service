@@ -28,6 +28,7 @@
 | 文档 | 说明 | 读者 |
 | --- | --- | --- |
 | [rl-feasibility-design.md](design/rl-feasibility-design.md) | RL 可行性分析与框架设计 | 预研 |
+| [uml/README.md](design/uml/README.md) | UE × Python 当前实现 UML、建模基线与证据追踪 | 开发 / 设计 / 答辩 |
 
 ## logs — 开发记录归档
 
