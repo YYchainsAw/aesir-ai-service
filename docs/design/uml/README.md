@@ -2,6 +2,8 @@
 
 本工作区使用 PlantUML 描述 Aesir Combat Prototype 的业务域模型。
 
+完整的图表范围、优先级和完成标准见 `deliverables-plan.md`。
+
 建模原则：
 
 1. 先描述当前代码和蓝图真实存在的 **As-Is** 模型，再单独描述规划中的 **To-Be** 模型。
@@ -26,13 +28,13 @@ UML/
 | --- | --- | --- | --- |
 | UML-01 | `01-system-context-as-is.puml` | 系统上下文图 | 已核验 |
 | UML-02 | `02-domain-components-as-is.puml` | 业务组件图 | 源码关系已核验，蓝图接线待核验 |
-| UML-03 | `03-core-domain-classes-as-is.puml` | 核心领域类图 | 待制作 |
+| UML-03 | `03-core-domain-classes-as-is.puml` | 核心领域类图 | 已按 C++ 与 Blueprint 证据核验 |
 | UML-04 | `04-companion-chat-sequence-as-is.puml` | 陪伴文本聊天时序图 | 已按 Widget、C++ 与 Python 源码核验 |
-| UML-05 | `05-combat-sequence-as-is.puml` | 近战攻击时序图 | 待制作 |
-| UML-06 | `06-tactical-order-state-as-is.puml` | 战术订单状态图 | 待制作 |
+| UML-05 | `05-combat-sequence-as-is.puml` | 近战攻击时序图 | 已按 C++、输入与 UI 证据核验 |
+| UML-06 | `06-tactical-order-state-as-is.puml` | 战术订单状态图 | 已按 C++ 与 Alice Blueprint 证据核验 |
 | UML-07 | `07-companion-ai-activity-as-is.puml` | 同伴 AI 活动图 | 已按 BT/BTS/BB 节点文本核验 |
-| UML-08 | `08-deployment-as-is.puml` | 部署图 | 待制作 |
-| UML-09 | `09-voice-tactical-command-to-be.puml` | 语音战术指令目标时序图 | 待制作（To-Be） |
+| UML-08 | `08-deployment-as-is.puml` | 部署图 | 已按 UE/Python 源码与启动配置核验 |
+| UML-09 | `09-voice-tactical-command-to-be.puml` | 语音战术指令目标时序图 | 已制作（To-Be，未实现步骤均显式标记） |
 
 ## 完成判定
 

@@ -53,7 +53,7 @@ note right
   NodeGuid：0C8F1D8E469F9FE688CA778BF6CBBB44
 end note
 
-note bottom
+floating note left
   当前行为树只有跟随分支。
   没有战术订单、攻击、治疗、施法或撤退节点。
 end note

@@ -1,0 +1,235 @@
+@startuml 03-core-domain-classes-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: UE-PLAYER-001, UE-ENEMY-001, UE-COMBAT-001,
+'           UE-HEALTH-001, UE-POISE-001, UE-COMBAT-STATE-001,
+'           UE-TARGETING-001, UE-MATCH-001, UE-ORDER-001,
+'           UE-CMD-001, UE-ALICE-BP-001
+
+title Aesir Combat Prototype — 核心领域类图（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+  FontColor #3F3308
+}
+
+hide empty members
+left to right direction
+
+package "战斗参与者" {
+  class AAesirPlayerCharacter <<Actor>> {
+    +DoMove(Right, Forward)
+    +DoLook(Yaw, Pitch)
+    -HandleLightAttackInput()
+    -HandleHeavyAttackInput()
+    -HandleEvadeInput()
+    -HandleLockOnInput()
+    -HandlePlayerDeath(...)
+  }
+
+  class AAesirEnemyCharacter <<Actor>> {
+    +TryAttack(): bool
+    +IsAttacking(): bool
+    +IsDead(): bool
+    +IsStunned(): bool
+    +SetLockOnIndicatorVisible(Visible)
+    -HandlePoiseBroken()
+    -HandleDeath(...)
+  }
+
+  class BP_AliceCompanion <<Blueprint>> {
+    +CompanionId = companion.alice
+    +EventGraph = EMPTY_GRAPH_VERIFIED
+  }
+}
+
+package "权威战斗组件" {
+  class UAesirCombatComponent <<ActorComponent>> {
+    +TryLightAttack()
+    +TryHeavyAttack()
+    +CancelAttack()
+    +IsAttacking(): bool
+    +IsDamageWindowActive(): bool
+    +OnAttackStateChanged(Attacking)
+    -PerformAttackTrace(Start, End)
+  }
+
+  enum EAesirAttackType {
+    None
+    Light
+    Heavy
+  }
+
+  class UAesirHealthComponent <<ActorComponent>> {
+    +GetCurrentHealth(): float
+    +GetMaxHealth(): float
+    +IsDead(): bool
+    +SetInvulnerable(Invulnerable)
+    +OnHealthChanged(Current, Max, Delta)
+    +OnHitReceived(Location, Causer, Fatal)
+    +OnDeath(Instigator, Causer)
+  }
+
+  class UAesirPoiseComponent <<ActorComponent>> {
+    +ApplyPoiseDamage(Damage): bool
+    +ResetPoise()
+    +IsBroken(): bool
+    +OnPoiseChanged(Current, Max, Delta)
+    +OnPoiseBroken()
+  }
+
+  class UAesirCombatStateComponent <<ActorComponent>> {
+    +GetCombatState(): EAesirCombatState
+    +SetCombatState(NewState): bool
+    +IsInCombatState(State): bool
+    +OnCombatStateChanged(Previous, Current)
+  }
+
+  enum EAesirCombatState {
+    Idle
+    Combat
+    Attacking
+    Evading
+    HitReact
+    Stunned
+    Dead
+  }
+
+  class UAesirTargetingComponent <<ActorComponent>> {
+    +ToggleLockOn(): bool
+    +FindBestTarget(Radius, MaxAngle): Enemy
+    +GetCurrentTarget(): Actor
+    +ClearTarget()
+  }
+}
+
+package "战局" {
+  class AAesirCombatPrototypeGameMode <<GameMode>> {
+    -RemainingEnemies: int
+    -MatchResult: EAesirMatchResult
+    -HandlePlayerDeath(...)
+    -HandleEnemyDeath(...)
+    -FinishCombat(Result)
+    #OnCombatEnded(Result)
+  }
+
+  enum EAesirMatchResult {
+    None
+    Victory
+    Defeat
+  }
+}
+
+package "战术订单与服务接入" {
+  class UCommandServiceSubsystem <<GameInstanceSubsystem>> {
+    +CheckHealth()
+    +ParseCommand(Text)
+    +ParseVoiceCommand(WavData)
+    +ResolveTacticalIntentForTest(..., Context)
+    +OnCommandParsed(..., Order)
+    +OnTacticalResolved(Success, ResponseJson)
+  }
+
+  class FCombatContext <<Value Object>> {
+    +EncounterId: string
+    +SnapshotId: string
+    +CapturedAt: string
+    +Player: FCombatContextPlayer
+    +Companion: FCombatContextCompanion
+    +Boss: FCombatContextBoss
+  }
+
+  class FTacticalOrder <<Value Object>> {
+    +OrderId: string
+    +AgentId: string
+    +Intent: ETacticalOrderIntent
+    +When: FTacticalWhen
+    +Then: FTacticalThen
+    +Priority: int
+    +Expires: FTacticalExpires
+  }
+
+  class UTacticalOrderComponent <<ActorComponent>> {
+    -SupportedAbilityIds
+    -EncounterActive: bool
+    -HasActiveOrder: bool
+    -ActiveOrder: FTacticalOrder
+    +ValidateOrder(Order): bool
+    +BeginEncounter()
+    +EndEncounter()
+    +TryAcceptOrder(Order): bool
+    +ValidateActiveOrderAtTrigger(...): bool
+    +CompleteActiveOrder(): bool
+    +CancelActiveOrder(Reason): bool
+  }
+}
+
+AAesirPlayerCharacter *-- UAesirCombatComponent : owns
+AAesirPlayerCharacter *-- UAesirHealthComponent : owns
+AAesirPlayerCharacter *-- UAesirCombatStateComponent : owns
+AAesirPlayerCharacter *-- UAesirTargetingComponent : owns
+
+AAesirEnemyCharacter *-- UAesirCombatComponent : owns
+AAesirEnemyCharacter *-- UAesirHealthComponent : owns
+AAesirEnemyCharacter *-- UAesirCombatStateComponent : owns
+AAesirEnemyCharacter *-- UAesirPoiseComponent : owns
+
+UAesirCombatComponent --> EAesirAttackType : tracks
+UAesirCombatComponent ..> UAesirHealthComponent : ApplyPointDamage
+UAesirCombatComponent ..> UAesirPoiseComponent : ApplyPoiseDamage
+UAesirCombatStateComponent --> EAesirCombatState : stores
+UAesirTargetingComponent --> AAesirEnemyCharacter : selects / clears
+AAesirEnemyCharacter ..> UAesirCombatStateComponent : stun / death state
+
+AAesirCombatPrototypeGameMode --> EAesirMatchResult : stores / emits
+AAesirCombatPrototypeGameMode ..> UAesirHealthComponent : subscribes OnDeath
+
+UCommandServiceSubsystem ..> FCombatContext : serializes request
+UCommandServiceSubsystem ..> FTacticalOrder : parses command response
+BP_AliceCompanion *-- UTacticalOrderComponent : attached
+UTacticalOrderComponent *-- FTacticalOrder : active order
+UTacticalOrderComponent ..> UAesirHealthComponent : validates owner / target
+UTacticalOrderComponent ..> UAesirCombatStateComponent : validates cast state
+
+note bottom of UAesirCombatComponent
+  Montage Notify 控制 ComboWindow 与 AttackWindow；
+  AttackWindow 内执行武器 Sweep，同一次攻击对每个 Actor
+  最多结算一次伤害，并在目标有 PoiseComponent 时扣减韧性。
+end note
+
+note bottom of UCommandServiceSubsystem
+  当前战术 resolve 回调只广播 ResponseJson，
+  尚未解析为强类型 TacticalDecision。
+end note
+
+note bottom of UTacticalOrderComponent
+  已实现订单结构、本地校验、优先级替换、
+  触发时复核、完成与取消。
+
+  当前没有已核验的 CommandService → TacticalOrder，
+  也没有 TacticalOrder → Alice BT/技能执行接线；
+  因此图中不画这两条关系（GAP-BP-001/002/003）。
+end note
+
+legend bottom
+  |= 关系 |= 含义 |
+  | *-- | Actor/Blueprint 实际拥有组件或值对象 |
+  | --> / ..> | 当前源码可确认的状态引用、调用或订阅 |
+  | 未出现的连线 | 尚未实现或尚未核验，不属于 As-Is |
+endlegend
+
+@enduml

@@ -5,6 +5,13 @@
 ' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
 ' Evidence: UE-PLAYER-001, UE-ENEMY-001, UE-COMBAT-001, UE-MATCH-001,
 '           UE-AI-001, UE-CMD-001, UE-CHAT-001, UE-VOICE-001, UE-ORDER-001,
+'           UE-BP-PRESENTATION-001, UE-HUD-BP-001, UE-HUD-BP-CONSTRUCT-001,
+'           UE-HUD-BP-FUNCTION-001,
+'           UE-ENEMY-HUD-BP-001, UE-ENEMY-HUD-BP-CALL-001,
+'           UE-LOCKON-HUD-BP-001, UE-LOCKON-HUD-BP-CALL-001,
+'           UE-RESULT-HUD-BP-001, UE-RESULT-HUD-BP-CALL-001,
+'           UE-INPUT-IMC-COMBAT-001, UE-INPUT-IMC-LOCOMOTION-001,
+'           UE-INPUT-ACTIONS-001,
 '           PY-APP-001, PY-ROUTES-001, PY-PARSER-001, PY-TACTICAL-001,
 '           PY-COMPANION-001, PY-SCHEMA-001, PY-DATA-001, PY-RECEIPT-001
 
@@ -41,7 +48,7 @@ left to right direction
 
 package "Unreal Engine 5.8 客户端" as UE {
   package "交互与表现" as UEPresentation {
-    component "输入 / HUD / 动画蓝图\n[UE-BP-PRESENTATION-001]" as Presentation <<Blueprint>>
+    component "输入 / HUD / 动画蓝图\n[UE-BP-PRESENTATION-001]\n[UE-INPUT-ACTIONS-001] [UE-INPUT-IMC-COMBAT-001]\n[UE-INPUT-IMC-LOCOMOTION-001]\n[UE-HUD-BP-001] [UE-ENEMY-HUD-BP-001]\n[UE-LOCKON-HUD-BP-001] [UE-RESULT-HUD-BP-001]" as Presentation <<Blueprint>>
   }
 
   package "权威战斗域" as UECombat {
@@ -65,10 +72,17 @@ package "Unreal Engine 5.8 客户端" as UE {
   PlayerCombat --> CombatComponents : 创建并协调组件
   EnemyCombat --> CombatComponents : 创建并协调组件
   PlayerCombat --> EnemyCombat : 锁定、攻击辅助与伤害目标
+  PlayerCombat --> VoiceCapture : 主要玩家 Push-to-talk 已核验
+  PlayerCombat --> CommandGateway : 录音完成后 ParseVoiceCommand
   AIExecution --> EnemyCombat : Boss 攻击与状态读取
   MatchFlow --> CombatComponents : 监听玩家/敌人死亡委托
+  MatchFlow --> Presentation : OnCombatEnded 创建结果 Widget\n设置结果、输入状态并暂停
 
   Presentation --> ChatGateway : WBP 文本聊天调用已核验
+  Presentation --> PlayerCombat : WBP_CombatHUD 获取 HealthComponent\n绑定 OnHealthChanged
+  Presentation --> PlayerCombat : IMC_AesirCombat 映射\n攻击、锁定与闪避输入
+  Presentation --> PlayerCombat : IMC_AesirLocomotion 映射\n移动、视角、姿态与 Push-to-talk
+  EnemyCombat --> Presentation : 持有 EnemyHealthBar / LockOnIndicator\n更新生命与锁定标记可见性
 }
 
 package "Python AI 服务" as Python {
@@ -121,6 +135,46 @@ note bottom of Presentation
   当前只接入 CompanionChatSubsystem，
   未发现 VoiceCapture、CommandService
   或 TacticalOrder 调用。
+
+  已核验 WBP_CombatHUD：构造时获取
+  玩家 HealthComponent，绑定 OnHealthChanged，
+  初始化及变化时调用 SetPlayerHealth；函数以
+  Max(MaxHealth, 1) 保护分母，比例 Clamp 到
+  [0, 1] 后写入 PB_PlayerHealth。
+
+  已核验 WBP_EnemyHealthBar：自身 EventGraph
+  为空，由 BP_AesirEnemyCharacter 初始化并在
+  OnHealthChanged 时调用 SetEnemyHealth。
+
+  已核验 WBP_LockOnIndicator：自身 EventGraph
+  为空；BP_AesirEnemyCharacter 的 override
+  直接控制 Widget Component 可见性。
+
+  已核验 WBP_CombatResult：显示胜负文本；
+  Restart 解除暂停、恢复 GameOnly 输入和隐藏鼠标，
+  然后重载 L_AesirCombatTest。
+
+  已核验 IMC_AesirCombat 的 5 个 Action、
+  10 个键鼠/手柄映射；用户确认全部 Mapping 级
+  Triggers 与 Modifiers 保持默认、无自定义项。
+
+  6 个 Aesir Action 均为 Digital (bool)，
+  Action 级 Triggers / Modifiers 均为 0，
+  其余 Details 设置也已确认为一致。
+
+  用户确认当前使用 IMC_AesirLocomotion；
+  16 个 Action / 29 个键位已核验。
+  当前 Controller 默认 Context 已确认为
+  IMC_AesirLocomotion + IMC_AesirCombat。
+  IA_Move 键盘方向已完整核验：W/S 使用
+  YXZ Swizzle，S/A 使用全轴 Negate，D 无 Modifier。
+  IA_Move_WorldSpace 的方向键采用对应的同套配置。
+end note
+
+note bottom of PlayerCombat
+  主要玩家资产为 BP_AesirPlayer_MM_Reference。
+  已核验 IA_PushToTalk → VoiceRecorder →
+  ParseVoiceCommand；尚未发现 TryAcceptOrder。
 end note
 
 legend bottom

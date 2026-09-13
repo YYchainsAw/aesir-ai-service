@@ -13,13 +13,13 @@
 
 | 业务组 | 资产 | 已创建的证据入口 | 当前状态 |
 | --- | --- | --- | --- |
-| 玩家与框架 | `BP_AesirGameMode`、`BP_AesirPlayerController`、`BP_AesirPlayerCharacter`、`BP_AesirDeathCamera` | metadata / components / defaults / EventGraph / Functions | 待填写 |
-| 敌人与 Boss | `BP_AesirEnemyCharacter`、`BP_AesirCombatDummy`、`BP_AesirMiniBoss_Clean`、`BP_AesirBossAIController` | metadata / components / defaults / EventGraph / Functions | 待填写 |
-| Boss 行为树 | `BT_AesirBoss`、`BB_AesirBoss` | Graph / tree / services-decorators / keys | 待填写 |
-| 战斗 UI | `WBP_CombatHUD`、`WBP_EnemyHealthBar`、`WBP_LockOnIndicator`、`WBP_CombatResult` | metadata / widget-tree / EventGraph / Functions | 待填写 |
+| 玩家与框架 | `BP_AesirGameMode`、`BP_AesirPlayerController`、`BP_AesirPlayerCharacter`、`BP_AesirPlayer_MM_Reference`、`BP_AesirDeathCamera` | metadata / components / defaults / EventGraph / Functions | GameMode EventGraph 已导入；PlayerController 已核验；基础与主要玩家组件/EventGraph 已导入；主要玩家为 `BP_AesirPlayer_MM_Reference`；默认值与 DeathCamera 待填写 |
+| 敌人与 Boss | `BP_AesirEnemyCharacter`、`BP_AesirCombatDummy`、`BP_AesirMiniBoss_Clean`、`BP_AesirBossAIController` | metadata / components / defaults / EventGraph / Functions | 普通敌人已核验；MiniBoss 继承组件、EventGraph 为空、Boss AIController 装配已核验；临时数值不建立基线；CombatDummy 待填写 |
+| Boss 行为树 | `BT_AesirBoss`、`BB_AesirBoss` | Graph / tree / services-decorators / keys | BT 的 17 个节点及三分支已核验；BB 的 3 个已知 Key Details 和 Parent=None 已核验；完整 Key 列表待截图 |
+| 战斗 UI | `WBP_CombatHUD`、`WBP_EnemyHealthBar`、`WBP_LockOnIndicator`、`WBP_CombatResult` | metadata / widget-tree / EventGraph / Functions | 四个核心 Widget 的业务 Graph 已核验；GameMode 已重新编译成功；Designer 样式和直接父类仍待核验 |
 | 动画蓝图 | `ABP_AesirPlayer`、`ABP_Alice`、`ABP_Gideon_RuntimeRetarget` | metadata / EventGraph / AnimGraph / StateMachines / Functions | 待填写 |
-| 关卡装配 | `L_AesirCombatTest` | metadata / world-settings / actors / LevelBlueprint | 待填写 |
-| Enhanced Input | 6 个 `IA_*`、2 个 `IMC_*` | actions / mappings | 待填写 |
+| 关卡装配 | `L_AesirCombatTest` | metadata / world-settings / actors / LevelBlueprint | Level Blueprint 已核验为空；World Settings 与业务 Actor 待填写 |
+| Enhanced Input | 6 个 Aesir `IA_*`、`IMC_AesirCombat`、`IMC_AesirLocomotion` | actions / mappings | 6 个 Aesir Action、Combat Context 与当前 Controller 装配已核验；Locomotion 的 16 个 Action/29 个键位以及 IA_Move、IA_Move_WorldSpace 方向 Modifier 已完整核验，其他映射细节和重叠键运行测试待补 |
 | Montage/Retarget | 玩家、敌人 Montage 与 Retargeting 资产 | montages / retargeting | 待填写 |
 | 候选/测试 | `BP_MMPlayerController`、`BP_AesirPlayerCharacter_MM_Test`、`BP_AesirPlayer_MM_Reference`、`BP_AesirEnemyCharacter_Clean` | 标准 Blueprint 证据模板 | 待判定运行引用 |
 

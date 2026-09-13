@@ -1,0 +1,74 @@
+@startuml 06-tactical-order-state-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: UE-ORDER-001, UE-ALICE-BP-001, UE-HEALTH-001,
+'           UE-COMBAT-STATE-001
+
+title 战术订单组件状态（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam state {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+}
+
+[*] --> NoEncounter
+
+state "无进行中遭遇\nEncounterActive=false\nHasActiveOrder=false" as NoEncounter
+state "遭遇中 / 无活动订单\nEncounterActive=true\nHasActiveOrder=false" as EncounterIdle
+state "遭遇中 / 有活动订单\nEncounterActive=true\nHasActiveOrder=true" as ActiveOrder
+
+NoEncounter --> EncounterIdle : BeginEncounter()\n重置 ActiveOrder
+NoEncounter --> NoEncounter : TryAcceptOrder()\n校验后因无遭遇而拒绝
+
+EncounterIdle --> ActiveOrder : TryAcceptOrder()\n[ValidateOrder 通过]
+EncounterIdle --> EncounterIdle : TryAcceptOrder()\n[ValidateOrder 失败]
+
+ActiveOrder --> ActiveOrder : TryAcceptOrder()\n[新 Priority > 当前 Priority]\n替换活动订单
+ActiveOrder --> ActiveOrder : TryAcceptOrder()\n[重复 ID 或 Priority <= 当前]\n拒绝并保留原订单
+ActiveOrder --> ActiveOrder : ValidateActiveOrderAtTrigger()\n[通过或拒绝；均不清除订单]
+ActiveOrder --> EncounterIdle : CompleteActiveOrder()
+ActiveOrder --> EncounterIdle : CancelActiveOrder(Reason)
+
+EncounterIdle --> NoEncounter : EndEncounter()\n清空订单
+ActiveOrder --> NoEncounter : EndEncounter()\n清空订单
+
+note right of ActiveOrder
+  接受前 ValidateOrder 检查：
+  - Owner 是 Companion 且 agent_id 匹配
+  - AI Controller 有效且 Companion 未死亡
+  - intent / then / expires 类型已实现
+  - AbilityId 在组件白名单中
+  - 条件主体与目标选择器可解析
+
+  触发时二次检查：
+  - 遭遇与活动订单仍有效
+  - 条件施法结构正确
+  - 目标存活、距离合法
+  - 资源足够、技能不在冷却
+  - Companion 状态为 Idle 或 Combat
+end note
+
+note bottom of NoEncounter
+  这是 UTacticalOrderComponent 内两个 bool 与 ActiveOrder
+  组合出的实际状态，不是源码中额外声明的枚举。
+end note
+
+note bottom of ActiveOrder
+  BP_AliceCompanion 已挂载 TacticalOrder，
+  但 EventGraph 为空，BT_Alice 也未读取订单。
+  因此本状态机只描述订单组件，不代表技能已经执行。
+end note
+
+@enduml
