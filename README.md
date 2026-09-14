@@ -2,6 +2,8 @@
 
 为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON，并提供 v0.2 上下文感知战术决策。
 
+> **定位升级（2026-09-13 起）**：项目要求已从「语音转 JSON 战术命令」升级为「**NPC 人格与行为代理**」——在保留战斗指挥的前提下新增持久化记忆、关系状态、非战斗自主行为与只读查证工具。需求规格、章程与任务分解见 [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md)（当前最高规划基线）；本 README 描述的 v0.1/v0.2 能力均已实现且保持兼容。
+
 解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。服务在本地运行，无外部依赖，UE 客户端通过 HTTP 直接调用。
 
 ## 设计理念
@@ -41,13 +43,17 @@ aesir-ai-service/
 │   │       ├── tactical.py        # /v1/tactical/resolve + executions
 │   │       ├── combat.py          # /v1/combat/events
 │   │       └── companion.py       # /v1/companion/chat
-│   ├── schemas/                   # 协议 schema：ids / tactical_order / combat_context …
+│   ├── schemas/                   # 协议 schema：ids / tactical_order / combat_context / directives（单一指令体系）…
 │   └── services/
 │       ├── parsers/               # rule / llm / command_parser（解析门面+回退）
 │       ├── transcribers/          # base / mock / faster_whisper / factory
 │       ├── tactical/              # resolver / event_policy / receipt_store / acknowledgement
 │       ├── companion/             # 对话服务 + 人设仓库
-│       └── llm/                   # client + factory（共享 LLM Client）
+│       ├── llm/                   # client + factory（共享 LLM Client）
+│       ├── memory/                # 记忆体系（SDD 骨架，US1）
+│       ├── relationship/          # 关系体系（SDD 骨架，US2）
+│       ├── agency/                # 活动域与自主行为（SDD 骨架，US3）
+│       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
 ├── rl/                            # RL 实验包（可选依赖；服务进程不会 import）
 │   ├── sim/                       # BossSim 模拟器内核 + 数值常量
 │   ├── policy/                    # ActingPolicy/TacticalPolicy 协议 + rule/ppo 基线
@@ -56,8 +62,10 @@ aesir-ai-service/
 ├── scripts/                       # rl_train.py / rl_eval.py / asr_eval.py / mock_ue_flow.py
 ├── data/
 │   ├── companions/                # 队友 YAML 人设（Alice）
-│   ├── policy/                    # 战术策略阈值/优先级（tactical_policy.yaml，试玩调参只改这里）
+│   ├── policy/                    # 战术/关系/活动域策略阈值（tactical/relationship/agency_policy.yaml）
+│   ├── world/                     # 世界观知识库 lore.yaml（只读查证用）
 │   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）
+│   ├── memory/                    # 运行期 NPC 记忆（gitignore 不入库）
 │   └── rl/                        # 运行数据（回执/轨迹 JSONL，gitignore 不入库）
 ├── tests/                         # api / schemas / services / rl 测试
 ├── docs/                          # 项目文档（planning/protocols/guides/design/logs）
@@ -77,6 +85,7 @@ aesir-ai-service/
 | LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
 | RL 可行性设计与框架 | [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md) |
 | 总策划书 v0.1 | [`docs/planning/game-design-doc-v0.1.md`](docs/planning/game-design-doc-v0.1.md) |
+| **需求规格说明书 SDD v1.0**（章程 / 用户故事 / 任务分解） | [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md) |
 | 全部文档索引 | [`docs/README.md`](docs/README.md) |
 
 ## 启动
