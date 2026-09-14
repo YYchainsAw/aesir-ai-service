@@ -2,15 +2,18 @@
 
 > 状态：**设计基线**。本文定义课程项目的目标架构、开发顺序、职责边界与验收目标；不等同于全部已实现功能。
 >
-> 更新日期：2026-09-09  
+> 更新日期：2026-09-14  
 > 项目：Aesir Combat Prototype（UE5 第三人称 ARPG）  
-> 队员：yjx（模型服务与协议）／dyh（UE 战术指示与队友行为）
+> 队员：dyh（Python Agent 服务、协议与策略）／yjx（UE 战斗与 NPC 行为、指令组件、表现层）
 >
 > 相关文档：
 >
+> - **定位升级后的需求规格（SDD v1.0，当前最高规划基线）**：[aesir-agent-sdd-v1.0.md](aesir-agent-sdd-v1.0.md)
 > - 当前已实现的格式基线：[ue-protocol-contract-v0.1.md](../protocols/ue-protocol-contract-v0.1.md)
 > - 下一阶段战斗事件与状态决策协议：[combat-tactical-protocol-v0.2.md](../protocols/combat-tactical-protocol-v0.2.md)
 > - 人物唯一配置源：`data/companions/primary_companion.yaml`
+>
+> **定位升级（2026-09-13 起）**：项目要求已从「语音识别转 JSON 命令」升级为「塑造 Aesir 的完整人格（agent/skill），并负责整个 NPC 的活动塑造」。新范围（持久化记忆、关系状态、非战斗自主行为、只读查证工具、多角色、单一指令体系）以 [SDD v1.0](aesir-agent-sdd-v1.0.md) 为准；本文的战斗链路、协议边界与验收基线仍然有效，其中与新范围冲突的「非目标」与「下一步优先级」已在本文内标注修订。
 
 ---
 
@@ -65,10 +68,12 @@ UE5：权威校验、行为树/状态机执行、伤害结算、动画与 UI 表
 
 ### 2.3 当前非目标
 
-- 多名可切换队友、长期好感度、剧情记忆与持久化关系网。
+- ~~多名可切换队友、长期好感度、剧情记忆与持久化关系网。~~ **（2026-09-13 定位升级后已转为正式范围：分级记忆、关系状态、多角色支持见 [SDD v1.0](aesir-agent-sdd-v1.0.md) US1/US2/US8；首版仍只启用一个 NPC）**
 - 联网对战、服务端权威同步、反作弊。
 - 让 LLM 每帧参与决策，或让云端模型承担反应级战斗逻辑。
 - 在首个闭环中训练并上线强化学习策略。
+- 服务端主动向 UE 推送（自主行为仍由心跳拉取判定，见 SDD FR-021）。
+- 多用户并发、账号体系、跨设备同步（SDD Assumptions）。
 
 内部仍保留稳定 ID `companion.alice`：它用于 UE Actor/DataAsset、日志、存档和协议关联；玩家不必看见或输入该 ID。
 
@@ -316,8 +321,8 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 
 | 负责人 | 主任务 | 交付物 |
 | --- | --- | --- |
-| yjx | Python 服务、Pydantic schema、LLM/ASR 接入、策略与测试 | `/app`、`/tests`、`/data`、协议文档 |
-| dyh | UE 战斗状态、队友行为树、指令组件、HTTP 调用、UI/动画映射 | UE C++/蓝图、DataAsset、联调录屏 |
+| dyh | Python Agent 服务、Pydantic schema、LLM/ASR 接入、记忆/关系/自主行为策略与测试 | `/app`、`/tests`、`/data`、协议文档 |
+| yjx | UE 战斗状态、NPC 行为树、指令组件、HTTP 调用、UI/动画映射 | UE C++/蓝图、DataAsset、联调录屏 |
 | 共同 | 能力 ID 表、事件阈值、golden JSON、试玩调参、答辩演示 | 版本化文档与演示用例 |
 
 集成规则：
@@ -342,6 +347,8 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 | 服务异常安全回退 | 100% | LLM/ASR 超时不阻塞 UE 战斗 |
 | 端到端交互延迟 | 文本战术 < 3 s（开发目标） | 高危动作本地规则可立即执行 |
 
+> 定位升级后，完整验收指标以 [SDD v1.0](aesir-agent-sdd-v1.0.md) 的成功标准 SC-001～SC-013 为准（含记忆回读 100%、关系阶段可区分 ≥90%、自主行为 ≥8 类、重复响应 0 等）；上表覆盖其中战斗指挥（US4）相关部分。
+
 推荐演示顺序：
 
 1. 非战斗聊天：展示人设、表情和动作 ID。
@@ -365,8 +372,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
    - ~~A：人设深度 + few-shot 语料 + 回退多样化~~（已完成，2026-09-10：YAML `dialogue_examples` + `fallback_dialogue_responses`，LLM prompt 全量注入人设，无 LLM 时按关键词分类回复并稳定轮换候选）。
    - B：短期对话记忆——~~请求加 `session_id`，服务端维护最近 N 轮滚动窗口注入 prompt~~（服务端已实现，2026-09-10：`session_id` 选填向后兼容、`session_memory.py` 滚动窗口、prompt 注入历史、YAML `runtime_state_policy` 升级 v0.3 语义；**UE 传参即可启用，无需再改服务端**）。
    - C：agent/skill 化——LLM 工具调用（查世界设定知识库、查 `CombatContext` 战况快照），让设定/战况类问答有据可依；复用 tactical LLM 的 JSON 白名单+回退模式；A/B 稳定后按需做。
-
-不要先做复杂长期记忆或 RL；先把一名队友、一只 Boss、两类事件、三类战术选择做成稳定且可演示的闭环。
+7. **（2026-09-13 起）定位升级为「NPC 人格与行为代理」**：后续优先级以 [SDD v1.0](aesir-agent-sdd-v1.0.md) 第四部分任务分解为准——先完成 Phase 1/2 基础设施（单一指令体系、世界状态快照、主入口），再按 US1 记忆 → US2 关系 → US3 自主行为推进 P1 闭环；本文上述战斗链路的稳定性要求继续有效，US4 战斗指挥只做关系接入后的回归加固。
 
 ---
 

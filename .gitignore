@@ -30,3 +30,7 @@ Thumbs.db
 # RL runtime data (receipts / trajectories)
 data/rl/
 aesir_ai_service.egg-info/
+
+# Local AI-assistant working notes and scratch deliverables (not for GitHub)
+.workbuddy/
+WorkBuddy_work/
