@@ -2,7 +2,29 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-10，**250 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-14，**286 通过 + 3 冒烟跳过**）。
+
+## 2026-09-14 — 终端对话调试台 + B1 人格语料扩充（SDD Phase 1~3 补记见下）
+
+### 终端对话 REPL（方案 A：start.bat chat 直接与 NPC 对话）
+
+- **`start.bat chat [端口]`**：服务已运行则直接复用，否则后台最小化启动 uvicorn，随后进入终端对话；退出对话后服务留在后台。
+- **`scripts/chat_console.py`**：httpx REPL——等 `/health` 就绪（最长 60s）、固定 `session_id`（跨轮短期记忆生效）、每轮显示 `source`（mock/llm/fallback）与 emotion/gesture/face 三个表现 ID，便于人设合格检查。内置命令：`/help` `/memory` `/reset` `/scene exploration|conversation` `/quit`。Windows 下 stdin/stdout 统一 UTF-8。
+- **新调试端点 `GET /v1/console/memory`**：返回指定角色三级长期记忆全量视图（counts + short_term/summaries/archive 精简条目），支撑 `/memory` 命令与 US1 验收检查。
+
+### B1：人格训练语料（few-shot 优先路线）
+
+- **`dialogue_examples` 8 → 62 组**：新增问候/告别/情绪关怀/称赞/设定问答/战斗闲聊/记忆引用/承诺/边界拒绝/礼物共 14 个互动类别；记忆引用类示范如何自然使用长期记忆；战斗请求全部角色口吻婉拒。
+- **`fallback_dialogue_responses` 新增 comfort/greeting/farewell 三类**：mock 后端（无 LLM）也能覆盖关怀与寒暄场景。
+- **`data/training/`**：语料管道落库——`README.md`（格式/分类表/流程：批量生成→人工过滤→入库→评测）+ `filter_checklist.md`（六条人工过滤红线）。语料攒 500+ 后再评估 B2 微调。
+- **语料红线自动测试**：禁出戏术语（指令/接口/频道/协议/系统/模型等）扫描全部 few-shot 与回退候选；体量与类别覆盖断言（≥60 组、≥12 类、关键类别齐全）。
+- **测试**：新增 5 例（console/memory 视图×2、语料红线×2、回退默认路径修正）。**286 通过 + 3 冒烟跳过**。
+
+### 补记：SDD Phase 1~3（feadebf / 61de0a6 / e20fcc9，此前漏登 CHANGELOG）
+
+- **Phase 1 Setup**：记忆/关系/活动域/技能服务子包骨架；记忆、心跳限流、关系数值、工具调用轮次等全部配置外置（`AESIR_MEMORY_*` 等）。
+- **Phase 2 Foundational**：v0.3 骨架——统一信封 `DirectiveEnvelope`、`WorldContext` 世界快照、`POST /v1/agent/step`（心跳限流 429 / 空动作）、`POST /v1/world/events`（幂等回放）、`GET /v1/console/state` + `POST /v1/console/memory/reset`；`data/golden/` 增世界快照与心跳样例。
+- **Phase 3 US1 记忆**：三级分级记忆（短期/摘要/档案，承诺不淘汰）、原子落盘 + `.bak` + 损坏隔离、预算检索注入 LLM prompt、对话链路全降级（记忆故障对话不中断，FR-011）、`scripts/demo_memory_persistence.py` 演示。测试 236 → 282。
 
 ## 2026-09-10 — 陪伴对话质量方案 B（短期会话记忆）+ RL 100 万步多种子训练
 

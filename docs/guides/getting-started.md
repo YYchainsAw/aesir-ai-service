@@ -67,6 +67,8 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 
 或直接双击项目根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
 
+**终端对话模式（人设质量检查）**：`start.bat chat [端口]` —— 服务已在运行则直接复用，否则后台最小化启动；随后进入终端 REPL 直接与艾莉对话（详见 5.7 节）。等价命令：`.venv\Scripts\python -m scripts.chat_console`。
+
 - `--reload`：代码改动后自动重启，仅开发环境使用。
 - 默认监听 `127.0.0.1:8000`。
 
@@ -86,7 +88,7 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 .\.venv\Scripts\python -m pytest
 ```
 
-测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况）、combat/events 幂等、策略 YAML 加载。测试数以 `pytest` 输出为准（2026-09-10：**236 通过 + 3 条冒烟默认跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
+测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、v0.3 骨架端点、语料红线。测试数以 `pytest` 输出为准（2026-09-14：**286 通过 + 3 条冒烟默认跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
 
 另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions。
 
@@ -243,13 +245,27 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 | --- | --- | --- |
 | `POST /v1/agent/step` | 骨架 | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）；当前返回空动作 `action:"none"`。未登记角色 404 |
 | `POST /v1/world/events` | 骨架 | 世界事件（战斗+生活类型白名单）：`companion_id + event_id` 幂等回放（`duplicate:true`）；反应暂回退角色默认表现 |
-| `GET /v1/console/state` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、会话记忆重置 |
+| `GET /v1/console/state` / `GET /v1/console/memory` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、三级长期记忆视图、会话+长期记忆重置 |
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
 ```
 
 完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 骨架链路（心跳限流 → 世界事件幂等 → 调试台）。
+
+### 5.7 终端对话调试（start.bat chat）
+
+无需 UE 即可与 NPC 面对面聊天，用于检查人设与记忆是否合格：
+
+```powershell
+start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console --port 8000
+```
+
+- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/companions/primary_companion.yaml` 白名单核对。
+- 同一次 REPL 使用固定 `session_id`，可验证短期会话记忆（接续上文）与长期记忆（重启服务后 `/memory` 仍能看到之前说过的内容）。
+- 内置命令：`/help` 帮助、`/memory` 查看三级长期记忆、`/reset` 清空会话+长期记忆、`/scene exploration|conversation` 切换对话场景、`/quit` 退出（服务留在后台）。
+
+人格训练语料（few-shot 优先路线）见 `data/training/README.md`：语料格式、14 个互动分类、人工过滤红线与入库流程。
 
 ## 6. 常见问题
 

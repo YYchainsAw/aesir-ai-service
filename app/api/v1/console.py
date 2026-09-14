@@ -1,7 +1,8 @@
 """调试与控制台路由（SDD T015，US7 可解释的调试数据源）。
 
 - ``GET /v1/console/state``：当前注册表、指定角色的运行状态摘要。
-- ``POST /v1/console/memory/reset``：清空指定角色的会话记忆。
+- ``GET /v1/console/memory``：查看指定角色的三级长期记忆（调试用，US1 验收）。
+- ``POST /v1/console/memory/reset``：清空指定角色的会话与长期记忆。
 
 Phase 2 骨架：长期记忆重置（T029）与情绪/关系阶段查询（T077）随后接入；
 当前返回的就地状态以「如实汇报骨架能力」为限，不虚构未实现字段。
@@ -62,6 +63,58 @@ def console_state(companion_id: str) -> ConsoleStateResponse:
         memory_backend="session-memory（进程内滚动窗口；长期记忆见 SDD T025）",
         session_memory_turns=get_settings().dialogue_history_turns,
         tactical_policy_revision=get_policy().revision,
+    )
+
+
+class MemoryEntryView(BaseModel):
+    """调试视图：单条长期记忆的精简字段。"""
+
+    model_config = ConfigDict(extra="forbid")
+    content: str
+    importance: str
+    source: str
+    real_time: str
+
+
+class MemoryViewResponse(BaseModel):
+    """三级长期记忆全量视图（GET /v1/console/memory）。"""
+
+    model_config = ConfigDict(extra="forbid")
+    companion_id: str
+    counts: dict[str, int]           # short_term / summaries / archive 各层条数
+    short_term: list[MemoryEntryView]
+    summaries: list[MemoryEntryView]
+    archive: list[MemoryEntryView]
+
+
+@router.get("/memory", response_model=MemoryViewResponse)
+def view_memory(companion_id: str) -> MemoryViewResponse:
+    try:
+        get_registered_profile(companion_id)
+    except UnknownCompanionError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    try:
+        snapshot = get_memory_store(companion_id).snapshot()
+    except MemoryStoreError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+    def _view(entry) -> MemoryEntryView:
+        return MemoryEntryView(
+            content=entry.content, importance=entry.importance,
+            source=entry.source, real_time=entry.real_time,
+        )
+
+    return MemoryViewResponse(
+        companion_id=companion_id,
+        counts={
+            "short_term": len(snapshot.short_term),
+            "summaries": len(snapshot.summaries),
+            "archive": len(snapshot.archive),
+        },
+        short_term=[_view(e) for e in snapshot.short_term],
+        summaries=[_view(e) for e in snapshot.summaries],
+        archive=[_view(e) for e in snapshot.archive],
     )
 
 

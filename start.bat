@@ -1,30 +1,55 @@
 @echo off
-REM Aesir AI Service Ò»¼üÆô¶¯
-REM ÓÃ·¨£ºË«»÷±¾ÎÄ¼ş£¬»òÔÚÖÕ¶ËÖ´ĞĞ start.bat [¶Ë¿Ú]
-REM ¿ÉÑ¡»·¾³±äÁ¿£¨Ä¬ÈÏÎŞĞèÉèÖÃ£©£º
-REM   AESIR_ASR_BACKEND=mock|faster_whisper   ÓïÒôÊ¶±ğºó¶Ë
-REM   AESIR_PARSER_BACKEND=rule|llm            Ö¸Áî½âÎöºó¶Ë
-REM Ä¬ÈÏ¶Ë¿Ú 8000£¬¿ÉÓÃµÚÒ»¸ö²ÎÊı¸²¸Ç£¬ÀıÈç£ºstart.bat 8001
+REM Aesir AI Service ä¸€é”®å¯åŠ¨
+REM ç”¨æ³•ï¼ˆåŒå‡»æˆ–åœ¨ç»ˆç«¯æ‰§è¡Œï¼‰ï¼š
+REM   start.bat            ä»…å¯åŠ¨æœåŠ¡ï¼ˆé»˜è®¤ç«¯å£ 8000ï¼‰
+REM   start.bat 8001       æŒ‡å®šç«¯å£å¯åŠ¨æœåŠ¡
+REM   start.bat chat       å¯åŠ¨æœåŠ¡å¹¶è¿›å…¥ç»ˆç«¯å¯¹è¯ï¼ˆæœåŠ¡å·²è¿è¡Œåˆ™ç›´æ¥å¤ç”¨ï¼‰
+REM   start.bat chat 8001  æŒ‡å®šç«¯å£ + ç»ˆç«¯å¯¹è¯
+REM å¯é€‰ç¯å¢ƒå˜é‡ï¼ˆé»˜è®¤å€¼è§ .env.exampleï¼‰ï¼š
+REM   AESIR_ASR_BACKEND=mock|faster_whisper   è¯­éŸ³è¯†åˆ«åç«¯
+REM   AESIR_PARSER_BACKEND=rule|llm           æŒ‡ä»¤è§£æåç«¯
+REM   AESIR_COMPANION_BACKEND=mock|llm        é™ªä¼´å¯¹è¯åç«¯
 
 setlocal
 cd /d "%~dp0"
+chcp 65001 >nul
 
-set PORT=%1
+set MODE=%1
+set PORT=%2
 if "%PORT%"=="" set PORT=8000
 
+if /i not "%MODE%"=="chat" (
+    if not "%MODE%"=="" set PORT=%MODE%
+)
+
 if not exist ".venv\Scripts\python.exe" (
-    echo [´íÎó] Î´ÕÒµ½ĞéÄâ»·¾³ .venv£¬ÇëÏÈÖ´ĞĞ£º
+    echo [é”™è¯¯] æœªæ‰¾åˆ°è™šæ‹Ÿç¯å¢ƒ .venvï¼Œè¯·å…ˆæ‰§è¡Œï¼š
     echo     python -m venv .venv
     echo     .venv\Scripts\python -m pip install -r requirements.txt
     pause
     exit /b 1
 )
 
-echo [INFO] Æô¶¯ Aesir AI Service£ºhttp://127.0.0.1:%PORT%
-echo [INFO] ½Ó¿ÚÎÄµµ£ºhttp://127.0.0.1:%PORT%/docs
-echo [INFO] °´ Ctrl+C Í£Ö¹·şÎñ
-echo.
+if /i not "%MODE%"=="chat" goto run_server
 
+REM ---- chat æ¨¡å¼ï¼šæœåŠ¡å·²è¿è¡Œåˆ™å¤ç”¨ï¼Œå¦åˆ™åå°å¯åŠ¨ ----
+curl -s -o nul -w "%%{http_code}" http://127.0.0.1:%PORT%/health 2>nul | findstr "200" >nul
+if %errorlevel%==0 (
+    echo [INFO] æœåŠ¡å·²åœ¨ http://127.0.0.1:%PORT% è¿è¡Œï¼Œç›´æ¥è¿›å…¥å¯¹è¯ã€‚
+) else (
+    echo [INFO] æ­£åœ¨å¯åŠ¨æœåŠ¡ï¼ˆhttp://127.0.0.1:%PORT%ï¼‰â€¦â€¦
+    start "Aesir AI Service" /min ".venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT%
+)
+echo [INFO] è¿›å…¥ç»ˆç«¯å¯¹è¯ï¼ˆ/help æŸ¥çœ‹è°ƒè¯•å‘½ä»¤ï¼Œ/quit é€€å‡ºï¼›æœåŠ¡çª—å£ç•™åœ¨åå°ï¼‰ã€‚
+".venv\Scripts\python.exe" -m scripts.chat_console --port %PORT%
+goto end
+
+:run_server
+echo [INFO] å¯åŠ¨ Aesir AI Serviceï¼ˆhttp://127.0.0.1:%PORT%ï¼‰
+echo [INFO] æ¥å£æ–‡æ¡£ï¼šhttp://127.0.0.1:%PORT%/docs
+echo [INFO] æŒ‰ Ctrl+C åœæ­¢æœåŠ¡
+echo.
 ".venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT% --reload
 
+:end
 endlocal

@@ -100,3 +100,28 @@ def test_console_memory_reset_clears_session_partition() -> None:
     body = response.json()
     assert body["reset"] is True
     assert body["cleared_sessions"] >= 0  # 无会话时为 0，也是成功
+
+
+def test_console_memory_view_shows_tiers_after_chat() -> None:
+    # 对话写入长期记忆后，调试端点能看到三级视图（方案 A /memory 命令的数据源）。
+    chat = client.post(
+        "/v1/companion/chat",
+        json={
+            "text": "记住：我最讨厌蘑菇。",
+            "companion_id": "companion.alice",
+            "game_state": "conversation",
+        },
+    )
+    assert chat.status_code == 200
+
+    response = client.get("/v1/console/memory", params={"companion_id": "companion.alice"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["counts"]["short_term"] >= 1
+    assert any("蘑菇" in entry["content"] for entry in body["short_term"])
+    assert all(entry["importance"] for entry in body["short_term"])
+
+
+def test_console_memory_view_unknown_companion_returns_404() -> None:
+    response = client.get("/v1/console/memory", params={"companion_id": "companion.unknown"})
+    assert response.status_code == 404

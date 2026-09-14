@@ -95,7 +95,7 @@ aesir-ai-service/
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 
-或直接双击根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
+或直接双击根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）；`start.bat chat` 可在终端直接与 NPC 对话（人设质量检查，见 `docs/guides/getting-started.md` §5.7）。
 
 服务启动后访问：
 
