@@ -21,29 +21,55 @@ class DialogueTurn:
 
 
 class SessionMemoryStore:
-    """线程安全的会话记忆存储；max_turns 为 0 时等价于关闭记忆。"""
+    """线程安全的会话记忆存储；max_turns 为 0 时等价于关闭记忆。
+
+    键为 ``(companion_id, session_id)``（SDD T011 / FR-044 状态隔离）：
+    不同角色的会话互不可见。``companion_id`` 缺省为 ``None``，兼容既有
+    单角色调用方（companion chat 链路），行为不变。
+    """
 
     def __init__(self, max_turns: int) -> None:
         self._max_turns = max(0, max_turns)
         self._lock = threading.Lock()
-        self._sessions: dict[str, deque[DialogueTurn]] = {}
+        self._sessions: dict[tuple[str | None, str], deque[DialogueTurn]] = {}
 
     @property
     def max_turns(self) -> int:
         return self._max_turns
 
-    def history(self, session_id: str) -> tuple[DialogueTurn, ...]:
-        """该会话最近 N 轮（时间正序），无记忆时为空组。"""
+    def history(
+        self, session_id: str, companion_id: str | None = None
+    ) -> tuple[DialogueTurn, ...]:
+        """该角色该会话最近 N 轮（时间正序），无记忆时为空组。"""
         with self._lock:
-            return tuple(self._sessions.get(session_id, ()))
+            return tuple(self._sessions.get((companion_id, session_id), ()))
 
-    def record(self, session_id: str, user_text: str, reply_text: str) -> None:
+    def record(
+        self,
+        session_id: str,
+        user_text: str,
+        reply_text: str,
+        companion_id: str | None = None,
+    ) -> None:
         """记录一轮对话；超出窗口自动淘汰最旧一轮。"""
         if self._max_turns == 0:
             return
         with self._lock:
-            turns = self._sessions.setdefault(session_id, deque(maxlen=self._max_turns))
+            turns = self._sessions.setdefault(
+                (companion_id, session_id), deque(maxlen=self._max_turns)
+            )
             turns.append(DialogueTurn(user_text=user_text, reply_text=reply_text))
+
+    def clear(self, companion_id: str | None = None) -> int:
+        """清空指定角色的全部会话记忆（console 记忆重置入口，SDD T015/T029）。
+
+        返回被清除的会话数。``companion_id=None`` 时清空未分区（旧链路）会话。
+        """
+        with self._lock:
+            keys = [key for key in self._sessions if key[0] == companion_id]
+            for key in keys:
+                del self._sessions[key]
+            return len(keys)
 
 
 # 进程级单例：会话记忆属于服务运行时状态，不随请求重建。

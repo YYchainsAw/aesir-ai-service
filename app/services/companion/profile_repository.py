@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 _PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
+_COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
 
 
 class CompanionProfileError(RuntimeError):
@@ -111,6 +112,29 @@ class CompanionProfileRepository:
             raise UnknownCompanionError(f"Unsupported companion_id: {companion_id}")
         return profile
 
+    # -- 多角色注册表（SDD T010 / FR-044）------------------------------------
+    def load_registered(self, companion_id: str) -> CompanionProfile:
+        """按角色标识解析注册表内任意角色（data/companions/ 下每个 YAML 一名角色）。
+
+        未登记的角色抛 ``UnknownCompanionError``——调用方据此返回 404，
+        **不**回退到默认角色的人格（FR-044）。
+        """
+        for path in self._profile_paths():
+            profile = get_profile(path)
+            if profile.companion_id == companion_id:
+                return profile
+        raise UnknownCompanionError(f"Unregistered companion_id: {companion_id}")
+
+    def list_registered(self) -> list[str]:
+        """当前注册表内的全部角色标识（/health 与 console 展示用）。"""
+        return [get_profile(path).companion_id for path in self._profile_paths()]
+
+    def _profile_paths(self) -> list[Path]:
+        try:
+            return sorted(_COMPANIONS_DIR.glob("*.yaml"))
+        except OSError:  # 目录不可读时退化为仅主队友
+            return [_PRIMARY_PROFILE_PATH]
+
 
 # ---------------------------------------------------------------------------
 # mtime 缓存 provider：YAML 是静态配置，文件未变时不必每请求重读重解析。
@@ -140,6 +164,20 @@ def get_profile(profile_path: Path | None = None) -> CompanionProfile:
     profile = repo.load_primary()
     _profile_cache[path] = (mtime, profile)
     return profile
+
+
+def get_registered_profile(companion_id: str) -> CompanionProfile:
+    """模块级多角色入口（SDD T010）：按标识取已登记角色，未登记抛 404 语义异常。
+
+    既有 ``get_profile()``（无参）仍返回主队友，供旧链路（companion chat /
+    tactical acknowledgement / event reactions）使用，语义不变。
+    """
+    return CompanionProfileRepository().load_registered(companion_id)
+
+
+def list_registered_companions() -> list[str]:
+    """注册表内全部角色标识（健康检查与调试台展示）。"""
+    return CompanionProfileRepository().list_registered()
 
 
 def _required_mapping(container: dict[str, Any], key: str) -> dict[str, Any]:

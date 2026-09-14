@@ -1,7 +1,8 @@
 """按总策划书 §9 的 UE 伪流程，把全链路端点跑一遍（联调前演示/自检）。
 
 覆盖：非战斗聊天 → 文本解析（parse）→ 上下文决策（resolve，四类战况同一意图）
-→ 战斗事件（combat/events，含幂等重试）→ 执行回执（executions）。
+→ 战斗事件（combat/events，含幂等重试）→ 执行回执（executions）
+→ v0.3 骨架：主入口心跳（含限流）→ 世界事件（幂等）→ 调试台。
 相当于一个「不会写 C++ 的假 UE」：UE 同学可以在写代码前看到完整闭环的响应长什么样。
 
 用法（先起服务）：
@@ -186,6 +187,34 @@ def main(url: str) -> int:
         _show("POST /v1/tactical/executions（executed 回执）", receipt.status_code, receipt.json())
 
     print("\n全链路完成：chat → parse → resolve ×4 → events（含幂等）→ executions。")
+
+    # 6. 主入口心跳（v0.3 骨架：空动作路径；SDD T018）
+    heartbeat_request = json.loads(
+        (GOLDEN_DIR / "agent_step_heartbeat_request.json").read_text(encoding="utf-8")
+    )
+    heartbeat_request["request_id"] = _rid()
+    heartbeat = client.post("/v1/agent/step", json=heartbeat_request)
+    _show("POST /v1/agent/step（心跳，探索快照）", heartbeat.status_code, heartbeat.json())
+    throttled = client.post("/v1/agent/step", json=heartbeat_request)
+    print(f"\n    立即重复心跳 → HTTP {throttled.status_code}（限流生效，FR-022）")
+
+    # 7. 世界事件（v0.3 骨架：region_first_entered + 幂等重试）
+    world_event = json.loads(
+        (GOLDEN_DIR / "world_event_region_first_entered.json").read_text(encoding="utf-8")
+    )
+    world_event["request_id"] = _rid()
+    we_first = client.post("/v1/world/events", json=world_event)
+    _show("POST /v1/world/events（region_first_entered 首次）", we_first.status_code, we_first.json())
+    we_retry = client.post("/v1/world/events", json=world_event)
+    print(f"\n    重复上报 duplicate={we_retry.json().get('duplicate')}（幂等回放，FR-033）")
+
+    # 8. 调试台：状态查询与记忆重置（v0.3 骨架）
+    state = client.get("/v1/console/state", params={"companion_id": "companion.alice"})
+    _show("GET /v1/console/state", state.status_code, state.json())
+    reset = client.post("/v1/console/memory/reset", json={"companion_id": "companion.alice"})
+    _show("POST /v1/console/memory/reset", reset.status_code, reset.json())
+
+    print("\nv0.3 骨架链路完成：agent/step（心跳+限流）→ world/events（幂等）→ console。")
     return 0
 
 

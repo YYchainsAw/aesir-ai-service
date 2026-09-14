@@ -1,0 +1,16 @@
+{
+  "snapshot_id": "77777777-7777-4777-8777-777777777777",
+  "captured_at": "2026-09-13T12:00:00Z",
+  "scene": "exploration",
+  "world_time": {"game_clock": "02:40", "time_of_day": "night", "weather": "storm"},
+  "region": {"region_id": "region.forest.deep", "first_visit": false},
+  "player": {"id": "party.player", "hp_percent": 35, "is_downed": false},
+  "companion": {"id": "companion.alice", "hp_percent": 62, "mp_percent": 15, "current_behavior": "follow", "is_casting": false},
+  "interactables": [
+    {"object_id": "object.cave_entrance.003", "kind": "poi", "distance_m": 8.0, "notable": true}
+  ],
+  "ui_popup": false,
+  "cutscene_playing": false,
+  "player_speaking": false,
+  "combat": null
+}

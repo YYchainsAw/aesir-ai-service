@@ -234,6 +234,22 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 - `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文；缺省时请求完全无状态。记忆在进程内存中，重启即清空。
 - 未登记的 `companion_id` 返回 `404`。
 
+### 5.6 v0.3 骨架端点（SDD Phase 2，主入口/世界事件/调试台）
+
+三个新端点已通、但为骨架实现（空动作路径；记忆/关系/自主行为在 SDD US1~US3 落地后接入），请求/响应结构以 `data/golden/` 下的样例为准：
+
+| 端点 | 状态 | 说明 |
+| --- | --- | --- |
+| `POST /v1/agent/step` | 骨架 | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）；当前返回空动作 `action:"none"`。未登记角色 404 |
+| `POST /v1/world/events` | 骨架 | 世界事件（战斗+生活类型白名单）：`companion_id + event_id` 幂等回放（`duplicate:true`）；反应暂回退角色默认表现 |
+| `GET /v1/console/state` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、会话记忆重置 |
+
+```powershell
+curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
+```
+
+完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 骨架链路（心跳限流 → 世界事件幂等 → 调试台）。
+
 ## 6. 常见问题
 
 - **端口被占用**：`--reload` 启动失败时，可用 `--port 8001` 指定其他端口。
