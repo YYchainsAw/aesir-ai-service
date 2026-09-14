@@ -275,15 +275,23 @@ def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
 
 _MAX_CACHE = 1024  # 有界缓存：单进程内存足够，防长会话膨胀
 
-_seen_events: "OrderedDict[tuple[str, str], CombatEventResponse]" = OrderedDict()
+_seen_events: "OrderedDict[tuple[str, str, str], CombatEventResponse]" = OrderedDict()
 _seen_events_lock = Lock()
 
 
 def _dedupe(
     request: CombatEventRequest, response: CombatEventResponse
 ) -> CombatEventResponse:
-    """首次见到的事件登记响应；重试时回放首次响应（回显新 request_id）。"""
-    key = (request.combat_context.encounter_id, request.event.event_id)
+    """首次见到的事件登记响应；重试时回放首次响应（回显新 request_id）。
+
+    幂等键含角色维度（SDD T012 / FR-044）：不同队友对同一 encounter 的
+    同一事件各自独立处理，状态互不干扰。
+    """
+    key = (
+        request.combat_context.companion.id,
+        request.combat_context.encounter_id,
+        request.event.event_id,
+    )
     with _seen_events_lock:
         cached = _seen_events.get(key)
         if cached is not None:

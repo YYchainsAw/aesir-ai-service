@@ -1,0 +1,54 @@
+# 关系体系策略（SDD US2 / FR-014~FR-018）。
+#
+# 关系数值变化必须由游戏内事实事件驱动；事件类型与影响幅度全部在本文件维护，
+# 代码不硬编码业务数值（章程原则 I）。修改后重启服务生效；破坏性调整应同步
+# revision，便于回执数据按策略版本归因。
+#
+# Phase 1 仅骨架：数值为占位默认值，待 T038 实现时与试玩调参一起定稿。
+
+revision: relationship-policy-001
+
+# 关系数值范围与初值（须与 app/config.py 的 AESIR_RELATIONSHIP_* 保持一致或覆盖之）
+bounds:
+  min: 0
+  max: 100
+  initial: 20
+
+# 关系阶段划分（FR-016：每阶段须定义可观察差异——称呼/语气、主动度、资源投入意愿、服从度）
+stages:
+  - name: distant          # 疏远
+    range: [0, 24]
+    address: "旅行者"      # 阶段化称呼示例
+    autonomy: low          # 主动互动频率
+    resource_willingness: conservative   # 资源投入意愿
+    obedience: high        # 对危险指令的服从度（高=不质疑执行）
+  - name: neutral          # 平常
+    range: [25, 49]
+    address: "你"
+    autonomy: medium
+    resource_willingness: balanced
+    obedience: high
+  - name: friendly          # 友好
+    range: [50, 74]
+    address: "朋友"
+    autonomy: medium
+    resource_willingness: generous
+    obedience: medium
+  - name: close             # 亲密
+    range: [75, 100]
+    address: "指挥官"
+    autonomy: high
+    resource_willingness: devoted
+    obedience: low          # 亲密阶段有权以角色口吻反对送死指令
+
+# 事实事件表（FR-014）：事件类型 → 数值增减；未登记事件一律忽略（T033）
+# 防刷参数见 app/config.py：冷却窗口 / 每日净变化上限
+events:
+  player_protected_companion: { delta: +6 }   # 玩家替 NPC 挡下攻击
+  companion_recovered: { delta: +2 }          # 战斗胜利且 NPC 存活
+  gift_given: { delta: +3 }                    # 玩家赠礼
+  promise_kept: { delta: +8 }                 # 玩家兑现承诺
+  promise_broken: { delta: -8 }               # 玩家失信
+  player_ignored_warning: { delta: -4 }       # 无视警告导致 NPC 受伤
+  companion_downed: { delta: -5 }             # NPC 倒地
+  long_idle: { delta: -1 }                    # 长时间冷落

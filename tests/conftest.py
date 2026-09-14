@@ -45,3 +45,17 @@ def _clean_profile_cache():
     _profile_cache.clear()
     yield
     _profile_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_memory_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """记忆体系测试隔离：运行期记忆一律落在临时目录，不污染 data/memory/。
+
+    （SDD T003：data/memory/ 属运行期产物；测试也不得写入仓库目录。）
+    """
+    monkeypatch.setenv("AESIR_MEMORY_ROOT", str(tmp_path / "memory"))
+    from app.services.memory import store as memory_store_module
+
+    memory_store_module.reset_memory_stores()
+    yield
+    memory_store_module.reset_memory_stores()

@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 _PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
+_COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
 
 
 class CompanionProfileError(RuntimeError):
@@ -29,6 +30,24 @@ class DialoguePresentation:
 
 
 @dataclass(frozen=True)
+class DialogueExample:
+    """一条 few-shot 示范：玩家输入 + 艾莉的示范回复（含表现 ID）。"""
+
+    category: str
+    player: str
+    presentation: DialoguePresentation
+
+
+@dataclass(frozen=True)
+class FallbackReplyCategory:
+    """无 LLM 回退的类别：关键词集合 + 候选回复（按 YAML 出现顺序判序）。"""
+
+    name: str
+    keywords: tuple[str, ...]
+    replies: tuple[DialoguePresentation, ...]
+
+
+@dataclass(frozen=True)
 class CompanionProfile:
     """从 YAML 提取出的、聊天服务所需的已校验人设快照。"""
 
@@ -39,6 +58,8 @@ class CompanionProfile:
     allowed_gesture_ids: frozenset[str]
     allowed_facial_expression_ids: frozenset[str]
     default_dialogue_response: DialoguePresentation
+    dialogue_examples: tuple[DialogueExample, ...]
+    fallback_reply_categories: tuple[FallbackReplyCategory, ...]
 
 
 class CompanionProfileRepository:
@@ -79,6 +100,10 @@ class CompanionProfileRepository:
             allowed_gesture_ids=frozenset(allowed_gestures),
             allowed_facial_expression_ids=frozenset(allowed_faces),
             default_dialogue_response=default_response,
+            dialogue_examples=_dialogue_examples(raw_profile, allowed_emotions, allowed_gestures, allowed_faces),
+            fallback_reply_categories=_fallback_reply_categories(
+                raw_profile, allowed_emotions, allowed_gestures, allowed_faces
+            ),
         )
 
     def require_primary(self, companion_id: str) -> CompanionProfile:
@@ -86,6 +111,29 @@ class CompanionProfileRepository:
         if companion_id != profile.companion_id:
             raise UnknownCompanionError(f"Unsupported companion_id: {companion_id}")
         return profile
+
+    # -- 多角色注册表（SDD T010 / FR-044）------------------------------------
+    def load_registered(self, companion_id: str) -> CompanionProfile:
+        """按角色标识解析注册表内任意角色（data/companions/ 下每个 YAML 一名角色）。
+
+        未登记的角色抛 ``UnknownCompanionError``——调用方据此返回 404，
+        **不**回退到默认角色的人格（FR-044）。
+        """
+        for path in self._profile_paths():
+            profile = get_profile(path)
+            if profile.companion_id == companion_id:
+                return profile
+        raise UnknownCompanionError(f"Unregistered companion_id: {companion_id}")
+
+    def list_registered(self) -> list[str]:
+        """当前注册表内的全部角色标识（/health 与 console 展示用）。"""
+        return [get_profile(path).companion_id for path in self._profile_paths()]
+
+    def _profile_paths(self) -> list[Path]:
+        try:
+            return sorted(_COMPANIONS_DIR.glob("*.yaml"))
+        except OSError:  # 目录不可读时退化为仅主队友
+            return [_PRIMARY_PROFILE_PATH]
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +164,20 @@ def get_profile(profile_path: Path | None = None) -> CompanionProfile:
     profile = repo.load_primary()
     _profile_cache[path] = (mtime, profile)
     return profile
+
+
+def get_registered_profile(companion_id: str) -> CompanionProfile:
+    """模块级多角色入口（SDD T010）：按标识取已登记角色，未登记抛 404 语义异常。
+
+    既有 ``get_profile()``（无参）仍返回主队友，供旧链路（companion chat /
+    tactical acknowledgement / event reactions）使用，语义不变。
+    """
+    return CompanionProfileRepository().load_registered(companion_id)
+
+
+def list_registered_companions() -> list[str]:
+    """注册表内全部角色标识（健康检查与调试台展示）。"""
+    return CompanionProfileRepository().list_registered()
 
 
 def _required_mapping(container: dict[str, Any], key: str) -> dict[str, Any]:
@@ -156,3 +218,88 @@ def _default_response(profile: dict[str, Any]) -> DialoguePresentation:
         facial_expression_id=_required_string(defaults, "facial_expression_id"),
         interruptible=defaults.get("interruptible", True),
     )
+
+
+def _presentation(
+    container: dict[str, Any], *, where: str, allowed_emotions: set, allowed_gestures: set, allowed_faces: set
+) -> DialoguePresentation:
+    """从映射构造回复表现并校验 ID 白名单（default/示例/回退候选共用）。"""
+    presentation = DialoguePresentation(
+        reply_text=_required_string(container, "reply_text"),
+        emotion_id=_required_string(container, "emotion_id"),
+        gesture_id=_required_string(container, "gesture_id"),
+        facial_expression_id=_required_string(container, "facial_expression_id"),
+        interruptible=container.get("interruptible", True),
+    )
+    _validate_presentation_ids(presentation, where, allowed_emotions, allowed_gestures, allowed_faces)
+    return presentation
+
+
+def _validate_presentation_ids(
+    presentation: DialoguePresentation, where: str, allowed_emotions: set, allowed_gestures: set, allowed_faces: set
+) -> None:
+    if presentation.emotion_id not in allowed_emotions:
+        raise CompanionProfileError(f"Emotion ID in {where} is not registered in the profile.")
+    if presentation.gesture_id not in allowed_gestures:
+        raise CompanionProfileError(f"Gesture ID in {where} is not registered in the profile.")
+    if presentation.facial_expression_id not in allowed_faces:
+        raise CompanionProfileError(f"Facial-expression ID in {where} is not registered in the profile.")
+
+
+def _dialogue_examples(
+    profile: dict[str, Any], allowed_emotions: set, allowed_gestures: set, allowed_faces: set
+) -> tuple[DialogueExample, ...]:
+    """few-shot 示范样例（可选字段，缺省为空组）。"""
+    examples = profile.get("dialogue_examples", [])
+    if not isinstance(examples, list):
+        raise CompanionProfileError("Profile field 'dialogue_examples' must be a list.")
+
+    parsed: list[DialogueExample] = []
+    for index, item in enumerate(examples):
+        if not isinstance(item, dict):
+            raise CompanionProfileError(f"Dialogue example #{index} must be a mapping.")
+        parsed.append(
+            DialogueExample(
+                category=_required_string(item, "category"),
+                player=_required_string(item, "player"),
+                presentation=_presentation(
+                    item, where=f"dialogue example #{index}", allowed_emotions=allowed_emotions,
+                    allowed_gestures=allowed_gestures, allowed_faces=allowed_faces,
+                ),
+            )
+        )
+    return tuple(parsed)
+
+
+def _fallback_reply_categories(
+    profile: dict[str, Any], allowed_emotions: set, allowed_gestures: set, allowed_faces: set
+) -> tuple[FallbackReplyCategory, ...]:
+    """分类回退候选（可选字段，缺省为空组；YAML 出现顺序即判序）。"""
+    categories = profile.get("fallback_dialogue_responses", {})
+    if not isinstance(categories, dict):
+        raise CompanionProfileError("Profile field 'fallback_dialogue_responses' must be a mapping.")
+
+    parsed: list[FallbackReplyCategory] = []
+    for name, body in categories.items():
+        if not isinstance(body, dict):
+            raise CompanionProfileError(f"Fallback reply category '{name}' must be a mapping.")
+        keywords = body.get("keywords", [])
+        replies = body.get("replies", [])
+        if not isinstance(keywords, list) or not all(isinstance(k, str) and k for k in keywords):
+            raise CompanionProfileError(f"Fallback reply category '{name}' keywords must be a list of strings.")
+        if not isinstance(replies, list) or not replies:
+            raise CompanionProfileError(f"Fallback reply category '{name}' must contain at least one reply.")
+        parsed.append(
+            FallbackReplyCategory(
+                name=str(name),
+                keywords=tuple(keywords),
+                replies=tuple(
+                    _presentation(
+                        reply, where=f"fallback reply '{name}'", allowed_emotions=allowed_emotions,
+                        allowed_gestures=allowed_gestures, allowed_faces=allowed_faces,
+                    )
+                    for reply in replies
+                ),
+            )
+        )
+    return tuple(parsed)

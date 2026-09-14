@@ -1,0 +1,13 @@
+# 世界观知识库（SDD US6 / FR-036~FR-038，Phase 1 占位）。
+#
+# 供只读查证工具检索：NPC 回答设定类问题先查本文件，查不到就明确表示不确定，
+# 绝不编造。首版条目由 T070 填充并登记来源。
+
+revision: lore-001
+
+entries: []
+# 首版条目结构（T068/T070 实现）：
+# - id: lore.<topic>            # 稳定 ID，供查证结果引用
+#   topic: 遗迹的建造者
+#   content: ……
+#   source: game-design-doc §x  # 来源登记（FR-012 可追溯）
