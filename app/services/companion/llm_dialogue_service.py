@@ -12,6 +12,8 @@ from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
+from app.services.memory.retrieval import format_memory_block
+from app.schemas.memory import MemoryEntry
 
 
 class _DialoguePayload(BaseModel):
@@ -43,11 +45,13 @@ class LLMCompanionDialogueService:
         request: CompanionDialogueRequest,
         *,
         history: tuple[DialogueTurn, ...] = (),
+        memories: list[MemoryEntry] = (),
     ) -> CompanionDialogueResponse:
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
                 history=history,
+                memories=list(memories),
             ),
             user_prompt=request.text,
         )
@@ -80,6 +84,7 @@ def _build_system_prompt(
     profile: CompanionProfile,
     *,
     history: tuple[DialogueTurn, ...] = (),
+    memories: list[MemoryEntry] | None = None,
 ) -> str:
     identity = profile.raw.get("identity", {})
     persona = profile.raw.get("persona", {})
@@ -108,6 +113,9 @@ def _build_system_prompt(
     lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
+
+    if memories:
+        lines.append(format_memory_block(memories, display_name=profile.display_name))
 
     if history:
         lines.append(

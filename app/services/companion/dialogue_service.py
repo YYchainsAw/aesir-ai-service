@@ -6,6 +6,7 @@ from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
     CompanionDialogueResponse,
 )
+from app.schemas.memory import MemoryEntry
 from app.config import get_settings
 from app.services.companion.llm_dialogue_service import LLMCompanionDialogueService
 from app.services.companion.profile_repository import (
@@ -15,10 +16,17 @@ from app.services.companion.profile_repository import (
 )
 from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
+from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
+from app.services.memory.retrieval import retrieve
 
 
 def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
-    """按 YAML 人设选择 LLM；不可用时回退到 YAML 分类候选回复。"""
+    """按 YAML 人设选择 LLM；不可用时回退到 YAML 分类候选回复。
+
+    记忆接入（SDD T028）：检索长期记忆注入 LLM prompt；回复后把该轮写入短期
+    记忆。记忆体系任何故障都降级为「无记忆继续对话」（FR-011 / T030），
+    绝不因记忆问题中断玩家流程。
+    """
     # mtime 缓存读取人设；id 校验语义与 require_primary 一致（404 路径不变）。
     profile = get_profile()
     if profile.companion_id != request.companion_id:
@@ -27,9 +35,13 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
 
+    memories = _recall(request.companion_id)
+
     if get_settings().companion_backend == "llm":
         try:
-            response = LLMCompanionDialogueService(profile=profile).reply(request, history=history)
+            response = LLMCompanionDialogueService(profile=profile).reply(
+                request, history=history, memories=memories
+            )
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
     else:
@@ -37,7 +49,31 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
 
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
+    _remember_turn(request.companion_id, request.text)
     return response
+
+
+def _recall(companion_id: str) -> list[MemoryEntry]:
+    """检索长期记忆（预算内）；故障降级为空列表（FR-011）。"""
+    try:
+        return retrieve(get_memory_store(companion_id))
+    except MemoryStoreError:
+        return []
+
+
+def _remember_turn(companion_id: str, player_text: str) -> None:
+    """把玩家发言写入短期记忆；写失败静默降级（服务继续，不记得而已）。"""
+    try:
+        store = get_memory_store(companion_id)
+        store.append_short_term(
+            MemoryEntry(
+                content=player_text,
+                source="player_statement",
+                tags=["dialogue"],
+            )
+        )
+    except MemoryStoreError:
+        pass
 
 
 def _create_mock_dialogue_reply(

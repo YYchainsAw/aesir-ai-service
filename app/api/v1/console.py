@@ -17,6 +17,7 @@ from app.services.companion.profile_repository import (
     list_registered_companions,
 )
 from app.services.companion.session_memory import get_session_memory
+from app.services.memory.store import MemoryStoreError, get_memory_store
 from app.services.tactical.policy import get_policy
 
 router = APIRouter(prefix="/v1/console", tags=["console"])
@@ -71,9 +72,15 @@ def reset_memory(request: MemoryResetRequest) -> MemoryResetResponse:
     except UnknownCompanionError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    # 长期记忆清空在 T029 接入；当前清空该角色的会话记忆分区。
+    # 记忆重置（FR-010 / T029）：清空长期记忆 + 会话记忆分区。
+    # 长期记忆故障时仍算部分成功：会话记忆已清，长期记忆保持原样并如实返回。
     memory = get_session_memory(get_settings().dialogue_history_turns)
     cleared = memory.clear(request.companion_id)
+    long_term_reset = True
+    try:
+        get_memory_store(request.companion_id).clear()
+    except MemoryStoreError:
+        long_term_reset = False
     return MemoryResetResponse(
-        companion_id=request.companion_id, reset=True, cleared_sessions=cleared
+        companion_id=request.companion_id, reset=long_term_reset, cleared_sessions=cleared
     )
