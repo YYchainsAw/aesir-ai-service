@@ -1,0 +1,48 @@
+# 活动域与自主行为策略（SDD US3 / FR-019~FR-025）。
+#
+# 活动场景白名单、行为目录、节流与禁打断规则全部外置本文件（章程原则 I）。
+# Phase 1 仅骨架：行为目录为占位集合，待 T051 实现时补全参数约束。
+
+revision: agency-policy-001
+
+# 活动场景（FR-019：不同场景提供不同可执行行为集合）
+domains:
+  combat: {}        # 战斗域排除生活类行为（FR-019/T050）
+  exploration: {}
+  camp: {}          # 营地休整
+  conversation: {}
+  idle: {}
+
+# 行为白名单目录（FR-020：非战斗自主行为 ≥8 类）
+behaviors:
+  follow: { domains: [exploration, camp, idle], priority: 20 }
+  move_to: { domains: [exploration, camp, idle], priority: 30 }
+  observe: { domains: [exploration, idle], priority: 25 }
+  inspect: { domains: [exploration, camp], priority: 25 }      # 查看/交互附近物件
+  interact: { domains: [exploration, camp], priority: 35 }
+  pickup: { domains: [exploration, camp], priority: 30 }
+  rest: { domains: [camp, idle], priority: 40 }                # 休整
+  wait: { domains: [exploration, camp, idle], priority: 15 }
+  express: { domains: [exploration, camp, conversation, idle], priority: 10 }
+  self_talk: { domains: [exploration, camp, idle], priority: 10 }  # 自言自语
+  alert_player: { domains: [exploration, camp, idle], priority: 70 }  # 发现线索提醒
+
+# 跨域优先级仲裁（FR-024：高 → 低）
+arbiter:
+  priority_order:
+    - danger_self_preserve   # 危险自保
+    - combat_tactical        # 战斗战术
+    - player_command         # 玩家指令
+    - story_event            # 剧情事件
+    - relationship_event     # 关系事件
+    - routine_autonomy       # 日常自主行为
+
+# 节流与禁打断（FR-022 / FR-023）；窗口参数默认值见 app/config.py
+throttle:
+  dedup_window_seconds: 300   # 同一触发源短期内不重复触发
+  max_per_window: 3
+  no_interrupt_when:           # 禁止打断情形，此时不发起自主行为
+    - cutscene_playing         # 剧情演出
+    - player_speaking          # 玩家正在说话
+    - npc_casting              # NPC 正在施法
+    - ui_popup                 # 界面弹窗

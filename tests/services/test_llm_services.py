@@ -11,6 +11,8 @@ from app.services.parsers.llm import LLMCommandParser
 class StubLLMClient:
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
+        self.system_prompt = ""
+        self.user_prompt = ""
 
     def generate_json(
         self,
@@ -19,6 +21,8 @@ class StubLLMClient:
         user_prompt: str,
         temperature: float = 0.2,
     ) -> dict[str, Any]:
+        self.system_prompt = system_prompt
+        self.user_prompt = user_prompt
         return self.payload
 
 
@@ -57,6 +61,57 @@ def test_companion_llm_service_rejects_unknown_ue_id() -> None:
 
     with pytest.raises(LLMClientError, match="unknown emotion ID"):
         service.reply(CompanionDialogueRequest(text="测试"))
+
+
+def test_companion_llm_prompt_injects_full_persona_and_examples() -> None:
+    """方案 A 回归：prompt 必须包含人设全量字段与 few-shot 示例。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "好呀。",
+            "emotion_id": "emotion.bright",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.bright_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="聊点什么吧"))
+
+    prompt = stub.system_prompt
+    assert "lightly_tsundere" in prompt                      # core_traits
+    assert "Relationship subtext" in prompt                   # relationship_to_player.subtext
+    assert "Speaking habits" in prompt                        # habits
+    assert "Speaking avoid" in prompt                          # avoid
+    assert "[praised] Player:" in prompt                       # dialogue_examples few-shot
+    assert "emotion.shy" in prompt
+
+
+def test_companion_llm_prompt_injects_conversation_history() -> None:
+    """方案 B 回归：session 历史以对话块形式进入系统提示。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "那就接着说。",
+            "emotion_id": "emotion.bright",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.bright_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="刚说到哪了？", session_id="s1"),
+        history=(DialogueTurn(user_text="我们出发吧。", reply_text="当然可以。"),),
+    )
+
+    prompt = stub.system_prompt
+    assert "Recent conversation" in prompt
+    assert "Player: 我们出发吧。" in prompt
+    assert "Alice: 当然可以。" in prompt
+    assert stub.user_prompt == "刚说到哪了？"
 
 
 def test_tactical_llm_parser_rejects_extra_fields() -> None:

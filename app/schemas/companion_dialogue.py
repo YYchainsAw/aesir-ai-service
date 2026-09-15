@@ -22,6 +22,15 @@ class CompanionDialogueRequest(BaseModel):
         description="UE 中队友的稳定 ID",
     )
     game_state: Literal["exploration", "conversation"] = "exploration"
+    session_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        description=(
+            "会话标识（UE 侧生成并在同一轮对话中复用）。传入时服务端维护最近 "
+            "N 轮滚动记忆并注入 LLM；缺省时本请求完全无状态（v0.1 行为不变）。"
+        ),
+    )
 
 
 class CompanionDialogueResponse(BaseModel):
@@ -31,6 +40,7 @@ class CompanionDialogueResponse(BaseModel):
 
     protocol_version: Literal["0.1"] = "0.1"
     companion_id: str
+    session_id: str | None = None
     reply_text: str
     emotion_id: str
     gesture_id: str

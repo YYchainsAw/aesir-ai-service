@@ -1,0 +1,23 @@
+{
+  "protocol_version": "0.3",
+  "request_id": "88888888-8888-4888-8888-888888888888",
+  "companion_id": "companion.alice",
+  "world_context": {
+    "snapshot_id": "44444444-4444-4444-8444-444444444444",
+    "captured_at": "2026-09-13T12:00:00Z",
+    "scene": "exploration",
+    "world_time": {"game_clock": "14:20", "time_of_day": "noon", "weather": "clear"},
+    "region": {"region_id": "region.forest.north", "first_visit": true},
+    "player": {"id": "party.player", "hp_percent": 80, "is_downed": false},
+    "companion": {"id": "companion.alice", "hp_percent": 90, "mp_percent": 70, "current_behavior": "follow", "is_casting": false},
+    "interactables": [
+      {"object_id": "object.ruins_sign.001", "kind": "poi", "distance_m": 4.0, "notable": true}
+    ],
+    "ui_popup": false,
+    "cutscene_playing": false,
+    "player_speaking": false,
+    "combat": null
+  },
+  "text": null,
+  "session_id": "ue-session-42"
+}

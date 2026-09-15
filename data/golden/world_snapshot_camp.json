@@ -1,0 +1,16 @@
+{
+  "snapshot_id": "55555555-5555-4555-8555-555555555555",
+  "captured_at": "2026-09-13T12:00:00Z",
+  "scene": "camp",
+  "world_time": {"game_clock": "21:30", "time_of_day": "night", "weather": "clear"},
+  "region": {"region_id": "region.camp.lakeside", "first_visit": false},
+  "player": {"id": "party.player", "hp_percent": 95, "is_downed": false},
+  "companion": {"id": "companion.alice", "hp_percent": 85, "mp_percent": 40, "current_behavior": "idle", "is_casting": false},
+  "interactables": [
+    {"object_id": "object.campfire.001", "kind": "prop", "distance_m": 3.0, "notable": true}
+  ],
+  "ui_popup": false,
+  "cutscene_playing": false,
+  "player_speaking": false,
+  "combat": null
+}

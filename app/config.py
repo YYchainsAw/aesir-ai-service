@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     asr_backend: str = "mock"                   # mock | faster_whisper
     tactical_policy: str = "rule"               # rule | rl（rl 仅占位，见总策划书 Phase 4）
     intent_backend: str = "rule"                # rule | llm（/v1/tactical/command 的意图解析后端）
+    dialogue_history_turns: int = 10            # 会话记忆滚动窗口（session_id 维度，0 = 关闭记忆）
 
     # -- ASR ----------------------------------------------------------------
     asr_mock_text: str = ""                      # mock 转写固定文本；空 = 没转出命令
@@ -44,6 +45,29 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", alias="LLM_MODEL")
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
     llm_timeout_seconds: float = Field(default=15.0, alias="LLM_TIMEOUT_SECONDS")
+
+    # -- 记忆体系（SDD US1 / T002）-------------------------------------------
+    memory_root: str = "data/memory"            # 按角色分目录：data/memory/<npc_id>/，不入版本库
+    memory_short_term_limit: int = 50           # 短期上下文条数上限（会话内滚动窗口）
+    memory_summary_limit: int = 80              # 跨会话经历摘要条数上限
+    memory_archive_limit: int = 40              # 长期档案条数上限（承诺/重大事件优先保留）
+    memory_injection_budget: int = 12           # 单次生成注入 prompt 的记忆条数预算
+
+    # -- 心跳与自主行为（SDD US3 / T002）--------------------------------------
+    heartbeat_min_interval_seconds: float = 2.0  # /v1/agent 心跳最小间隔（限流用）
+    behavior_throttle_window_seconds: float = 300.0  # 自主行为节流窗口
+    behavior_max_per_window: int = 3             # 节流窗口内自主行为触发次数上限
+
+    # -- 关系体系（SDD US2 / T002）--------------------------------------------
+    relationship_min: int = 0                    # 关系数值下界（钳制，不越界）
+    relationship_max: int = 100                  # 关系数值上界
+    relationship_initial: int = 20               # 初始关系数值（损坏/缺失时也回退到该值）
+    relationship_daily_cap: int = 15              # 每日正向净变化上限（防刷）
+    relationship_event_cooldown_seconds: float = 60.0  # 同类事件冷却窗口（窗口内重复不计分）
+
+    # -- 查证工具（SDD US6 / T002）---------------------------------------------
+    tools_max_rounds: int = 2                    # 单次生成允许的查证轮次上限
+    tools_timeout_seconds: float = 5.0           # 单次工具调用超时
 
 
 def get_settings() -> Settings:
