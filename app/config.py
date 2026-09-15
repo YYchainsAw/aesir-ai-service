@@ -60,6 +60,7 @@ class Settings(BaseSettings):
 
     # -- 关系体系（SDD US2 / T002）--------------------------------------------
     relationship_min: int = 0                    # 关系数值下界（钳制，不越界）
+    relationship_root: str = "data/relationship"  # 按角色分目录：data/relationship/<npc_id>/，不入版本库
     relationship_max: int = 100                  # 关系数值上界
     relationship_initial: int = 20               # 初始关系数值（损坏/缺失时也回退到该值）
     relationship_daily_cap: int = 15              # 每日正向净变化上限（防刷）

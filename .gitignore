@@ -37,3 +37,6 @@ aesir_ai_service.egg-info/
 # Local AI-assistant working notes and scratch deliverables (not for GitHub)
 .workbuddy/
 WorkBuddy_work/
+
+# NPC relationship state (SDD T037: 运行期生成的关系持久化，不入版本库)
+data/relationship/

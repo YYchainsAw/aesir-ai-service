@@ -58,6 +58,19 @@ def _reset_heartbeat_tracker() -> None:
         _last_heartbeat.clear()
 
 
+def _relationship_stage_or_empty(companion_id: str) -> str:
+    """读取当前关系阶段（US2 / T042）；关系体系故障降级为空字符串。"""
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        return get_relationship_store(companion_id).state().stage
+    except RelationshipStoreError:
+        return ""
+
+
 def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> AgentStepResponse:
     """空动作轻量返回（FR-025：不虚构行为；FR-021 判定无产出时快速返回）。"""
     return AgentStepResponse(
@@ -70,6 +83,7 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             reason_codes=reason_codes,
             policy_revision=POLICY_REVISION,
             used_snapshot_id=request.world_context.snapshot_id,
+            relationship_stage=_relationship_stage_or_empty(request.companion_id),
         ),
     )
 

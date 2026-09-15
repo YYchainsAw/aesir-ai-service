@@ -47,3 +47,6 @@ class CompanionDialogueResponse(BaseModel):
     facial_expression_id: str
     interruptible: bool = True
     source: Literal["mock", "llm", "fallback"] = "mock"
+    # US2（T042）：当前关系阶段（distant/neutral/friendly/close）；关系体系
+    # 故障降级时为空字符串——UE 不应依赖该字段做表现逻辑。
+    relationship_stage: str = ""

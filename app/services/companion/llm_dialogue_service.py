@@ -46,12 +46,14 @@ class LLMCompanionDialogueService:
         *,
         history: tuple[DialogueTurn, ...] = (),
         memories: list[MemoryEntry] = (),
+        relationship_stage: str = "",
     ) -> CompanionDialogueResponse:
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
                 history=history,
                 memories=list(memories),
+                relationship_stage=relationship_stage,
             ),
             user_prompt=request.text,
         )
@@ -85,6 +87,7 @@ def _build_system_prompt(
     *,
     history: tuple[DialogueTurn, ...] = (),
     memories: list[MemoryEntry] | None = None,
+    relationship_stage: str = "",
 ) -> str:
     identity = profile.raw.get("identity", {})
     persona = profile.raw.get("persona", {})
@@ -110,6 +113,16 @@ def _build_system_prompt(
         )
 
     lines.append(f"Speaking tone: {speaking_style.get('tone', '')}")
+
+    # 关系阶段化人设偏移（US2 / T040）：覆盖称呼与语气；缺失阶段沿用基线
+    stage_personas = profile.raw.get("relationship_stage_personas", {})
+    if relationship_stage and relationship_stage in stage_personas:
+        persona = stage_personas[relationship_stage]
+        lines.append(
+            f"Current relationship stage: {relationship_stage} "
+            f"(address the player as: {persona.get('address', '')}). "
+            f"Stage tone shift: {persona.get('tone_shift', '')}"
+        )
     lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))

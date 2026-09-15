@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-14，**286 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-14，**311 通过 + 3 冒烟跳过**）。
+
+## 2026-09-14 — SDD Phase 4 US2 关系体系（关系数值/阶段/防刷/阶段化行为差异）
+
+- **测试先行**：先写四组失败测试再实现（章程原则 IV）——`test_relationship_state.py`（阶段边界/钳制/持久化/角色分区）、`test_relationship_rules.py`（增减/冷却防刷/日上限/跨日重置/未知事件忽略）、`test_relationship_effect.py`（同一指令 × ≥3 阶段可区分）、`test_relationship_degradation.py`（损坏隔离/备份恢复/回退初值后服务可用）。
+- **关系状态模型与持久化**（T036/T037）：`app/schemas/relationship.py` + `app/services/relationship/state.py`——按角色分区落盘 `data/relationship/<npc_id>/relationship.json`，原子写入 + `.bak` 单版本备份 + 损坏隔离（`.corrupt`），主文件损坏先恢复备份再回退初值（FR-018），全程服务不中断。
+- **事件驱动规则**（T038）：`rules.py` 从 `data/policy/relationship_policy.yaml` 读事件表（8 类事实事件）；防刷 = 同类事件冷却窗口（`AESIR_RELATIONSHIP_EVENT_COOLDOWN_SECONDS`）+ 每日正向净变化上限（`AESIR_RELATIONSHIP_DAILY_CAP`，负向不受限）；数值钳制边界内。
+- **阶段化行为差异**（T034/T039）：`effect.py` 对战术决策做阶段调制——distant（conservative）维持保守拒绝并追加关系原因码；close（devoted）低蓝下仍为玩家重建护盾动作；close（obedience=low）对危险指令追加抗议码但执行权归 UE。全部差异落在 `reason_codes`（可解释）。v0.2 契约端点（`/v1/tactical/*`）**行为不变**——关系调制以可选参数接入 resolver，完整编排在 Phase 5 主入口（T054）接入。
+- **对话层接线**（T040/T041/T042）：`primary_companion.yaml` 新增 `relationship_stage_personas`（四阶段称呼与语气偏移）；LLM 系统提示注入当前阶段；`/v1/companion/chat` 响应与 `/v1/agent/step` observability 均回带 `relationship_stage`（关系故障降级为空字符串，对话不中断）。
+- **演示**（T043）：`scripts/demo_relationship.py`——同一指令「护住我！」× 4 阶段决策对比；`--events` 附事件计分/防刷/日上限演示。
+- **测试**：新增 25 例（US2 四组 21 + 对话接线 4）。**311 通过 + 3 冒烟跳过**。
 
 ## 2026-09-14 — 终端对话调试台 + B1 人格语料扩充（SDD Phase 1~3 补记见下）
 

@@ -36,16 +36,18 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
+    stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend == "llm":
         try:
             response = LLMCompanionDialogueService(profile=profile).reply(
-                request, history=history, memories=memories
+                request, history=history, memories=memories, relationship_stage=stage
             )
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
+    response.relationship_stage = stage
 
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
@@ -59,6 +61,19 @@ def _recall(companion_id: str) -> list[MemoryEntry]:
         return retrieve(get_memory_store(companion_id))
     except MemoryStoreError:
         return []
+
+
+def _relationship_stage(companion_id: str) -> str:
+    """当前关系阶段（US2 / T040）；故障降级为空字符串（对话不中断）。"""
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        return get_relationship_store(companion_id).state().stage
+    except RelationshipStoreError:
+        return ""
 
 
 def _remember_turn(companion_id: str, player_text: str) -> None:

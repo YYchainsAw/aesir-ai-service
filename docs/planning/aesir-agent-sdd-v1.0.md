@@ -749,23 +749,23 @@ scripts/
 
 #### Tests for User Story 2 ⚠️
 
-- [ ] T032 [P] [US2] 数值与阶段测试：`tests/services/test_relationship_state.py`（阶段边界归属、上下限钳制、持久化）
-- [ ] T033 [P] [US2] 事件增减与防刷测试：`tests/services/test_relationship_rules.py`（正常增减、冷却窗口内重复不计分、日上限、未知事件忽略）
-- [ ] T034 [P] [US2] 阶段化差异测试：`tests/services/test_relationship_effect.py`（同一意图在不同阶段产出不同资源投入与服从度）
-- [ ] T035 [P] [US2] 损坏降级测试：`tests/services/test_relationship_degradation.py`（文件损坏回退初值，服务可用）
+- [x] T032 [P] [US2] 数值与阶段测试：`tests/services/test_relationship_state.py`（阶段边界归属、上下限钳制、持久化）
+- [x] T033 [P] [US2] 事件增减与防刷测试：`tests/services/test_relationship_rules.py`（正常增减、冷却窗口内重复不计分、日上限、未知事件忽略）
+- [x] T034 [P] [US2] 阶段化差异测试：`tests/services/test_relationship_effect.py`（同一意图在不同阶段产出不同资源投入与服从度）
+- [x] T035 [P] [US2] 损坏降级测试：`tests/services/test_relationship_degradation.py`（文件损坏回退初值，服务可用）
 
 #### Implementation for User Story 2
 
-- [ ] T036 [P] [US2] 关系状态模型：`app/schemas/relationship.py`（数值、阶段、近期事件、当日净变化）
-- [ ] T037 [US2] 关系状态持久化：`app/services/relationship/state.py`（读取、更新、备份、损坏隔离）
-- [ ] T038 [US2] 事件驱动规则：`app/services/relationship/rules.py`（从 `data/policy/relationship_policy.yaml` 读取事件表与幅度，实施防刷与日上限）
-- [ ] T039 [US2] 决策层接收关系：改造 `app/services/tactical/resolver.py`（资源投入意愿、服从度受阶段影响，产出原因码）
-- [ ] T040 [US2] 对话层接收关系：改造 `app/services/companion/dialogue_service.py` 与人格配置读取（阶段化称呼与语气偏移）
-- [ ] T041 [US2] 关系人格偏移配置：扩展 `data/companions/` 人格配置（各阶段称呼、语气、主动度、冒险意愿）
-- [ ] T042 [US2] 响应回带关系阶段与本次变化（`agent_step.py`、`companion.py` 响应字段）
-- [ ] T043 [US2] 阶段对比演示脚本：`scripts/demo_relationship.py`（同一指令 × 4 阶段）
+- [x] T036 [P] [US2] 关系状态模型：`app/schemas/relationship.py`（数值、阶段、近期事件、当日净变化）
+- [x] T037 [US2] 关系状态持久化：`app/services/relationship/state.py`（读取、更新、备份、损坏隔离）
+- [x] T038 [US2] 事件驱动规则：`app/services/relationship/rules.py`（从 `data/policy/relationship_policy.yaml` 读取事件表与幅度，实施防刷与日上限）
+- [x] T039 [US2] 决策层接收关系：改造 `app/services/tactical/resolver.py`（资源投入意愿、服从度受阶段影响，产出原因码；可选参数缺省时 v0.2 契约端点行为不变，完整编排待 Phase 5 T054 接入主入口）
+- [x] T040 [US2] 对话层接收关系：改造 `app/services/companion/dialogue_service.py` 与人格配置读取（阶段化称呼与语气偏移）
+- [x] T041 [US2] 关系人格偏移配置：扩展 `data/companions/` 人格配置（各阶段称呼、语气、主动度、冒险意愿）
+- [x] T042 [US2] 响应回带关系阶段与本次变化（`agent_step.py`、`companion.py` 响应字段）
+- [x] T043 [US2] 阶段对比演示脚本：`scripts/demo_relationship.py`（同一指令 × 4 阶段）
 
-**Checkpoint**: US1 与 US2 均可独立验证
+**Checkpoint**: US1 与 US2 均可独立验证（US2 于 2026-09-14 完成，阶段差异验收见 demo 脚本输出）
 
 ---
 
