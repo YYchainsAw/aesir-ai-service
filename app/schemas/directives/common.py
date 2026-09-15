@@ -14,10 +14,37 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.directives.combat import CombatActionTypes
+from app.schemas.directives.interaction import InteractionActionTypes
+from app.schemas.directives.movement import MovementActionTypes
+from app.schemas.directives.routine import RoutineActionTypes
+from app.schemas.directives.social import SocialActionTypes
+
 DIRECTIVE_PROTOCOL_VERSION = "0.3"
 
 # 活动域（FR-019，与 data/policy/agency_policy.yaml 的 domains 一致）
 DirectiveDomain = Literal["combat", "exploration", "camp", "conversation", "idle"]
+
+# ---------------------------------------------------------------------------
+# 行为类型联合（T049：各域分文件声明，在此汇总注册）
+# ---------------------------------------------------------------------------
+DirectiveActionType: TypeAlias = Union[
+    CombatActionTypes,
+    MovementActionTypes,
+    InteractionActionTypes,
+    SocialActionTypes,
+    RoutineActionTypes,
+]
+
+KNOWN_ACTION_TYPES: frozenset[str] = frozenset(
+    {
+        "major_heal", "quick_heal", "shield", "burst", "retreat",
+        "follow", "move_to", "wait", "retreat_move",
+        "inspect", "interact", "pickup", "observe", "alert_player",
+        "express", "self_talk",
+        "rest", "eat", "repair_gear",
+    }
+)
 
 
 # ---------------------------------------------------------------------------

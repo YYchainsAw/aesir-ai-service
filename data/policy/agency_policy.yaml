@@ -1,9 +1,10 @@
 # 活动域与自主行为策略（SDD US3 / FR-019~FR-025）。
 #
 # 活动场景白名单、行为目录、节流与禁打断规则全部外置本文件（章程原则 I）。
-# Phase 1 仅骨架：行为目录为占位集合，待 T051 实现时补全参数约束。
+# T051 补全：每行为增加参数约束（目标类型白名单 / 距离上限），用于
+# 不可执行防护（FR-025/FR-040：目标必须出现在快照中且类型/距离可达）。
 
-revision: agency-policy-001
+revision: agency-policy-002
 
 # 活动场景（FR-019：不同场景提供不同可执行行为集合）
 domains:
@@ -14,18 +15,22 @@ domains:
   idle: {}
 
 # 行为白名单目录（FR-020：非战斗自主行为 ≥8 类）
+# - domains：适用场景白名单
+# - priority：默认优先级（0~100，同级仲裁用）
+# - allowed_kinds：可作目标的 interactable 类型；null 表示无目标行为
+# - max_distance_m：目标距离上限（米），超出视为不可达不产出（FR-025）
 behaviors:
-  follow: { domains: [exploration, camp, idle], priority: 20 }
-  move_to: { domains: [exploration, camp, idle], priority: 30 }
-  observe: { domains: [exploration, idle], priority: 25 }
-  inspect: { domains: [exploration, camp], priority: 25 }      # 查看/交互附近物件
-  interact: { domains: [exploration, camp], priority: 35 }
-  pickup: { domains: [exploration, camp], priority: 30 }
-  rest: { domains: [camp, idle], priority: 40 }                # 休整
-  wait: { domains: [exploration, camp, idle], priority: 15 }
-  express: { domains: [exploration, camp, conversation, idle], priority: 10 }
-  self_talk: { domains: [exploration, camp, idle], priority: 10 }  # 自言自语
-  alert_player: { domains: [exploration, camp, idle], priority: 70 }  # 发现线索提醒
+  follow:       { domains: [exploration, camp, idle], priority: 20, allowed_kinds: null, max_distance_m: 50 }
+  move_to:      { domains: [exploration, camp, idle], priority: 30, allowed_kinds: [item, npc, prop, poi], max_distance_m: 30 }
+  observe:      { domains: [exploration, idle], priority: 25, allowed_kinds: [item, npc, prop, poi], max_distance_m: 25 }
+  inspect:      { domains: [exploration, camp], priority: 25, allowed_kinds: [prop, poi, npc], max_distance_m: 10 }
+  interact:    { domains: [exploration, camp], priority: 35, allowed_kinds: [item, prop, npc], max_distance_m: 5 }
+  pickup:       { domains: [exploration, camp], priority: 30, allowed_kinds: [item], max_distance_m: 5 }
+  rest:         { domains: [camp, idle], priority: 40, allowed_kinds: null, max_distance_m: 0 }
+  wait:         { domains: [exploration, camp, idle], priority: 15, allowed_kinds: null, max_distance_m: 0 }
+  express:      { domains: [exploration, camp, conversation, idle], priority: 10, allowed_kinds: null, max_distance_m: 0 }
+  self_talk:    { domains: [exploration, camp, idle], priority: 10, allowed_kinds: null, max_distance_m: 0 }
+  alert_player: { domains: [exploration, camp, idle], priority: 70, allowed_kinds: null, max_distance_m: 0 }
 
 # 跨域优先级仲裁（FR-024：高 → 低）
 arbiter:

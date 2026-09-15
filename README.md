@@ -50,9 +50,9 @@ aesir-ai-service/
 │       ├── tactical/              # resolver / event_policy / receipt_store / acknowledgement
 │       ├── companion/             # 对话服务 + 人设仓库
 │       ├── llm/                   # client + factory（共享 LLM Client）
-│       ├── memory/                # 记忆体系（SDD 骨架，US1）
-│       ├── relationship/          # 关系体系（SDD 骨架，US2）
-│       ├── agency/                # 活动域与自主行为（SDD 骨架，US3）
+│       ├── memory/                # 记忆体系（US1：三级记忆/淘汰/检索/降级）
+│       ├── relationship/          # 关系体系（US2：数值/阶段/防刷/阶段化调制）
+│       ├── agency/                # 自主行为（US3：场景判定/行为目录/仲裁/节流）
 │       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
 ├── rl/                            # RL 实验包（可选依赖；服务进程不会 import）
 │   ├── sim/                       # BossSim 模拟器内核 + 数值常量
@@ -114,6 +114,9 @@ aesir-ai-service/
 | `POST` | `/v1/tactical/executions` | v0.2 §7：UE 执行回执（202 受理，落 JSONL） |
 | `POST` | `/v1/combat/events` | v0.2 §6：战斗事件 → 艾莉反应/建议/候选动作 |
 | `POST` | `/v1/companion/chat` | 陪伴对话 |
+| `POST` | `/v1/agent/step` | v0.3 主入口：心跳/世界快照 → 禁打断判定 → 候选生成 → 仲裁 → 节流 → 自主行为指令（US3） |
+| `POST` | `/v1/world/events` | v0.3 世界事件（含幂等回放） |
+| `GET` | `/v1/console/state` · `/memory`，`POST /memory/reset` | v0.3 调试台（状态查询/记忆重置） |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
 支持的 5 条战术指令（`intent`）：

@@ -2,7 +2,19 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-14，**311 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**355 通过 + 3 冒烟跳过**）。
+
+## 2026-09-15 — SDD Phase 5 US3 自主行为体系（P1 闭环达成：她在没有战斗的时候也活着）
+
+- **测试先行**（T044~T048）：先写五组失败测试再实现——`test_agency_domain.py`（五场景判定/战斗域排除生活行为/禁打断聚合/scene 与内嵌战斗快照矛盾以 scene 为准）、`test_agency_catalog.py`（白名单闭集/域过滤/候选生成/kind 与距离防护/关系阶段调制/YAML 非法报错）、`test_agency_arbiter.py`（六级优先级两两顺序/同级比数值再比稳定序/未知类目丢弃）、`test_agency_throttle.py`（去重窗口/窗口过期/单周期上限/角色隔离/并发安全/reset）、`test_agency_not_actionable.py`（不虚构目标/pickup 仅 item/距离超限丢弃/战斗场景空/禁打断静止）。
+- **指令类型分文件**（T049）：`app/schemas/directives/{combat,movement,interaction,social,routine}.py` 各域 action_type 白名单 Literal，`common.py` 汇总 `DirectiveActionType` 联合与 `KNOWN_ACTION_TYPES`；信封 `action_type` 保持 `str`（白名单校验在目录层），不破坏既有契约。T055（表现块）Phase 2 已完成。
+- **场景判定**（T050）：`app/services/agency/domain.py` 纯函数——`resolve_scene` 透传 UE 上报、`allows_lifestyle`（combat → False）、`no_interrupt_reason`（四种禁打断标志聚合为单一原因名，与策略 YAML 名单对齐）。
+- **行为目录与候选生成**（T051）：`behavior_catalog.py` 参照 tactical/policy 模式加载 `agency_policy.yaml`（revision 升至 `agency-policy-002`，每行为补 `allowed_kinds`/`max_distance_m` 参数约束）；`generate_candidates` 为确定性规则驱动（无 LLM，FR-028 不猜测）——低血/夜晚休整、notable 物件查看、近距物品拾取、首访区域提醒、玩家倒地高优告警、兜底观察；三重不可执行防护：目标 ID 必须在快照、类型在白名单、距离在上限内（FR-025/FR-040）。
+- **跨域仲裁**（T052）：`arbiter.py`——六级优先级（危险自保 > 战斗战术 > 玩家指令 > 剧情事件 > 关系事件 > 日常自主）来自 YAML；同级比 priority 数值再比稳定序；被压制候选保留在 `suppressed` 供可解释。
+- **节流去重禁打断**（T053）：`throttle.py` 进程内（不落盘：语义窗口 300s 远小于进程生命周期，丢失最坏是重复一次行为且 UE 有最终否决权）；键 = (角色, 行为, 目标, 触发源)——同目标不同触发原因不算重复；OrderedDict + Lock + 有界缓存，与心跳限流同款模式。
+- **主入口编排接入**（T054）：`POST /v1/agent/step` 纯心跳路径串联「禁打断 → 候选生成（注入关系阶段）→ 目录校验 → 仲裁 → 节流 → 指令输出」；输出 `DirectiveEnvelope`（source=autonomy，presentation 带 `gaze_target_id`，人设读取失败降级为简短 reply_text）；`policy_revision` 改读策略 YAML。文本指令路径与心跳限流 429 不变；v0.1/v0.2 契约测试零改动全绿。
+- **演示**（T056）：`scripts/mock_ue_flow.py` 新增 US3 分支——营地夜晚休整（directive）、同触发源重复（THROTTLED/DEDUP_WINDOW 静止）、探索查看物件（directive + 注视目标）、剧情演出中（INTERRUPT_FORBIDDEN 静止）。
+- **测试**：新增 44 例（agency 五组 41 + 主入口编排 3，原心跳用例升级为 directive 期望并新增禁打断/节流用例）。**355 通过 + 3 冒烟跳过**。
 
 ## 2026-09-14 — SDD Phase 4 US2 关系体系（关系数值/阶段/防刷/阶段化行为差异）
 

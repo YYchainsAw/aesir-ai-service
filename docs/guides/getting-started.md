@@ -237,13 +237,13 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 - **长期记忆已接入（SDD US1）**：每轮对话玩家发言写入分级记忆（`data/memory/<companion_id>/`，重启保留）；LLM 生成时按预算（`AESIR_MEMORY_INJECTION_BUDGET`，默认 12 条）注入档案/摘要/短期记忆，角色可自然引用历史信息。记忆故障自动降级为无记忆继续对话（FR-011）。重置入口：`POST /v1/console/memory/reset`；持久化演示：`python -m scripts.demo_memory_persistence`。
 - 未登记的 `companion_id` 返回 `404`。
 
-### 5.6 v0.3 骨架端点（SDD Phase 2，主入口/世界事件/调试台）
+### 5.6 v0.3 端点（主入口/世界事件/调试台；US3 自主行为已接入）
 
-三个新端点已通、但为骨架实现（空动作路径；记忆/关系/自主行为在 SDD US1~US3 落地后接入），请求/响应结构以 `data/golden/` 下的样例为准：
+主入口 `/v1/agent/step` 已接入 US3 自主行为编排（SDD Phase 5，2026-09-15）：纯心跳路径串联「禁打断判定 → 候选生成（注入关系阶段）→ 目录校验 → 跨域仲裁 → 节流去重 → 指令输出」。请求/响应结构以 `data/golden/` 下的样例为准：
 
 | 端点 | 状态 | 说明 |
 | --- | --- | --- |
-| `POST /v1/agent/step` | 骨架 | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）；当前返回空动作 `action:"none"`。未登记角色 404 |
+| `POST /v1/agent/step` | **已实现（US3）** | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）。非战斗场景产出自主行为指令 `action:"directive"`（`source:"autonomy"`，策略版本 `agency-policy-002`）；禁打断/节流/无候选时返回空动作并附原因码（`INTERRUPT_FORBIDDEN:*` / `THROTTLED` / `NO_AUTONOMOUS_CANDIDATE`）。战斗场景不产生活类行为（决策归 v0.1/v0.2 链路）。未登记角色 404。行为白名单与优先级配置：`data/policy/agency_policy.yaml` |
 | `POST /v1/world/events` | 骨架 | 世界事件（战斗+生活类型白名单）：`companion_id + event_id` 幂等回放（`duplicate:true`）；反应暂回退角色默认表现 |
 | `GET /v1/console/state` / `GET /v1/console/memory` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、三级长期记忆视图、会话+长期记忆重置 |
 
@@ -251,7 +251,7 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
 ```
 
-完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 骨架链路（心跳限流 → 世界事件幂等 → 调试台）。
+完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 链路（心跳限流 → 世界事件幂等 → 调试台 → US3 自主行为四分支演示：休整指令/同触发源去重静止/物件查看指令/剧情演出禁打断静止）。
 
 ### 5.7 终端对话调试（start.bat chat）
 

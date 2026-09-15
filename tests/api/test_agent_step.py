@@ -1,14 +1,17 @@
-"""`POST /v1/agent/step` 主入口契约测试（SDD T019，骨架空动作路径）。
+"""`POST /v1/agent/step` 主入口契约测试（SDD T019 + T054 自主行为编排）。
 
-覆盖四类用例（章程原则 IV）：正常心跳、缺字段 422、未登记角色 404、
-心跳过频 429；另覆盖骨架期的文本指令路径（如实返回待接入原因码）。
+覆盖四类用例（章程原则 IV）：正常心跳（自主行为产出指令）、缺字段 422、
+未登记角色 404、心跳过频 429；另覆盖禁打断静止、节流静止与骨架期的文本
+指令路径（如实返回待接入原因码）。
 """
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.api.v1 import agent as agent_module
 from app.api.v1.agent import _reset_heartbeat_tracker
+from app.services.agency.throttle import reset_throttle
 
 client = TestClient(app)
 
@@ -16,11 +19,13 @@ _REQUEST_ID = "0f9f4b62-6f37-4d0f-9bb5-2be97a4d0f27"
 
 
 @pytest.fixture(autouse=True)
-def _clean_heartbeat_tracker():
-    """各测试独立：清空心跳限流状态，避免用例间串扰。"""
+def _clean_state():
+    """各测试独立：清空心跳限流与自主行为节流状态，避免用例间串扰。"""
     _reset_heartbeat_tracker()
+    reset_throttle()
     yield
     _reset_heartbeat_tracker()
+    reset_throttle()
 
 
 def _step_payload(**overrides) -> dict:
@@ -43,16 +48,67 @@ def _step_payload(**overrides) -> dict:
     return payload
 
 
-def test_heartbeat_returns_none_action_with_observability() -> None:
+def _bypass_heartbeat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """跳过心跳限流（节流用例需要连续两次心跳）。"""
+    monkeypatch.setattr(agent_module, "_heartbeat_too_soon", lambda *_args, **_kwargs: False)
+
+
+def test_heartbeat_emits_autonomous_directive() -> None:
+    """T054：探索场景 + notable 篝火 → 自主行为产出指令（US3 核心路径）。"""
     response = client.post("/v1/agent/step", json=_step_payload())
     assert response.status_code == 200
     body = response.json()
     assert body["request_id"] == _REQUEST_ID
     assert body["companion_id"] == "companion.alice"
+    assert body["action"] == "directive"
+    directive = body["directive"]
+    assert directive["agent_id"] == "companion.alice"
+    assert directive["domain"] == "exploration"
+    assert directive["source"] == "autonomy"
+    assert directive["action_type"] == "inspect"
+    assert directive["presentation"]["gaze_target_id"] == "object.campfire.001"
+    assert directive["policy_revision"]
+    observability = body["observability"]
+    assert observability["source"] == "rule"
+    assert observability["used_snapshot_id"] == "22222222-2222-4222-8222-222222222222"
+    assert any(code.startswith("ARB_WON:") for code in observability["reason_codes"])
+
+
+def test_heartbeat_no_candidates_returns_none_action() -> None:
+    """战斗场景心跳：无生活类候选 → 空动作 + NO_AUTONOMOUS_CANDIDATE。"""
+    payload = _step_payload()
+    payload["world_context"]["scene"] = "combat"
+    response = client.post("/v1/agent/step", json=payload)
+    assert response.status_code == 200
+    body = response.json()
     assert body["action"] == "none"
     assert body["directive"] is None
-    assert body["observability"]["source"] == "rule"
-    assert body["observability"]["used_snapshot_id"] == "22222222-2222-4222-8222-222222222222"
+    assert "NO_AUTONOMOUS_CANDIDATE" in body["observability"]["reason_codes"]
+
+
+def test_heartbeat_no_interrupt_returns_none_action() -> None:
+    """禁打断（剧情演出）→ 静止观察，不发起自主行为（FR-023）。"""
+    payload = _step_payload()
+    payload["world_context"]["cutscene_playing"] = True
+    response = client.post("/v1/agent/step", json=payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"] == "none"
+    assert "INTERRUPT_FORBIDDEN:cutscene_playing" in body["observability"]["reason_codes"]
+
+
+def test_repeated_trigger_throttled_to_none_action(monkeypatch: pytest.MonkeyPatch) -> None:
+    """同一触发源短期重复 → 节流为静止 + THROTTLED（FR-022 去重）。"""
+    _bypass_heartbeat(monkeypatch)
+    first = client.post("/v1/agent/step", json=_step_payload())
+    assert first.status_code == 200
+    assert first.json()["action"] == "directive"
+    second = client.post("/v1/agent/step", json=_step_payload())
+    assert second.status_code == 200
+    body = second.json()
+    assert body["action"] == "none"
+    assert "THROTTLED" in body["observability"]["reason_codes"]
+    assert "DEDUP_WINDOW" in body["observability"]["reason_codes"]
 
 
 def test_text_command_skeleton_reports_pending_reason() -> None:
