@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**355 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**362 通过 + 3 冒烟跳过**）。
+
+## 2026-09-15 — 陪伴对话流式输出（SSE，P1 清账）
+
+- **`LLMClient` 流式能力**：新增 `stream_completion` 迭代器（OpenAI 兼容 `stream=true`，逐段透传 `delta.content` 原始增量、忽略 DeepSeek `reasoning_content`、异常统一包 `LLMClientError`）；`generate_json` 原样不动，非流式路径零改动。
+- **服务层**：`stream_reply` 与 `reply` 共用同一 system prompt 与校验（提取共享 `_validate_dialogue_payload`），流式只是传输层差异；`_ReplyTextStreamExtractor` 从部分 JSON 增量抽取 `reply_text`（缓冲重解码，天然处理 `\n`/`\uXXXX` 转义跨 chunk 分割）。
+- **SSE 端点**：`POST /v1/companion/chat/stream`（请求体复用 `CompanionDialogueRequest`），三种帧——`delta`（文本增量）/ `meta`（权威完整响应）/ `error`（中途故障）。契约以 v0.1 附加附录 A 形式记录（schema 零改动、不升版本）；非流式端点与全部既有契约测试不动、全绿。
+- **回退语义**：LLM 未发出任何 delta 即失败 → 静默回退 mock（`source="fallback"`）与非流式一致；已发 delta 后中断 → `error` 帧、不写记忆（唯一行为差异，已在契约注明）。未登记角色的 404 在 SSE 响应头发出之前抛出。
+- **终端调试台**：`chat_console.py` 默认改走流式端点打字机式输出（meta 帧打印来源/表现 ID 信息行），`--no-stream` 回退旧非流式路径；首字延迟从「整条生成时长」降为「首 token 时长」。
+- **测试**：新增 7 例（流式服务层 4：delta 拼接/转义跨 chunk/白名单拒绝/非法 JSON；SSE API 3：帧形状与 meta 权威字段/战斗场景 422/未知角色 404）。**362 通过 + 3 冒烟跳过**。
+
 
 ## 2026-09-15 — SDD Phase 5 US3 自主行为体系（P1 闭环达成：她在没有战斗的时候也活着）
 

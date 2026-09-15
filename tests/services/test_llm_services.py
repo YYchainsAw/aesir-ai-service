@@ -144,3 +144,97 @@ def test_tactical_llm_parser_marks_its_own_source() -> None:
     response = parser.parse("做一个不存在的动作")
 
     assert response.source == "llm"
+
+
+class StubStreamingLLMClient:
+    """按预定 chunk 列表产出原始文本增量的流式测试替身。"""
+
+    def __init__(self, chunks: list[str]) -> None:
+        self._chunks = chunks
+
+    def generate_json(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+    ) -> dict[str, Any]:
+        raise AssertionError("stream_reply must not call generate_json")
+
+    def stream_completion(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+    ):
+        yield from self._chunks
+
+
+_FULL_STREAM_REPLY = (
+    '{"reply_text": "好呀，那就走吧。", '
+    '"emotion_id": "emotion.bright", '
+    '"gesture_id": "gesture.cheerful_idle", '
+    '"facial_expression_id": "face.bright_smile", '
+    '"interruptible": true}'
+)
+
+
+def _split_mid_word(text: str, parts: int) -> list[str]:
+    size = max(1, len(text) // parts)
+    return [text[i : i + size] for i in range(0, len(text), size)]
+
+
+def test_stream_reply_emits_deltas_then_meta() -> None:
+    service = LLMCompanionDialogueService(StubStreamingLLMClient(_split_mid_word(_FULL_STREAM_REPLY, 7)))
+
+    events = list(
+        service.stream_reply(CompanionDialogueRequest(text="我们出发吧。", session_id="s1"))
+    )
+
+    deltas = [e for e in events if e.kind == "delta"]
+    metas = [e for e in events if e.kind == "meta"]
+    assert "".join(e.text for e in deltas) == "好呀，那就走吧。"
+    assert len(metas) == 1
+    assert metas[0].response is not None
+    assert metas[0].response.reply_text == "好呀，那就走吧。"
+    assert metas[0].response.source == "llm"
+    assert metas[0].response.session_id == "s1"
+    assert all(e.kind != "error" for e in events)
+
+
+def test_stream_reply_decodes_escapes_across_chunks() -> None:
+    r"""转义序列（\n、\uXXXX）被 chunk 边界切断时也能正确拼出 delta。"""
+    chunks = [
+        '{"reply_text": "第一行',
+        '\\n',
+        '第二行 \\u',
+        '4e2d',
+        '弹"',
+        ', "emotion_id": "emotion.bright", "gesture_id": "gesture.cheerful_idle", '
+        '"facial_expression_id": "face.bright_smile", "interruptible": true}',
+    ]
+    service = LLMCompanionDialogueService(StubStreamingLLMClient(chunks))
+
+    events = list(service.stream_reply(CompanionDialogueRequest(text="测试")))
+
+    joined = "".join(e.text for e in events if e.kind == "delta")
+    assert joined == "第一行\n第二行 中弹"
+    meta = next(e for e in events if e.kind == "meta")
+    assert meta.response is not None
+    assert meta.response.reply_text == "第一行\n第二行 中弹"
+
+
+def test_stream_reply_rejects_unknown_ue_id_after_stream() -> None:
+    payload = _FULL_STREAM_REPLY.replace("emotion.bright", "emotion.not_registered")
+    service = LLMCompanionDialogueService(StubStreamingLLMClient([payload]))
+
+    with pytest.raises(LLMClientError, match="unknown emotion ID"):
+        list(service.stream_reply(CompanionDialogueRequest(text="测试")))
+
+
+def test_stream_reply_rejects_invalid_json() -> None:
+    service = LLMCompanionDialogueService(StubStreamingLLMClient(["不是 JSON"]))
+
+    with pytest.raises(LLMClientError, match="not valid JSON"):
+        list(service.stream_reply(CompanionDialogueRequest(text="测试")))

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -28,6 +29,15 @@ class LLMClient(Protocol):
         temperature: float = 0.2,
     ) -> dict[str, Any]:
         """生成并解析一个 JSON 对象。"""
+
+    def stream_completion(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+    ) -> Iterator[str]:
+        """流式生成，逐段产出原始文本增量（不做 JSON 解析）。"""
 
 
 @dataclass(frozen=True)
@@ -96,3 +106,56 @@ class OpenAICompatibleLLMClient:
         if not isinstance(parsed, dict):
             raise LLMClientError("LLM response root must be a JSON object.")
         return parsed
+
+    def stream_completion(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.2,
+    ) -> Iterator[str]:
+        """流式调用 ``/chat/completions``，逐段产出 ``delta.content`` 文本增量。
+
+        客户端只做原始增量透传（DeepSeek 的 ``reasoning_content`` 一律忽略），
+        JSON 解析与校验留给业务层，与非流式 ``generate_json`` 的分工一致。
+        """
+        payload = {
+            "model": self._settings.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": temperature,
+            "response_format": {"type": "json_object"},
+            "stream": True,
+        }
+
+        try:
+            with self._http_client.stream(
+                "POST",
+                f"{self._settings.base_url.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {self._settings.api_key}"},
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                yield from self._iter_sse_content(response)
+        except LLMClientError:
+            raise
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
+            raise LLMClientError("LLM stream request failed or returned an invalid response.") from error
+
+    def _iter_sse_content(self, response: httpx.Response) -> Iterator[str]:
+        """解析 SSE 行，产出每个 data 块里的 ``choices[0].delta.content``。"""
+        for line in response.iter_lines():
+            if not line.startswith("data:"):
+                continue
+            data = line[len("data:"):].strip()
+            if data == "[DONE]":
+                return
+            try:
+                chunk = json.loads(data)
+                content = chunk["choices"][0]["delta"].get("content")
+            except (json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
+                raise LLMClientError("LLM stream chunk is not a valid completion delta.") from error
+            if isinstance(content, str) and content:
+                yield content

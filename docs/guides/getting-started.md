@@ -234,6 +234,7 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 ```
 
 - `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文；缺省时请求完全无状态。
+- **流式变体（2026-09-15）**：`POST /v1/companion/chat/stream` 返回 SSE——`delta` 帧出 `reply_text` 增量（打字机式即时展示），`meta` 帧出权威完整响应（表现 ID/来源以此为准），`error` 帧表示流中途故障；帧语法与语义见契约 `ue-protocol-contract-v0.1.md` 附录 A。非流式端点行为不变。终端调试台默认已走流式（`--no-stream` 回退）。
 - **长期记忆已接入（SDD US1）**：每轮对话玩家发言写入分级记忆（`data/memory/<companion_id>/`，重启保留）；LLM 生成时按预算（`AESIR_MEMORY_INJECTION_BUDGET`，默认 12 条）注入档案/摘要/短期记忆，角色可自然引用历史信息。记忆故障自动降级为无记忆继续对话（FR-011）。重置入口：`POST /v1/console/memory/reset`；持久化演示：`python -m scripts.demo_memory_persistence`。
 - 未登记的 `companion_id` 返回 `404`。
 

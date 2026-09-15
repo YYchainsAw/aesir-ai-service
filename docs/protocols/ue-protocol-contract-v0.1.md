@@ -651,3 +651,45 @@ TacticalOrder（等待眩晕施法）
 - [x] LLM prompt：改喂 `context` 的 ID 目录 + 判别联合结构说明 + 5 份 golden 示例
 - [ ] UE：`FTacticalOrder` 实现判别反序列化 + `{ref:...}` 解析 + UUID 校验
 - [x] 测试：5 份 golden JSON 各配 1 例合法 + 1 例未知 type/越界 ID 负例
+
+---
+
+## 附录 A. 陪伴对话 SSE 流式端点（v0.1 附加扩展，2026-09-15）
+
+`POST /v1/companion/chat/stream` 是 `/v1/companion/chat` 的**流式变体**：请求体
+复用 `CompanionDialogueRequest`（原样），响应改为 `text/event-stream`（SSE）。
+现有 JSON schema 零改动、非流式端点行为零改动，故为 v0.1 附加式扩展、不升版本。
+
+### 帧语法
+
+每帧两行 + 空行，`data` 为单行 JSON：
+
+```
+event: delta
+data: {"protocol_version":"0.1","text":"好的"}
+
+event: meta
+data: {"protocol_version":"0.1","companion_id":"companion.alice","session_id":"...","reply_text":"...完整文本...","emotion_id":"emotion.bright","gesture_id":"gesture.cheerful_idle","facial_expression_id":"face.bright_smile","interruptible":true,"source":"llm","relationship_stage":""}
+
+event: error
+data: {"detail":"LLM stream interrupted; this turn is incomplete."}
+```
+
+- **delta**（0..N 帧）：`reply_text` 的文本增量，只用于即时展示。
+- **meta**（终结帧，1 帧）：完整的 `CompanionDialogueResponse`，**权威数据**——
+  最终文案、表现 ID、来源（mock/llm/fallback）以此帧为准，UE 应在收到后
+  用它覆盖已展示的增量拼接结果。
+- **error**（可选终结帧）：流中途故障（见下），该轮对话不完整。
+
+### 语义规则
+
+- **meta 为权威，delta 尽力而为**：delta 可能缺失（LLM 未按 JSON 顺序输出
+  `reply_text` 时服务端不猜测），不能只靠 delta 渲染最终状态。
+- **回退语义**：LLM 在发出任何 delta 之前失败 → 服务端静默回退 mock 回复，
+  `source:"fallback"`，与非流式路径一致；mock 后端输出单 delta（全文）+ meta。
+- **中断行为（与非流式的唯一差异）**：已发出 delta 后流中断 → `error` 帧，
+  该轮**不写**会话/长期记忆；非流式路径回退回复会照常写入。已展示一半的
+  文本由 UE 自行处理（建议淡出或保留）。
+- HTTP 状态恒为 200；流开始前的错误照常返回 404（未登记角色）/ 422（参数
+  校验）。
+- 建议代理层禁用缓冲（服务端已带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`）。

@@ -1,6 +1,7 @@
 """陪伴对话服务入口：默认模拟回复，配置后可调用 LLM。"""
 
 import zlib
+from collections.abc import Iterator
 
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
@@ -8,7 +9,7 @@ from app.schemas.companion_dialogue import (
 )
 from app.schemas.memory import MemoryEntry
 from app.config import get_settings
-from app.services.companion.llm_dialogue_service import LLMCompanionDialogueService
+from app.services.companion.llm_dialogue_service import LLMCompanionDialogueService, StreamEvent
 from app.services.companion.profile_repository import (
     CompanionProfile,
     UnknownCompanionError,
@@ -48,11 +49,92 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
     response.relationship_stage = stage
+    _record_turn(request, response)
+    return response
 
+
+def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamEvent]:
+    """``create_dialogue_reply`` 的流式变体：delta 先行，meta 为权威结束帧。
+
+    回退语义（契约附录有记录）：LLM 在发出任何 delta 之前失败 → 静默回退
+    mock（source="fallback"），与非流式一致；已发出 delta 后中断 → yield
+    error 事件并停止，该轮不写记忆（唯一与非流式的行为差异）。
+
+    注意：本函数是普通函数（不是生成器），人设校验在调用时立即执行，
+    未知名伴的 404 得以在 SSE 响应头发出之前抛出。
+    """
+    profile = get_profile()
+    if profile.companion_id != request.companion_id:
+        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
+
+    memory = get_session_memory(get_settings().dialogue_history_turns)
+    history = memory.history(request.session_id) if request.session_id else ()
+
+    memories = _recall(request.companion_id)
+    stage = _relationship_stage(request.companion_id)
+
+    if get_settings().companion_backend != "llm":
+        return _stream_mock_reply(request, profile=profile, source="mock", stage=stage)
+
+    return _stream_llm_reply(
+        request, profile=profile, history=history, memories=memories, stage=stage
+    )
+
+
+def _stream_llm_reply(
+    request: CompanionDialogueRequest,
+    *,
+    profile: CompanionProfile,
+    history: tuple,
+    memories: list[MemoryEntry],
+    stage: str,
+) -> Iterator[StreamEvent]:
+    emitted_delta = False
+    try:
+        for event in LLMCompanionDialogueService(profile=profile).stream_reply(
+            request, history=history, memories=memories, relationship_stage=stage
+        ):
+            if event.kind == "delta":
+                emitted_delta = True
+                yield event
+                continue
+            _record_turn(request, event.response)
+            yield _with_stage(event, stage)
+            return
+    except LLMClientError:
+        if emitted_delta:
+            yield StreamEvent(kind="error", text="LLM stream interrupted; this turn is incomplete.")
+            return
+        yield from _stream_mock_reply(request, profile=profile, source="fallback", stage=stage)
+
+
+def _stream_mock_reply(
+    request: CompanionDialogueRequest,
+    *,
+    profile: CompanionProfile,
+    source: str,
+    stage: str,
+) -> Iterator[StreamEvent]:
+    """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
+    response = _create_mock_dialogue_reply(request, profile=profile, source=source)
+    _record_turn(request, response)
+    if response.reply_text:
+        yield StreamEvent(kind="delta", text=response.reply_text)
+    yield _with_stage(StreamEvent(kind="meta", response=response), stage)
+
+
+def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
+    if event.response is not None:
+        event.response.relationship_stage = stage
+    return event
+
+
+def _record_turn(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:
+    """成功完成一轮后写入会话与短期记忆（与非流式路径相同副作用）。"""
+    memory = get_session_memory(get_settings().dialogue_history_turns)
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
     _remember_turn(request.companion_id, request.text)
-    return response
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
