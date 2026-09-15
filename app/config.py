@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     asr_language: str = "zh"                     # 跳过语言检测省开销
 
     # -- 回执与 LLM Provider -------------------------------------------------
-    receipts_dir: str = "data/rl/executions"    # executions JSONL 落盘目录（草案 §7）
+    receipts_dir: str = "data/runtime/command_service/executions"
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
     llm_model: str = Field(default="", alias="LLM_MODEL")
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")

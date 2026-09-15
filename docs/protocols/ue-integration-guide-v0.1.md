@@ -64,7 +64,7 @@ $env:AESIR_ASR_BACKEND = "faster_whisper"
 ```
 
 用真人录音（「艾莉，撤退并优先保命」等）替换 mock 文本验证。真人声调优已取消，
-`scripts/asr_eval.py` 评测脚手架保留备用。
+`scripts/command_service/asr_eval.py` 评测脚手架保留备用。
 
 验收：一句指令端到端 < 3s（`small` 模型本机约 0.5s）；识别错句时确认走
 `recognized:false` 而非报错。
@@ -184,6 +184,6 @@ Boss 快眩晕、Boss 眩晕、Boss 狂暴、艾莉蓝量低、Boss 被击败）
 
 - **golden 快照**：`data/golden/` 下 A（濒危贴脸）/B（稳态消耗）/C（眩晕窗口）/D（资源枯竭）四份
   `CombatContext` JSON，与回归评测集同源，可直接作为请求体 fixture。
-- **假 UE 全链路脚本**：`.\.venv\Scripts\python -m scripts.mock_ue_flow`——按总策划书 §9
+- **假 UE 全链路脚本**：`.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow`——按总策划书 §9
   伪流程跑 chat → parse → resolve（同一句治疗指令 × 四类战况）→ combat/events（含幂等
   重试）→ executions，打印每步响应 JSON；写 C++ 前先跑一遍即可看到完整闭环的期望输出。

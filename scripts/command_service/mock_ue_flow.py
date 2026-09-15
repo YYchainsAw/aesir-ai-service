@@ -7,8 +7,8 @@
 
 用法（先起服务）：
     .venv/Scripts/python -m uvicorn app.main:app --reload
-    .venv/Scripts/python -m scripts.mock_ue_flow            # 默认 http://127.0.0.1:8000
-    .venv/Scripts/python -m scripts.mock_ue_flow --url http://127.0.0.1:8001
+    .venv/Scripts/python -m scripts.command_service.mock_ue_flow
+    .venv/Scripts/python -m scripts.command_service.mock_ue_flow --url http://127.0.0.1:8001
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import httpx
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
-GOLDEN_DIR = Path(__file__).resolve().parents[1] / "data" / "golden"
+GOLDEN_DIR = Path(__file__).resolve().parents[2] / "data" / "golden"
 SNAPSHOTS = [
     ("A 濒危贴脸", "snapshot_a_critical.json"),
     ("B 稳态消耗", "snapshot_b_steady.json"),

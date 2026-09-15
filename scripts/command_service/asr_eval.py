@@ -7,8 +7,8 @@
        $env:HF_ENDPOINT = "https://hf-mirror.com"   # 首次下载模型
        $env:AESIR_ASR_MODEL = "small"                # 要对比的模型
     3. 运行：
-       .\.venv\Scripts\python scripts\asr_eval.py
-       .\.venv\Scripts\python scripts\asr_eval.py --model medium --beam 5 --no-vad  # 参数扫描
+       .\.venv\Scripts\python scripts\command_service\asr_eval.py
+       .\.venv\Scripts\python scripts\command_service\asr_eval.py --model medium --beam 5 --no-vad
 
 输出每条样本的转写结果、字错误率（CER）与耗时，以及整体平均；用于对比
 模型/beam/VAD 组合，选出 8GB 显存下的最优配置。
@@ -17,6 +17,9 @@
 import argparse
 import time
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.config import get_settings
 from app.services.transcribers.faster_whisper import _load_model

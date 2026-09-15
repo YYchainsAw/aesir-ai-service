@@ -10,16 +10,27 @@
 
 title Aesir Combat Prototype — 核心领域类图（As-Is）
 
+top to bottom direction
+
 skinparam backgroundColor #FAFAF7
 skinparam shadowing false
 skinparam defaultFontName Microsoft YaHei
 skinparam defaultFontSize 13
 skinparam ArrowColor #334155
+skinparam ArrowThickness 1.1
+skinparam linetype ortho
+skinparam nodesep 42
+skinparam ranksep 48
 skinparam classAttributeIconSize 0
 skinparam class {
   BackgroundColor #E8F0FE
   BorderColor #315A93
   FontColor #172554
+}
+skinparam package {
+  BackgroundColor #F7F8FA
+  BorderColor #64748B
+  FontColor #1E293B
 }
 skinparam note {
   BackgroundColor #FFF8DB
@@ -28,10 +39,14 @@ skinparam note {
 }
 
 hide empty members
-left to right direction
 
-package "战斗参与者" {
-  class AAesirPlayerCharacter <<Actor>> {
+package "A. 权威战斗域" as CombatDomain {
+  class "AAesirPlayerCharacter" as Player <<Actor>> {
+    -CombatComponent: UAesirCombatComponent [1] {composite}
+    -HealthComponent: UAesirHealthComponent [1] {composite}
+    -CombatStateComponent: UAesirCombatStateComponent [1] {composite}
+    -TargetingComponent: UAesirTargetingComponent [1] {composite}
+    --
     +DoMove(Right, Forward)
     +DoLook(Yaw, Pitch)
     -HandleLightAttackInput()
@@ -41,7 +56,19 @@ package "战斗参与者" {
     -HandlePlayerDeath(...)
   }
 
-  class AAesirEnemyCharacter <<Actor>> {
+  class "UAesirTargetingComponent" as Targeting <<ActorComponent>> {
+    +ToggleLockOn(): bool
+    +FindBestTarget(Radius, MaxAngle): Enemy
+    +GetCurrentTarget(): Actor
+    +ClearTarget()
+  }
+
+  class "AAesirEnemyCharacter" as Enemy <<Actor>> {
+    -CombatComponent: UAesirCombatComponent [1] {composite}
+    -HealthComponent: UAesirHealthComponent [1] {composite}
+    -CombatStateComponent: UAesirCombatStateComponent [1] {composite}
+    -PoiseComponent: UAesirPoiseComponent [1] {composite}
+    --
     +TryAttack(): bool
     +IsAttacking(): bool
     +IsDead(): bool
@@ -51,14 +78,8 @@ package "战斗参与者" {
     -HandleDeath(...)
   }
 
-  class BP_AliceCompanion <<Blueprint>> {
-    +CompanionId = companion.alice
-    +EventGraph = EMPTY_GRAPH_VERIFIED
-  }
-}
-
-package "权威战斗组件" {
-  class UAesirCombatComponent <<ActorComponent>> {
+  class "UAesirCombatComponent" as Combat <<ActorComponent>> {
+    -CurrentAttackType: EAesirAttackType
     +TryLightAttack()
     +TryHeavyAttack()
     +CancelAttack()
@@ -68,38 +89,21 @@ package "权威战斗组件" {
     -PerformAttackTrace(Start, End)
   }
 
-  enum EAesirAttackType {
+  enum "EAesirAttackType" as AttackType {
     None
     Light
     Heavy
   }
 
-  class UAesirHealthComponent <<ActorComponent>> {
-    +GetCurrentHealth(): float
-    +GetMaxHealth(): float
-    +IsDead(): bool
-    +SetInvulnerable(Invulnerable)
-    +OnHealthChanged(Current, Max, Delta)
-    +OnHitReceived(Location, Causer, Fatal)
-    +OnDeath(Instigator, Causer)
-  }
-
-  class UAesirPoiseComponent <<ActorComponent>> {
-    +ApplyPoiseDamage(Damage): bool
-    +ResetPoise()
-    +IsBroken(): bool
-    +OnPoiseChanged(Current, Max, Delta)
-    +OnPoiseBroken()
-  }
-
-  class UAesirCombatStateComponent <<ActorComponent>> {
+  class "UAesirCombatStateComponent" as CombatState <<ActorComponent>> {
+    -CurrentState: EAesirCombatState
     +GetCombatState(): EAesirCombatState
     +SetCombatState(NewState): bool
     +IsInCombatState(State): bool
     +OnCombatStateChanged(Previous, Current)
   }
 
-  enum EAesirCombatState {
+  enum "EAesirCombatState" as StateType {
     Idle
     Combat
     Attacking
@@ -109,61 +113,44 @@ package "权威战斗组件" {
     Dead
   }
 
-  class UAesirTargetingComponent <<ActorComponent>> {
-    +ToggleLockOn(): bool
-    +FindBestTarget(Radius, MaxAngle): Enemy
-    +GetCurrentTarget(): Actor
-    +ClearTarget()
+  class "UAesirHealthComponent" as Health <<ActorComponent>> {
+    +GetCurrentHealth(): float
+    +GetMaxHealth(): float
+    +IsDead(): bool
+    +SetInvulnerable(Invulnerable)
+    +OnHealthChanged(Current, Max, Delta)
+    +OnHitReceived(Location, Causer, Fatal)
+    +OnDeath(Instigator, Causer)
   }
+
+  class "UAesirPoiseComponent" as Poise <<ActorComponent>> {
+    +ApplyPoiseDamage(Damage): bool
+    +ResetPoise()
+    +IsBroken(): bool
+    +OnPoiseChanged(Current, Max, Delta)
+    +OnPoiseBroken()
+  }
+
+  Targeting -right-> Enemy : selects / clears
+  Combat -right-> AttackType : tracks
+  CombatState -right-> StateType : stores
+
+  Player -[hidden]down-> Combat
+  Targeting -[hidden]down-> AttackType
+  Enemy -[hidden]down-> StateType
+  Combat -[hidden]down-> CombatState
+  CombatState -[hidden]down-> Health
+  Health -[hidden]right-> Poise
 }
 
-package "战局" {
-  class AAesirCombatPrototypeGameMode <<GameMode>> {
-    -RemainingEnemies: int
-    -MatchResult: EAesirMatchResult
-    -HandlePlayerDeath(...)
-    -HandleEnemyDeath(...)
-    -FinishCombat(Result)
-    #OnCombatEnded(Result)
+package "B. 战术订单与服务接入域" as TacticalDomain {
+  class "BP_AliceCompanion" as Alice <<Blueprint>> {
+    -TacticalOrder: UTacticalOrderComponent [1] {composite}
+    +CompanionId = companion.alice
+    +EventGraph = EMPTY_GRAPH_VERIFIED
   }
 
-  enum EAesirMatchResult {
-    None
-    Victory
-    Defeat
-  }
-}
-
-package "战术订单与服务接入" {
-  class UCommandServiceSubsystem <<GameInstanceSubsystem>> {
-    +CheckHealth()
-    +ParseCommand(Text)
-    +ParseVoiceCommand(WavData)
-    +ResolveTacticalIntentForTest(..., Context)
-    +OnCommandParsed(..., Order)
-    +OnTacticalResolved(Success, ResponseJson)
-  }
-
-  class FCombatContext <<Value Object>> {
-    +EncounterId: string
-    +SnapshotId: string
-    +CapturedAt: string
-    +Player: FCombatContextPlayer
-    +Companion: FCombatContextCompanion
-    +Boss: FCombatContextBoss
-  }
-
-  class FTacticalOrder <<Value Object>> {
-    +OrderId: string
-    +AgentId: string
-    +Intent: ETacticalOrderIntent
-    +When: FTacticalWhen
-    +Then: FTacticalThen
-    +Priority: int
-    +Expires: FTacticalExpires
-  }
-
-  class UTacticalOrderComponent <<ActorComponent>> {
+  class "UTacticalOrderComponent" as OrderComponent <<ActorComponent>> {
     -SupportedAbilityIds
     -EncounterActive: bool
     -HasActiveOrder: bool
@@ -176,60 +163,88 @@ package "战术订单与服务接入" {
     +CompleteActiveOrder(): bool
     +CancelActiveOrder(Reason): bool
   }
+
+  class "FTacticalOrder" as Order <<Value Object>> {
+    +OrderId: string
+    +AgentId: string
+    +Intent: ETacticalOrderIntent
+    +When: FTacticalWhen
+    +Then: FTacticalThen
+    +Priority: int
+    +Expires: FTacticalExpires
+  }
+
+  class "UCommandServiceSubsystem" as CommandService <<GameInstanceSubsystem>> {
+    +CheckHealth()
+    +ParseCommand(Text)
+    +ParseVoiceCommand(WavData)
+    +ResolveTacticalIntentForTest(..., Context)
+    +OnCommandParsed(..., Order)
+    +OnTacticalResolved(Success, ResponseJson)
+  }
+
+  class "FCombatContext" as Context <<Value Object>> {
+    +EncounterId: string
+    +SnapshotId: string
+    +CapturedAt: string
+    +Player: FCombatContextPlayer
+    +Companion: FCombatContextCompanion
+    +Boss: FCombatContextBoss
+  }
+
+  Alice -[hidden]right-> OrderComponent
+  OrderComponent *--right Order : active order
+  CommandService -[dashed]right-> Context : serializes request
+  CommandService -[dashed]up-> Order : parses command response
+  Alice -[hidden]down-> CommandService
 }
 
-AAesirPlayerCharacter *-- UAesirCombatComponent : owns
-AAesirPlayerCharacter *-- UAesirHealthComponent : owns
-AAesirPlayerCharacter *-- UAesirCombatStateComponent : owns
-AAesirPlayerCharacter *-- UAesirTargetingComponent : owns
+package "C. 战局结果域" as MatchDomain {
+  class "AAesirCombatPrototypeGameMode" as GameMode <<GameMode>> {
+    -ObservedHealthComponents: UAesirHealthComponent [1..*]
+    -RemainingEnemies: int
+    -MatchResult: EAesirMatchResult
+    -HandlePlayerDeath(...)
+    -HandleEnemyDeath(...)
+    -FinishCombat(Result)
+    #OnCombatEnded(Result)
+  }
 
-AAesirEnemyCharacter *-- UAesirCombatComponent : owns
-AAesirEnemyCharacter *-- UAesirHealthComponent : owns
-AAesirEnemyCharacter *-- UAesirCombatStateComponent : owns
-AAesirEnemyCharacter *-- UAesirPoiseComponent : owns
+  enum "EAesirMatchResult" as MatchResult {
+    None
+    Victory
+    Defeat
+  }
 
-UAesirCombatComponent --> EAesirAttackType : tracks
-UAesirCombatComponent ..> UAesirHealthComponent : ApplyPointDamage
-UAesirCombatComponent ..> UAesirPoiseComponent : ApplyPoiseDamage
-UAesirCombatStateComponent --> EAesirCombatState : stores
-UAesirTargetingComponent --> AAesirEnemyCharacter : selects / clears
-AAesirEnemyCharacter ..> UAesirCombatStateComponent : stun / death state
+  GameMode -right-> MatchResult : stores / emits
+}
 
-AAesirCombatPrototypeGameMode --> EAesirMatchResult : stores / emits
-AAesirCombatPrototypeGameMode ..> UAesirHealthComponent : subscribes OnDeath
+Health -[hidden]down-> Alice
+CommandService -[hidden]down-> GameMode
 
-UCommandServiceSubsystem ..> FCombatContext : serializes request
-UCommandServiceSubsystem ..> FTacticalOrder : parses command response
-BP_AliceCompanion *-- UTacticalOrderComponent : attached
-UTacticalOrderComponent *-- FTacticalOrder : active order
-UTacticalOrderComponent ..> UAesirHealthComponent : validates owner / target
-UTacticalOrderComponent ..> UAesirCombatStateComponent : validates cast state
-
-note bottom of UAesirCombatComponent
-  Montage Notify 控制 ComboWindow 与 AttackWindow；
-  AttackWindow 内执行武器 Sweep，同一次攻击对每个 Actor
-  最多结算一次伤害，并在目标有 PoiseComponent 时扣减韧性。
+note bottom of CombatDomain
+  Actor 对组件的实际拥有关系以 {composite} 类型属性表达，避免重复连线。
+  CombatComponent 通过 ApplyPointDamage 影响 Health；目标存在 PoiseComponent 时扣减韧性。
+  Montage Notify 控制 ComboWindow 与 AttackWindow。
 end note
 
-note bottom of UCommandServiceSubsystem
-  当前战术 resolve 回调只广播 ResponseJson，
-  尚未解析为强类型 TacticalDecision。
+note bottom of TacticalDomain
+  TacticalOrderComponent 已实现校验、优先级替换、触发时复核、完成与取消。
+  当前 CommandService → TacticalOrder、TacticalOrder → Alice BT/技能执行均未核验，
+  所以不画为 As-Is 关系（GAP-BP-001/002/003）。resolve 当前仍广播 ResponseJson。
 end note
 
-note bottom of UTacticalOrderComponent
-  已实现订单结构、本地校验、优先级替换、
-  触发时复核、完成与取消。
-
-  当前没有已核验的 CommandService → TacticalOrder，
-  也没有 TacticalOrder → Alice BT/技能执行接线；
-  因此图中不画这两条关系（GAP-BP-001/002/003）。
+note bottom of MatchDomain
+  GameMode 在 BeginPlay 订阅玩家和全部敌人的 Health.OnDeath，
+  并将最终结果裁定为 Victory 或 Defeat。
 end note
 
 legend bottom
-  |= 关系 |= 含义 |
-  | *-- | Actor/Blueprint 实际拥有组件或值对象 |
-  | --> / ..> | 当前源码可确认的状态引用、调用或订阅 |
-  | 未出现的连线 | 尚未实现或尚未核验，不属于 As-Is |
+  |= 表达方式 |= 含义 |
+  | {composite} 类型属性 | Actor/Blueprint 实际拥有的组件；等价表达组合关系 |
+  | 实线箭头 | 当前源码中的直接类型关联 |
+  | 虚线箭头 | 当前源码中的序列化或响应解析依赖 |
+  | 隐藏布局线 | 只约束排版，不表示领域关系 |
 endlegend
 
 @enduml

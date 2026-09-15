@@ -35,6 +35,7 @@ UML/
 | UML-07 | `07-companion-ai-activity-as-is.puml` | 同伴 AI 活动图 | 已按 BT/BTS/BB 节点文本核验 |
 | UML-08 | `08-deployment-as-is.puml` | 部署图 | 已按 UE/Python 源码与启动配置核验 |
 | UML-09 | `09-voice-tactical-command-to-be.puml` | 语音战术指令目标时序图 | 已制作（To-Be，未实现步骤均显式标记） |
+| UML-10 | `10-player-use-cases-as-is.puml` | 玩家功能用例图 | 已按 C++、输入、Blueprint 与 Python 接口证据核验 |
 
 ## 完成判定
 

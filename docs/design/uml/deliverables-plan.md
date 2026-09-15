@@ -41,7 +41,7 @@
 
 | 优先级 | 编号与建议文件 | UML 类型 | 口径 | 必须表达的内容 | 完成条件 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | `10-player-use-cases-as-is.puml` | 用例图 | As-Is | 移动、攻击、闪避、锁定、文本聊天、语音录制、重开战斗 | 每个用例均能追溯到 C++、输入资产或 Blueprint |
+| P0（已完成） | `10-player-use-cases-as-is.puml` | 用例图 | As-Is | 移动、攻击、闪避、锁定、文本聊天、语音录制、重开战斗 | 每个用例均能追溯到 C++、输入资产或 Blueprint |
 | P0 | `11-combat-state-machine-as-is.puml` | 状态机图 | As-Is | Idle、Combat、Attacking、Evading、HitReact、Stunned、Dead | 转换必须来自 Player、Enemy 和 CombatState 源码，不推测不存在的转换 |
 | P0 | `12-match-flow-state-as-is.puml` | 状态机图 | As-Is | 战斗开始、进行中、Victory、Defeat、结果界面、Restart | 与 GameMode 和 WBP_CombatResult 完全一致 |
 | P0 | `13-boss-ai-activity-as-is.puml` | 活动图 | As-Is | Dead、Stunned、Engage、Move To、Attack、Wait | 与 BT_AesirBoss、BB_AesirBoss 的实际节点和条件一致 |

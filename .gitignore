@@ -27,8 +27,8 @@ Thumbs.db
 
 .claude/
 
-# RL runtime data (receipts / trajectories)
-data/rl/
+# Generated command-service and RL runtime data
+data/runtime/
 
 # NPC runtime memory (SDD T003: 运行期生成的持久化记忆，不入版本库)
 data/memory/

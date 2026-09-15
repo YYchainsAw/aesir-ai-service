@@ -1,6 +1,6 @@
 # Aesir AI Service
 
-为 **Aesir Combat Prototype** 提供本地 AI 服务：把玩家的**文本或语音**战术指令转换为 UE 可校验的 `TacticalOrder` JSON，并提供 v0.2 上下文感知战术决策。
+本仓库包含两个边界明确的子系统：供 Unreal 调用的**指令服务**，以及独立运行的 **Boss 强化学习实验**。指令服务把玩家的文本或语音战术指令转换为 UE 可校验的 JSON；Boss RL 负责训练和评估高层战术策略，不参与指令服务启动。
 
 > **定位升级（2026-09-13 起）**：项目要求已从「语音转 JSON 战术命令」升级为「**NPC 人格与行为代理**」——在保留战斗指挥的前提下新增持久化记忆、关系状态、非战斗自主行为与只读查证工具。需求规格、章程与任务分解见 [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md)（当前最高规划基线）；本 README 描述的 v0.1/v0.2 能力均已实现且保持兼容。
 
@@ -30,7 +30,7 @@
 
 ```
 aesir-ai-service/
-├── app/
+├── app/                           # 指令服务（生产运行时，不依赖 rl）
 │   ├── main.py                    # FastAPI 应用入口
 │   ├── config.py                  # pydantic-settings 环境变量解析
 │   ├── api/
@@ -54,20 +54,20 @@ aesir-ai-service/
 │       ├── relationship/          # 关系体系（SDD 骨架，US2）
 │       ├── agency/                # 活动域与自主行为（SDD 骨架，US3）
 │       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
-├── rl/                            # RL 实验包（可选依赖；服务进程不会 import）
-│   ├── sim/                       # BossSim 模拟器内核 + 数值常量
-│   ├── policy/                    # ActingPolicy/TacticalPolicy 协议 + rule/ppo 基线
-│   ├── env.py / features.py       # Gymnasium 环境 + 观测提取
-│   └── rewards.py / eval_utils.py
-├── scripts/                       # rl_train.py / rl_eval.py / asr_eval.py / mock_ue_flow.py
+├── rl/                            # Boss 强化学习研究（可选依赖）
+│   └── boss/                      # Boss-as-agent + UE schema v2
+├── scripts/
+│   ├── command_service/           # ASR 评估与假 UE 联调
+│   └── rl/
+│       └── boss/                  # Boss 训练/评估入口
 ├── data/
 │   ├── companions/                # 队友 YAML 人设（Alice）
 │   ├── policy/                    # 战术/关系/活动域策略阈值（tactical/relationship/agency_policy.yaml）
 │   ├── world/                     # 世界观知识库 lore.yaml（只读查证用）
 │   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）
 │   ├── memory/                    # 运行期 NPC 记忆（gitignore 不入库）
-│   └── rl/                        # 运行数据（回执/轨迹 JSONL，gitignore 不入库）
-├── tests/                         # api / schemas / services / rl 测试
+│   └── runtime/                   # 指令回执等运行数据（gitignore 不入库）
+├── tests/                         # 指令服务测试 + rl/boss
 ├── docs/                          # 项目文档（planning/protocols/guides/design/logs）
 ├── requirements*.txt              # 运行时 / ML / RL / 开发测试 依赖拆分
 └── CHANGELOG.md                   # 里程碑记录
@@ -83,7 +83,7 @@ aesir-ai-service/
 | 战斗事件 / 上下文感知战术协议 v0.2（正式版） | [`docs/protocols/combat-tactical-protocol-v0.2.md`](docs/protocols/combat-tactical-protocol-v0.2.md) |
 | 启动 / 安装 / 接口示例 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
 | LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
-| RL 可行性设计与框架 | [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md) |
+| 当前 Boss RL 代码与运行入口 | [`rl/README.md`](rl/README.md) |
 | 总策划书 v0.1 | [`docs/planning/game-design-doc-v0.1.md`](docs/planning/game-design-doc-v0.1.md) |
 | **需求规格说明书 SDD v1.0**（章程 / 用户故事 / 任务分解） | [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md) |
 | 全部文档索引 | [`docs/README.md`](docs/README.md) |
@@ -147,7 +147,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 默认 `AESIR_ASR_BACKEND=mock` 返回 `AESIR_ASR_MOCK_TEXT` 固定文本，用于无模型环境自测。
 
-~~真人声调优~~（已取消：无真人录音样本；`scripts/asr_eval.py` 评测脚手架保留备用）。
+~~真人声调优~~（已取消：无真人录音样本；`scripts/command_service/asr_eval.py` 评测脚手架保留备用）。
 
 ## 核心设计
 
@@ -165,18 +165,17 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 解析逻辑隔离在 `app/services/parsers/`，输出 `ParseCommandResponse` 由 schema 固定。`source` 字段标注最终实际来源（`rule` / `llm` / `rule_fallback`），供 UE 端日志与降级观测。
 
-## RL 实验（可选，Phase 4）
+## Boss RL（当前答辩主线）
 
-Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/资源管理」策略与规则基线 A/B。**不影响服务运行时**——不装依赖全量测试仍全绿：
+`rl/boss/` 是当前唯一的强化学习实现，动作和观察契约与 UE 对齐。它不会被 `app.main:app` 导入：
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-rl.txt      # gymnasium/sb3/torch(CPU)
-.\.venv\Scripts\python scripts\rl_train.py --timesteps 20000      # 冒烟训练
-.\.venv\Scripts\python scripts\rl_eval.py --episodes 50 --agents rule,models/rl/ppo_bossfight
+.\.venv\Scripts\python scripts\rl\boss\eval.py --episodes 20      # BT/规则基线
+.\.venv\Scripts\python scripts\rl\boss\train.py --timesteps 20000 # PPO 冒烟训练
 ```
 
-组件可训性评级、奖励设计、sim-to-real 风险与上线判定标准见
- [`docs/design/rl-feasibility-design.md`](docs/design/rl-feasibility-design.md)。RL 目前不接服务路径（`AESIR_TACTICAL_POLICY=rl` 为占位，恒回退规则）。
+目录边界与旧实验说明见 [`rl/README.md`](rl/README.md)。RL 尚未接入 HTTP 推理路径；后续会通过独立 Boss policy adapter 接入，而不是混进玩家指令解析器。
 
 ## 测试
 
@@ -185,13 +184,13 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML 加载、Boss 战模拟器与 RL 环境等。测试数以 `pytest` 输出为准（2026-09-10：**236 通过 + 3 条冒烟默认跳过**，锚点详见 [CHANGELOG](CHANGELOG.md)）。真机 ASR 冒烟需 `AESIR_ASR_SMOKE=1`；RL 训练冒烟需 `AESIR_RL_SMOKE=1`（并安装 requirements-rl.txt）。
+覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML、当前 Boss RL 和归档队友实验。测试数量以当前 `pytest` 输出为准；真机 ASR 与完整 PPO 训练需要各自的可选依赖和显式冒烟开关。
 
 ### UE 联调前预演（不写一行 C++ 也能看到全链路）
 
 ```powershell
 .\.venv\Scripts\python -m uvicorn app.main:app --reload          # 终端 1：起服务
-.\.venv\Scripts\python -m scripts.mock_ue_flow                    # 终端 2：假 UE 全链路
+.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow    # 终端 2：假 UE 全链路
 ```
 
 脚本按策划书 §9 的 UE 伪流程依次调用 chat → parse → resolve（同一句治疗指令 × A/B/C/D 四类战况，见 `data/golden/`）→ combat/events（含同一 `event_id` 重试的幂等回放）→ executions 回执，全部打印响应 JSON，可直接作为 UE 侧开发与答辩演示素材。
@@ -206,9 +205,10 @@ Python 侧 Boss 战模拟器 + PPO 训练闭环已搭好，供「爆发时机/�
 - [x] v0.2 第一阶段：CombatContext/TacticalIntent/TacticalDecision schema + `/v1/tactical/resolve` 规则策略 v1 + 85 例回归评测
 - [x] `/v1/combat/events` 战斗事件端点 + `/v1/tactical/executions` 执行回执
 - [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
-- [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/mock_ue_flow.py` 全链路演示（2026-09-09）
+- [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/command_service/mock_ue_flow.py` 全链路演示（2026-09-09）
 - [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
-- [ ] 强化学习走位策略：为 AI 队友提供决策能力（Python 模拟器已就绪，待训练）
+- [x] Boss RL schema v2、训练模拟器、奖励和 Behavior Tree 规则基线
+- [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 
 ## 调试
 
