@@ -5,7 +5,7 @@ This directory is isolated from the Unreal command service in `app/`.
 ## `rl/boss/`
 
 Boss-as-agent research for the semester defense. It mirrors Unreal observation
-schema v2 and `EAesirBossAction`, contains the deterministic training simulator,
+schema v3 and `EAesirBossAction`, contains the deterministic training simulator,
 reward terms, Behavior Tree-style baseline, Gymnasium environment, and metrics.
 
 Commands:

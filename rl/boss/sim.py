@@ -78,6 +78,13 @@ class BossCombatState:
     def boss_dead(self) -> bool:
         return self.boss_health_ratio <= 0.0
 
+    def is_action_available(self, action: BossAction) -> bool:
+        """Mirror the simulator's side-effect-free action legality checks."""
+        return (
+            not self.boss_stunned
+            and self.cooldown_steps.get(action, 0) <= 0
+        )
+
     def observation(self):
         return make_observation(
             (
@@ -91,6 +98,7 @@ class BossCombatState:
                 float(self.target_blocking),
                 float(self.target_attacking),
                 float(self.target_dead),
+                *(float(self.is_action_available(action)) for action in BossAction),
             )
         )
 
@@ -143,15 +151,14 @@ class BossPolicySim:
 
         action = BossAction(action_value)
         state = self.state
-        self._tick_cooldowns()
-        if state.boss_stunned_steps > 0:
-            state.boss_stunned_steps -= 1
+        cooldowns_to_tick = set(state.cooldown_steps)
+        was_stunned = state.boss_stunned
 
         events = BossStepEvents(action=action)
         self._select_player_intent()
 
-        if state.boss_stunned:
-            # The runtime executor also pauses tactical execution while stunned.
+        if was_stunned:
+            # The runtime executor pauses tactical execution while state-locked.
             # The submitted action is ignored rather than treated as illegal.
             events.result = "state_locked"
         elif state.cooldown_steps.get(action, 0) > 0:
@@ -161,7 +168,14 @@ class BossPolicySim:
             self._track_repetition(action, events)
             self._apply_boss_action(action, events)
 
+        self._advance_action_timers(
+            cooldowns_to_tick,
+            was_stunned=was_stunned,
+        )
         self._resolve_player_action(action, events)
+        # A simulator step spans the complete high-level action. The next
+        # observation is sampled only after that action has finished.
+        state.boss_attacking = False
         state.step += 1
         state.boss_health_ratio = max(0.0, state.boss_health_ratio)
         state.target_health_ratio = max(0.0, state.target_health_ratio)
@@ -170,7 +184,6 @@ class BossPolicySim:
     def _select_player_intent(self) -> None:
         state = self.state
         profile = self.profile
-        state.boss_attacking = False
         state.target_attacking = False
         state.target_blocking = False
 
@@ -291,13 +304,21 @@ class BossPolicySim:
             state.consecutive_action_count = 1
         events.repeat_count = state.consecutive_action_count
 
-    def _tick_cooldowns(self) -> None:
-        for action in list(self.state.cooldown_steps):
+    def _advance_action_timers(
+        self,
+        cooldowns_to_tick: set[BossAction],
+        *,
+        was_stunned: bool,
+    ) -> None:
+        for action in cooldowns_to_tick:
             remaining = self.state.cooldown_steps[action] - 1
             if remaining <= 0:
                 del self.state.cooldown_steps[action]
             else:
                 self.state.cooldown_steps[action] = remaining
+
+        if was_stunned and self.state.boss_stunned_steps > 0:
+            self.state.boss_stunned_steps -= 1
 
     def _terminal_reason(self) -> str | None:
         if self.state.target_dead:

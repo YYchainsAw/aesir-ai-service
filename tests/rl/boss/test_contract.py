@@ -16,9 +16,9 @@ from rl.boss.rewards import compute_reward
 from rl.boss.sim import BossPolicySim
 
 
-def test_contract_matches_unreal_schema_v2() -> None:
-    assert SCHEMA_VERSION == 2
-    assert OBSERVATION_DIM == 10
+def test_contract_matches_unreal_schema_v3() -> None:
+    assert SCHEMA_VERSION == 3
+    assert OBSERVATION_DIM == 17
     assert FEATURE_NAMES == (
         "boss_health_ratio",
         "target_health_ratio",
@@ -30,10 +30,28 @@ def test_contract_matches_unreal_schema_v2() -> None:
         "target_blocking",
         "target_attacking",
         "target_dead",
+        "light_attack_available",
+        "heavy_attack_available",
+        "defend_available",
+        "dodge_available",
+        "pursue_available",
+        "disengage_available",
+        "use_ability_available",
     )
     assert [action.value for action in BossAction] == list(range(7))
     assert OBSERVATION_LOW == (0.0,) * OBSERVATION_DIM
     assert OBSERVATION_HIGH == (1.0,) * OBSERVATION_DIM
+
+
+def test_action_availability_tracks_stun_and_cooldown() -> None:
+    sim = BossPolicySim(seed=0, profile="defensive")
+    assert sim.state.observation()[10:] == (1.0,) * len(BossAction)
+
+    sim.state.cooldown_steps[BossAction.DODGE] = 2
+    assert sim.state.observation()[13] == 0.0
+
+    sim.state.boss_stunned_steps = 2
+    assert sim.state.observation()[10:] == (0.0,) * len(BossAction)
 
 
 def test_same_seed_and_profile_are_reproducible() -> None:

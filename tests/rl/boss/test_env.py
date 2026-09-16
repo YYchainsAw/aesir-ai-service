@@ -17,11 +17,11 @@ from rl.boss.contract import (  # noqa: E402
 from rl.boss.env import AesirBossEnv  # noqa: E402
 
 
-def test_contract_matches_unreal_schema_v2() -> None:
-    assert SCHEMA_VERSION == 2
-    assert OBSERVATION_DIM == 10
+def test_contract_matches_unreal_schema_v3() -> None:
+    assert SCHEMA_VERSION == 3
+    assert OBSERVATION_DIM == 17
     assert FEATURE_NAMES[0] == "boss_health_ratio"
-    assert FEATURE_NAMES[-1] == "target_dead"
+    assert FEATURE_NAMES[-1] == "use_ability_available"
     assert [action.value for action in BossAction] == list(range(7))
     assert BossAction.PURSUE.value == 4
     assert BossAction.USE_ABILITY.value == 6

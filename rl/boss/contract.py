@@ -8,7 +8,7 @@ retraining every model. The integer action values mirror
 from enum import IntEnum
 from typing import Iterable
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 FEATURE_NAMES = (
     "boss_health_ratio",
@@ -21,6 +21,13 @@ FEATURE_NAMES = (
     "target_blocking",
     "target_attacking",
     "target_dead",
+    "light_attack_available",
+    "heavy_attack_available",
+    "defend_available",
+    "dodge_available",
+    "pursue_available",
+    "disengage_available",
+    "use_ability_available",
 )
 OBSERVATION_DIM = len(FEATURE_NAMES)
 
@@ -42,7 +49,7 @@ ACTION_COUNT = len(BossAction)
 
 
 def make_observation(values: Iterable[float]) -> tuple[float, ...]:
-    """Build and validate one schema-v2 observation."""
+    """Build and validate one schema-v3 observation."""
     observation = tuple(float(value) for value in values)
     if len(observation) != OBSERVATION_DIM:
         raise ValueError(
@@ -53,5 +60,5 @@ def make_observation(values: Iterable[float]) -> tuple[float, ...]:
         value < low or value > high
         for value, low, high in zip(observation, OBSERVATION_LOW, OBSERVATION_HIGH)
     ):
-        raise ValueError("observation contains values outside the schema-v2 bounds")
+        raise ValueError("observation contains values outside the schema-v3 bounds")
     return observation
