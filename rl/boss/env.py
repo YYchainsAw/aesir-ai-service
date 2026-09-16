@@ -40,8 +40,8 @@ class AesirBossEnv(gym.Env):
         )
         self.action_space = spaces.Discrete(ACTION_COUNT)
         self.observation_space = spaces.Box(
-            low=OBSERVATION_LOW,
-            high=OBSERVATION_HIGH,
+            low=np.asarray(OBSERVATION_LOW, dtype=np.float32),
+            high=np.asarray(OBSERVATION_HIGH, dtype=np.float32),
             dtype=np.float32,
         )
 
