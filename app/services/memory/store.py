@@ -22,6 +22,7 @@ from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
 from app.services.memory.summarizer import summarize_experiences
 from app.services.memory.topics import extract_topics as _extract_topics
 from app.services.memory.topics import impression_weight as _impression_weight
+from app.services.memory.topics import is_blocked_topic as _is_blocked_topic
 
 # 淘汰序：重要性越低越先淘汰；同级别按时间越旧越先淘汰（FR-008）
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
@@ -97,20 +98,26 @@ class MemoryStore:
             return self._snapshot.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
-    def record_mention(self, topics: list[str], *, salient: bool = False) -> None:
+    def record_mention(
+        self, topics: list[str], *, salient: bool = False, salience_boost: float | None = None
+    ) -> None:
         """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
 
         正式路径 ``topics`` 由 LLM 顺带返回；空列表直接跳过（如 LLM
-        未返回或本轮无显著主题）。``salient`` 为郑重声明（双通道之一）：
-        等效提及加成 + 更长半衰期；主题一旦显著不回退。写失败抛
-        ``MemoryStoreError``，由调用方静默降级（与 ``append_short_term``
-        同语义）。
+        未返回或本轮无显著主题）。黑名单主题（角色自指 / 元语言碎片）
+        在合并入口统一过滤。``salient`` 为郑重声明（双通道之一）：
+        等效提及加成 + 更长半衰期；主题一旦显著不回退。``salience_boost``
+        为按在意值缩放后的加成（声明时定格，见 ``topics.care_scale``）；
+        ``None`` 用全局默认。写失败抛 ``MemoryStoreError``，由调用方
+        静默降级（与 ``append_short_term`` 同语义）。
         """
         if not topics:
             return
         now = _utc_now_iso()
         with self._lock:
-            self._merge_mentions_locked(topics, now=now, salient=salient)
+            self._merge_mentions_locked(
+                topics, now=now, salient=salient, salience_boost=salience_boost
+            )
             self._evict_impressions_locked()
             self._persist_locked()
 
@@ -142,15 +149,37 @@ class MemoryStore:
             return len(dialogue)
 
     def _merge_mentions_locked(
-        self, topics: list[str], *, now: str, salient: bool = False
+        self,
+        topics: list[str],
+        *,
+        now: str,
+        salient: bool = False,
+        salience_boost: float | None = None,
     ) -> None:
-        """按主题合并计数并刷新权重（调用方须持锁）。"""
+        """按主题合并计数并刷新权重（调用方须持锁）。
+
+        黑名单主题统一在此过滤——LLM 顺带返回、规则提取、迁移脚本三条
+        路径都汇到本入口。显著话题的 ``salience_boost`` 取历史最大值：
+        在意加深可以强化，淡化不回退（与 ``salient`` 旗标同一语义）。
+        """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
+            if _is_blocked_topic(topic):
+                continue
+            effective_boost = salience_boost if salient else None
             prior = existing.get(topic)
             if prior is None:
                 impression = TopicImpression(
-                    topic=topic, salient=salient, last_seen=now
+                    topic=topic,
+                    salient=salient,
+                    salience_boost=effective_boost,
+                    last_seen=now,
+                )
+                impression.weight = _impression_weight(
+                    mention_count=impression.mention_count,
+                    last_seen_days_ago=_days_since(impression.last_seen),
+                    salient=impression.salient,
+                    salience_boost=impression.salience_boost,
                 )
                 self._snapshot.impressions.append(impression)
                 existing[topic] = impression
@@ -159,10 +188,15 @@ class MemoryStore:
             prior.last_seen = now
             if salient:
                 prior.salient = True
+                if effective_boost is not None:
+                    prior.salience_boost = max(
+                        effective_boost, prior.salience_boost or 0.0
+                    )
             prior.weight = _impression_weight(
                 mention_count=prior.mention_count,
                 last_seen_days_ago=_days_since(prior.last_seen),
                 salient=prior.salient,
+                salience_boost=prior.salience_boost,
             )
 
     def _evict_impressions_locked(self) -> None:

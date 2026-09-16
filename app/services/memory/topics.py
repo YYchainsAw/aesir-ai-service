@@ -32,15 +32,35 @@ _SPLIT_PATTERN = re.compile(
     r"[\s，。、！？；：,!?;:\"'（）()\[\]【】《》—…·]+"
 )
 
+# 主题黑名单：无论规则提取还是 LLM 顺带返回，都不该成为「对玩家的印象」——
+# 角色自指（她的名字）、记忆/对话本身的元语言碎片（迁移实测出现过「艾莉」「记得」「名字」）。
+# 过滤点在 ``store._merge_mentions_locked``（合并入口，三条路径共用）与 ``extract_topics``。
+_TOPIC_BLACKLIST = frozenset(
+    """
+    艾莉 爱莉 alice 名字 记得 记住 忘了 忘记 告诉 答应 说话 对话 回复 聊天
+    重要 事情 感觉 时候 现在
+    """.split()
+)
+
 MAX_TOPICS = 3
 
 
+def is_blocked_topic(topic: str) -> bool:
+    """主题是否含黑名单词（角色自指 / 元语言碎片，不构成对玩家的印象）。
+
+    按「包含」而非全等匹配：规则提取的碎片常是「叫艾莉」「不记得」这类
+    带粘连字的形式，全等匹配漏掉；黑名单词本身即为不该出现的内容。
+    """
+    lowered = topic.strip().lower()
+    return any(word in lowered for word in _TOPIC_BLACKLIST)
+
+
 def extract_topics(text: str, *, max_topics: int = MAX_TOPICS) -> list[str]:
-    """规则降级提取：切段 → 去停用词 → 保留 ≥2 字 → 去重截断。"""
+    """规则降级提取：切段 → 去停用词 → 保留 ≥2 字 → 去黑名单 → 去重截断。"""
     topics: list[str] = []
     for segment in _SPLIT_PATTERN.split(text):
         for run in _remove_stopwords(segment):
-            if len(run) >= 2 and run not in topics:
+            if len(run) >= 2 and run not in topics and not is_blocked_topic(run):
                 topics.append(run)
     return topics[:max_topics]
 
@@ -103,20 +123,45 @@ def tier_of(
     salient: bool = False,
     faint_threshold: int | None = None,
     deep_threshold: int = 5,
+    salience_boost: float | None = None,
 ) -> str | None:
     """注入档位：None（不注入）| faint（有点印象）| deep（印象很深）。
 
-    显著性计入等效提及（``tier_of(1, salient=True)`` 即达 faint）。
+    显著性计入等效提及；``salience_boost`` 为该条印象声明时按在意值缩放后
+    持久化的加成（None 用全局默认，兼容旧数据）。
     """
     if faint_threshold is None:
         faint_threshold = get_settings().memory_impression_min_mentions
     if salient:
-        mention_count = mention_count + get_settings().memory_impression_salience_boost
+        if salience_boost is None:
+            salience_boost = get_settings().memory_impression_salience_boost
+        mention_count = mention_count + salience_boost
     if mention_count < faint_threshold:
         return None
     if mention_count >= deep_threshold:
         return "deep"
     return "faint"
+
+
+# 在意值缩放边界：中性无感 ×0.25（几乎记不住），极度在意（极爱 / 极厌）×2.0。
+_CARE_SCALE_FLOOR = 0.25
+_CARE_SCALE_CEIL = 2.0
+
+
+def care_scale(relationship_value: int | float, *, neutral: float | None = None) -> float:
+    """在意值 → 显著性加成乘子。
+
+    「在意」是偏离无感的程度，与方向无关：极亲密（100）与极度讨厌（0）
+    都最在意——太不喜欢也是在意的一部分；中性无感才最健忘。距离中性点
+    按两侧实际跨度归一，返回值钳制在 ``[_CARE_SCALE_FLOOR, _CARE_SCALE_CEIL]``。
+    """
+    settings = get_settings()
+    if neutral is None:
+        neutral = settings.memory_impression_care_neutral
+    distance = float(relationship_value) - neutral
+    span = max(neutral, 1e-9) if distance < 0 else max(100.0 - neutral, 1e-9)
+    normalized = abs(distance) / span
+    return _CARE_SCALE_FLOOR + (_CARE_SCALE_CEIL - _CARE_SCALE_FLOOR) * normalized
 
 
 # 郑重声明线索（规则兜底；正式路径走 LLM 顺带返回的 salient 标记）。

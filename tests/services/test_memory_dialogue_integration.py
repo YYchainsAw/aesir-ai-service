@@ -92,6 +92,34 @@ def test_solemn_statement_archived_verbatim_and_impressed(_fresh_memory) -> None
     assert salient_topics and salient_topics[0].salient is True
 
 
+def test_companion_own_reply_topics_recorded(_fresh_memory) -> None:
+    """艾莉自己的回复也提取主题入印象（非显著）——她记得自己说过什么。"""
+    from app.schemas.companion_dialogue import (
+        CompanionDialogueRequest,
+        CompanionDialogueResponse,
+    )
+    from app.services.companion.dialogue_service import _record_turn
+
+    request = CompanionDialogueRequest(
+        text="嗯嗯好的。",
+        companion_id="companion.alice",
+        game_state="conversation",
+    )
+    response = CompanionDialogueResponse(
+        companion_id="companion.alice",
+        session_id=None,
+        reply_text="钓鱼吗？我也挺喜欢钓鱼的。",
+        emotion_id="neutral",
+        gesture_id="idle",
+        facial_expression_id="default",
+    )
+    _record_turn(request, response)  # 玩家侧无主题，回复侧主题入印象
+
+    impressions = get_memory_store("companion.alice").snapshot().impressions
+    assert "钓鱼" in [i.topic for i in impressions]
+    assert all(not i.salient for i in impressions)  # 她自己的话不显著
+
+
 def test_plain_chat_is_not_archived(_fresh_memory) -> None:
     """普通闲聊只入印象层，不进档案（档案留给郑重声明/承诺/经历）。"""
     _chat("钓鱼、钓鱼，还是钓鱼。", session_id="s5")

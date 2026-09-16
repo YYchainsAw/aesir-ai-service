@@ -46,6 +46,38 @@ def test_partitions_by_npc(tmp_path) -> None:
     assert alice.snapshot().archive[0].content != bob.snapshot().archive[0].content
 
 
+def test_record_mention_filters_blacklisted_topics(store: MemoryStore) -> None:
+    """合并入口统一过滤黑名单：LLM 顺带返回「艾莉」也不入印象。"""
+    store.record_mention(["钓鱼", "艾莉", "名字"])
+    snapshot = store.snapshot()
+    assert [i.topic for i in snapshot.impressions] == ["钓鱼"]
+
+
+def test_record_mention_persists_care_scaled_boost(store: MemoryStore) -> None:
+    """郑重声明的等效提及加成（在意值缩放后）持久化，检索按其分档。"""
+    from app.services.memory.retrieval import retrieve_impressions
+
+    # 无感时缩放后的加成 0.5：1 + 0.5 = 1.5 < 3，声明不入注入档。
+    store.record_mention(["搬家"], salient=True, salience_boost=0.5)
+    assert retrieve_impressions(store) == []
+
+    # 极在意时缩放后的加成 4.0：1 + 4 = 5，首提即 deep。
+    store.record_mention(["上海"], salient=True, salience_boost=4.0)
+    ranked = retrieve_impressions(store)
+    assert [i.topic for i in ranked] == ["上海"]
+    shanghai = next(i for i in store.snapshot().impressions if i.topic == "上海")
+    assert shanghai.salience_boost == 4.0
+
+
+def test_salience_boost_takes_max_not_retreat(store: MemoryStore) -> None:
+    """在意加深可强化加成，淡化不回退（与 salient 旗标同一语义）。"""
+    store.record_mention(["医院"], salient=True, salience_boost=4.0)
+    store.record_mention(["医院"], salient=True, salience_boost=1.0)
+    impression = store.snapshot().impressions[0]
+    assert impression.salience_boost == 4.0
+    assert impression.mention_count == 2
+
+
 def test_concurrent_append_is_thread_safe(tmp_path) -> None:
     """并发写入不丢条目、不损坏文件（T020 并发安全）。"""
     store = MemoryStore("companion.alice", root=str(tmp_path))

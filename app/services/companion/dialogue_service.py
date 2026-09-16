@@ -170,7 +170,9 @@ def _record_turn(
 
     双通道：``topics``/``salient`` 为 LLM 顺带返回；``None``（mock/回退
     路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
-    复述）+ 主题入印象层（等效提及加成、衰减更慢）；普通发言只入印象层。
+    复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；普通
+    发言只入印象层。艾莉自己的回复也提取主题入印象（非显著）——她记得
+    自己说过什么，反复谈起的话题同样形成印象。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     if request.session_id:
@@ -181,7 +183,13 @@ def _record_turn(
         salient = looks_salient(request.text)
     if salient:
         _remember_fact(request.companion_id, request.text)
-    _remember_turn(request.companion_id, topics, salient=salient)
+    salience_boost = _care_scaled_boost(request.companion_id) if salient else None
+    _remember_turn(
+        request.companion_id, topics, salient=salient, salience_boost=salience_boost
+    )
+    reply_topics = extract_topics(response.reply_text)
+    if reply_topics:
+        _remember_turn(request.companion_id, reply_topics)
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
@@ -213,12 +221,40 @@ def _relationship_stage(companion_id: str) -> str:
         return ""
 
 
-def _remember_turn(companion_id: str, topics: list[str], *, salient: bool = False) -> None:
+def _remember_turn(
+    companion_id: str,
+    topics: list[str],
+    *,
+    salient: bool = False,
+    salience_boost: float | None = None,
+) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
-        get_memory_store(companion_id).record_mention(topics, salient=salient)
+        get_memory_store(companion_id).record_mention(
+            topics, salient=salient, salience_boost=salience_boost
+        )
     except MemoryStoreError:
         pass
+
+
+def _care_scaled_boost(companion_id: str) -> float | None:
+    """郑重声明的等效提及加成，按当前在意值缩放。
+
+    在意 = 偏离无感的程度（极爱与极厌都最在意）。关系数值读取失败时
+    返回 ``None``（用全局默认加成，不缩放）。
+    """
+    from app.services.memory.topics import care_scale
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        value = get_relationship_store(companion_id).state().value
+    except RelationshipStoreError:
+        return None
+    settings = get_settings()
+    return settings.memory_impression_salience_boost * care_scale(value)
 
 
 def _remember_fact(companion_id: str, player_text: str) -> None:

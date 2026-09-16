@@ -53,6 +53,9 @@ class TopicImpression(BaseModel):
     topic: str = Field(min_length=1, max_length=32)
     mention_count: int = Field(default=1, ge=1)
     salient: bool = False  # 郑重声明过：等效提及加成 + 衰减更慢（一旦显著不回退）
+    # 声明那一刻按在意值缩放后的等效提及加成；None = 未缩放（旧数据/非显著），
+    # 检索档位与权重按本字段现算，全局默认值只作回退。
+    salience_boost: float | None = Field(default=None, ge=0.0)
     first_seen: str = Field(default_factory=_utc_now_iso)
     last_seen: str = Field(default_factory=_utc_now_iso)
     weight: float = Field(default=1.0, ge=0.0)
