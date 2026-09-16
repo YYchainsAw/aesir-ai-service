@@ -1,16 +1,21 @@
-"""按预算检索与注入（SDD T027 / FR-009）。
+"""按预算检索与注入（SDD T027 / FR-009 + 模糊印象层）。
 
 合并档案 + 摘要 + 近期短期三层，按重要性优先、同级按时间新者优先排序，
-在预算（条数）内截断——避免上下文无限增长。任何存储层故障都降级为空
-记忆（FR-011）：检索失败不能阻塞对话主流程。
+在预算（条数）内截断——避免上下文无限增长。模糊印象单独走
+``retrieve_impressions``：按现算权重排序、占固定小份额（不挤占上面的
+预算），注入为「对玩家常提话题的印象」而非逐字内容。
+
+任何存储层故障都降级为空记忆（FR-011）：检索失败不能阻塞对话主流程。
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Protocol
 
-from app.schemas.memory import MemoryEntry
+from app.schemas.memory import MemoryEntry, TopicImpression
 from app.config import get_settings
+from app.services.memory.topics import impression_weight, tier_of
 
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
 
@@ -39,6 +44,91 @@ def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[Mem
     # reverse 后同级内部时间也是新→旧；但重要性序也反了，重新按重要性升序展示注入
     merged.sort(key=lambda e: _IMPORTANCE_ORDER.get(e.importance, 2))
     return merged[:budget]
+
+
+def retrieve_impressions(
+    store: _SnapshotProvider,
+    *,
+    share: int | None = None,
+) -> list[TopicImpression]:
+    """检索达到注入阈值的模糊印象，按现算权重降序、截固定份额。
+
+    权重随半衰期衰减：长期不再被提及的主题自然淡出注入。存储层故障
+    降级为空列表（FR-011 同语义）。
+    """
+    if share is None:
+        share = get_settings().memory_impression_injection_share
+    if share <= 0:
+        return []
+    try:
+        snapshot = store.snapshot()
+    except Exception:  # noqa: BLE001 - 存储层任何故障都降级为无记忆
+        return []
+
+    now = datetime.now(timezone.utc)
+    ranked: list[tuple[float, TopicImpression]] = []
+    for impression in snapshot.impressions:
+        if (
+            tier_of(
+                impression.mention_count,
+                salient=impression.salient,
+                salience_boost=impression.salience_boost,
+            )
+            is None
+        ):
+            continue
+        weight = impression_weight(
+            mention_count=impression.mention_count,
+            last_seen_days_ago=_days_ago(impression.last_seen, now),
+            salient=impression.salient,
+            salience_boost=impression.salience_boost,
+        )
+        ranked.append((weight, impression))
+    ranked.sort(key=lambda pair: pair[0], reverse=True)
+    return [impression for _, impression in ranked[:share]]
+
+
+def _days_ago(iso_timestamp: str, now: datetime) -> float:
+    """ISO 时间戳距今天数；解析失败按 0 处理（宁可多注入不静默丢失）。"""
+    try:
+        parsed = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0.0, (now - parsed).total_seconds() / 86400.0)
+
+
+def format_impression_block(
+    impressions: list[TopicImpression], display_name: str = "她"
+) -> str:
+    """把模糊印象格式化为注入 LLM prompt 的文本块（档位化口吻）。"""
+    if not impressions:
+        return ""
+    lines = [
+        f"Fuzzy impressions of the player's recurring topics ({display_name} "
+        "does not recall them word for word; weave them in naturally only when "
+        "relevant, never recite counts):"
+    ]
+    for impression in impressions:
+        if (
+            tier_of(
+                impression.mention_count,
+                salient=impression.salient,
+                salience_boost=impression.salience_boost,
+            )
+            == "deep"
+        ):
+            lines.append(
+                f"- {impression.topic} is something the player often brings up; "
+                f"{display_name} has a deep impression of it."
+            )
+        else:
+            lines.append(
+                f"- {display_name} vaguely remembers the player mentioning "
+                f"{impression.topic} more than once."
+            )
+    return "\n".join(lines)
 
 
 def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -> str:

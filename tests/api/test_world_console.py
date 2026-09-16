@@ -103,7 +103,7 @@ def test_console_memory_reset_clears_session_partition() -> None:
 
 
 def test_console_memory_view_shows_tiers_after_chat() -> None:
-    # 对话写入长期记忆后，调试端点能看到三级视图（方案 A /memory 命令的数据源）。
+    # 对话写入模糊印象后，调试端点能看到分层视图（方案 A /memory 命令的数据源）。
     chat = client.post(
         "/v1/companion/chat",
         json={
@@ -117,9 +117,9 @@ def test_console_memory_view_shows_tiers_after_chat() -> None:
     response = client.get("/v1/console/memory", params={"companion_id": "companion.alice"})
     assert response.status_code == 200
     body = response.json()
-    assert body["counts"]["short_term"] >= 1
-    assert any("蘑菇" in entry["content"] for entry in body["short_term"])
-    assert all(entry["importance"] for entry in body["short_term"])
+    assert body["counts"]["impressions"] >= 1
+    assert any("蘑菇" in impression["topic"] for impression in body["impressions"])
+    assert all(impression["mention_count"] >= 1 for impression in body["impressions"])
 
 
 def test_console_memory_view_unknown_companion_returns_404() -> None:

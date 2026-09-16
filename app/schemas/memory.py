@@ -1,9 +1,11 @@
 """记忆条目与档案模型（SDD T024 / FR-006~FR-012）。
 
-三条分级（FR-007）：
+四条分级（FR-007 + 模糊印象层）：
 - 短期上下文：会话内的对话轮次，滚动窗口；
 - 经历摘要：跨会话的共同经历，落盘时聚合生成（T026，非逐条）；
-- 长期档案：事实与承诺，容量淘汰时承诺类优先保留（FR-008）。
+- 长期档案：事实与承诺，容量淘汰时承诺类优先保留（FR-008）；
+- 模糊印象：主题 × 提及频率——不逐字记对话，反复提起的话题印象加深
+  （weight 随半衰期衰减），达到阈值才注入 prompt。
 """
 
 from typing import Literal
@@ -39,9 +41,34 @@ class MemoryEntry(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class TopicImpression(BaseModel):
+    """模糊印象：她对一个主题的记忆强度（提及频率驱动，非逐字）。
+
+    ``weight`` 为展示方便的冗余快照（检索时按 ``mention_count`` +
+    ``last_seen`` 现算，见 ``topics.impression_weight``），落盘时刷新。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic: str = Field(min_length=1, max_length=32)
+    mention_count: int = Field(default=1, ge=1)
+    salient: bool = False  # 郑重声明过：等效提及加成 + 衰减更慢（一旦显著不回退）
+    # 声明那一刻按在意值缩放后的等效提及加成；None = 未缩放（旧数据/非显著），
+    # 检索档位与权重按本字段现算，全局默认值只作回退。
+    salience_boost: float | None = Field(default=None, ge=0.0)
+    first_seen: str = Field(default_factory=_utc_now_iso)
+    last_seen: str = Field(default_factory=_utc_now_iso)
+    weight: float = Field(default=1.0, ge=0.0)
+
+
 class MemorySnapshot(BaseModel):
-    """一次读取到的三级记忆全量视图（检索按预算压缩注入，FR-009）。"""
+    """一次读取到的记忆全量视图（检索按预算压缩注入，FR-009）。
+
+    ``impressions`` 为模糊印象层：旧 ``memory.json`` 无此字段时默认空列表，
+    向后兼容。
+    """
 
     short_term: list[MemoryEntry] = Field(default_factory=list)
     summaries: list[MemoryEntry] = Field(default_factory=list)
     archive: list[MemoryEntry] = Field(default_factory=list)
+    impressions: list[TopicImpression] = Field(default_factory=list)

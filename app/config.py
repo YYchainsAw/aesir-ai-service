@@ -52,23 +52,25 @@ class Settings(BaseSettings):
     memory_summary_limit: int = 80              # 跨会话经历摘要条数上限
     memory_archive_limit: int = 40              # 长期档案条数上限（承诺/重大事件优先保留）
     memory_injection_budget: int = 12           # 单次生成注入 prompt 的记忆条数预算
+    # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
+    memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
+    memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）
+    memory_impression_min_mentions: int = 3     # 达到该提及次数才注入 prompt
+    memory_impression_injection_share: int = 3  # 单次注入的印象条数份额（不挤占记忆预算）
+    memory_impression_salience_boost: float = 2.0  # 郑重声明的等效提及加成（首提即达注入阈值）
+    memory_impression_salient_half_life_days: float = 28.0  # 显著话题半衰期（重要的事遗忘更慢）
+    memory_impression_care_neutral: float = 50.0  # 在意值中性锚点：显著性加成按「偏离该值的程度」缩放（极爱与极厌都最在意）
 
-    # -- 心跳与自主行为（SDD US3 / T002）--------------------------------------
+    # -- 心跳（SDD US3 / T002）------------------------------------------------
+    # 注：自主行为节流参数在 data/policy/agency_policy.yaml（不在此处）
     heartbeat_min_interval_seconds: float = 2.0  # /v1/agent 心跳最小间隔（限流用）
-    behavior_throttle_window_seconds: float = 300.0  # 自主行为节流窗口
-    behavior_max_per_window: int = 3             # 节流窗口内自主行为触发次数上限
 
     # -- 关系体系（SDD US2 / T002）--------------------------------------------
-    relationship_min: int = 0                    # 关系数值下界（钳制，不越界）
+    # 注：数值上下界在 app/schemas/relationship.py 的 _VALUE_BOUNDS
     relationship_root: str = "data/relationship"  # 按角色分目录：data/relationship/<npc_id>/，不入版本库
-    relationship_max: int = 100                  # 关系数值上界
     relationship_initial: int = 20               # 初始关系数值（损坏/缺失时也回退到该值）
     relationship_daily_cap: int = 15              # 每日正向净变化上限（防刷）
     relationship_event_cooldown_seconds: float = 60.0  # 同类事件冷却窗口（窗口内重复不计分）
-
-    # -- 查证工具（SDD US6 / T002）---------------------------------------------
-    tools_max_rounds: int = 2                    # 单次生成允许的查证轮次上限
-    tools_timeout_seconds: float = 5.0           # 单次工具调用超时
 
 
 def get_settings() -> Settings:

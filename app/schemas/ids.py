@@ -6,10 +6,8 @@
 
 AGENT = "companion.alice"
 ABILITY_EXPLOSION = "ability.alice.explosion"
-ABILITY_BASIC_ATTACK = "ability.alice.basic_attack"
 
 SELECTOR_PRIMARY_HOSTILE = "encounter.primary_hostile"
 SELECTOR_PLAYER = "party.player"
 
 STATE_STUNNED = "state.stunned"
-STATE_PHASE_TWO = "state.phase_two"

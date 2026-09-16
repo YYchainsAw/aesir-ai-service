@@ -2,7 +2,44 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**362 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**388 通过 + 2 跳过**）。
+
+## 2026-09-16 — 记忆三补：主题黑名单 + 自述入印象 + 在意值缩放
+
+- **主题黑名单**（`topics._TOPIC_BLACKLIST` + `is_blocked_topic`）：角色自指（艾莉/爱莉/alice）与记忆/对话元语言碎片（名字/记得/记住/告诉/事情/重要…）不构成「对玩家的印象」——迁移实测出现过的「艾莉」「记得」「名字」这类碎片词从此被拦下。按「包含」匹配（碎片常带粘连字如「叫艾莉」）；过滤点在 `store._merge_mentions_locked` 合并入口，LLM 顺带返回 / 规则提取 / 迁移脚本三条路径统一覆盖。
+- **艾莉自身回复入印象**：`_record_turn` 对 `response.reply_text` 也提取主题并 `record_mention`（非显著）——她记得自己说过什么，反复谈起的话题同样形成印象；黑名单同步拦掉她回复里的自指。
+- **在意值缩放显著记忆强度**：郑重声明的等效提及加成不再固定，而按「在意值」缩放——在意 = 偏离无感的程度，**太不喜欢也是在意的一部分**（极亲密 100 与极度讨厌 0 同为最在意，中性无感 50 最健忘）。`care_scale`：缩放乘子 = 0.25 + 1.75 × 偏离中性点(默认 50)的归一距离，钳制 [0.25, 2.0]；加成 = `SALIENCE_BOOST × care_scale(关系数值)` 在声明那一刻定格，持久化到 `TopicImpression.salience_boost`（`None` 回退全局默认，旧数据兼容），检索档位与权重按各条自带的加成现算。语义：初值 20 → 乘子 1.3（首提达 faint）；无感 50 → 0.25（郑重声明也几乎记不住）；0/100 → 2.0（首提即 deep）。在意加深取最大值强化、淡化不回退（与 `salient` 旗标同语义）。
+- **配置**：新增 `AESIR_MEMORY_IMPRESSION_CARE_NEUTRAL`（默认 50，在意值中性锚点）。
+- **测试**：新增 13 例（黑名单 4 + care_scale 5 + store 过滤/持久化/最大值 3 + 集成自述入印象 1）。**388 通过 + 2 跳过**。
+
+## 2026-09-16 — 双通道记忆：郑重声明不靠频率（显著性维度）
+
+- **缺口**：「有件重要的事情告诉你」这类一次性郑重声明，纯频率权重 log2(2)=1 达不到注入阈值，被错杀；而真人恰恰对郑重声明过一次的事记得最清楚。
+- **通道 1（档案分流）**：LLM 顺带返回 `salient: true`（规则兜底线索表「记住/重要/别忘/告诉你…」）→ 玩家原话逐字入 archive（`importance=high`，容量淘汰优先保留）——玩家期待精确复述的事不适合模糊化。
+- **通道 2（显著性加成）**：`TopicImpression.salient`；权重 = `log2(1+次数+2×salient) × 衰减`，郑重提过一次 ≈ 等效 3 次普通提及**首提即达注入阈值**；显著话题半衰期 7→28 天（重要的事遗忘更慢）；主题一旦显著不回退（普通提及只刷计数）。
+- **判定来源**：LLM 响应新增 `salient` 键（与 `topics` 同批，零额外请求）；mock/回退路径退化为 `looks_salient()` 关键词规则。
+- **配置**：`AESIR_MEMORY_IMPRESSION_SALIENCE_BOOST`（默认 2.0）、`AESIR_MEMORY_IMPRESSION_SALIENT_HALF_LIFE_DAYS`（默认 28）。
+- **测试**：新增 8 例（显著性权重/慢衰减/首提达档/线索词判定/档案分流/普通闲聊不进档案等）。**375 通过 + 2 跳过**。
+
+## 2026-09-16 — 模糊记忆模式（SDD US1 增补：主题 × 提及频率）
+
+- **动机**：真人不会逐字记住所有对话，但对反复出现的主题形成强印象。旧「长期逐字存玩家发言」改为模糊印象层。
+- **第四层记忆 `impressions`**（`schemas/memory.py`）：`TopicImpression`（主题/累计提及/首末次时间/权重），旧 `memory.json` 无此字段时默认空列表，向后兼容。
+- **频率强化 + 半衰期衰减**（`services/memory/topics.py`）：权重 = `log2(1+次数) × 0.5**(距上次提及天数/半衰期)`（默认 7 天）；提及次数达阈值（默认 3）才注入 prompt——「有点印象 / 印象很深」两档口吻（`format_impression_block`），占固定注入份额（默认 3 条）不挤占记忆预算。
+- **主题提取**：LLM 顺带返回（对话 JSON 响应新增 `topics` 键，零额外请求）；mock/回退路径退化为规则提取（停用词切段，质量有限、已文档注明）。
+- **对话链路**：`_remember_turn` 由「逐字写短期层」改为「按主题 `record_mention`」；会话内逐字历史（session memory）不变。
+- **可观测与运维**：`GET /v1/console/memory` 增加 `impressions` 视图（主题/次数/权重）；记忆重置端点顺带清空印象。
+- **一次性迁移**：`python -m scripts.migrate_memory_impressions`（支持 `--dry-run`）把已存逐字发言按规则提主题后清出短期层；本地 8 条已迁移为 13 个主题印象。
+- **配置**：`AESIR_MEMORY_IMPRESSION_{LIMIT,HALF_LIFE_DAYS,MIN_MENTIONS,INJECTION_SHARE}`。
+- **测试**：新增 13 例（topics 单元 11 + 集成迁移/频率强化 2），改写 5 个逐字断言旧测试。**367 通过 + 2 跳过**。
+
+## 2026-09-16 — 死代码清理（合并 main 后）
+
+- **合并 main**：`develop-dyh` 合入 `origin/main`（RL 重构为 `rl/boss/`、scripts 按域拆分、UML/blueprint 证据文档），无冲突。
+- **修复 main 既有 bug**：`rl/boss/env.py` 观测空间 `Box` 的 low/high 需 `np.asarray`（gymnasium 拒绝 tuple），修复后 main 带来的 4 个失败测试全绿。
+- **死代码清理**：删除 `app/config.py` 中 6 个无代码读取的字段（`behavior_throttle_*` 已被 `agency_policy.yaml` 取代、`relationship_min/max` 已被 `_VALUE_BOUNDS` 取代、`tools_max_rounds/timeout` 属未实现的 US6 预定义）；删除 `app/schemas/ids.py` 中从未被引用的 `ABILITY_BASIC_ATTACK`、`STATE_PHASE_TWO` 常量。
+- **`.gitignore`**：补 `data/rl/executions/`（record_execution 运行期回执产物，一直以 untracked 状态遗漏）。
+- 全量测试 **354 通过 + 2 跳过**（main 合并后新测试基线）。
 
 ## 2026-09-15 — 陪伴对话流式输出（SSE，P1 清账）
 

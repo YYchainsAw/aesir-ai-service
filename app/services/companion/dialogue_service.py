@@ -18,7 +18,8 @@ from app.services.companion.profile_repository import (
 from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
 from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
-from app.services.memory.retrieval import retrieve
+from app.services.memory.retrieval import retrieve, retrieve_impressions
+from app.services.memory.topics import extract_topics, looks_salient
 
 
 def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
@@ -37,19 +38,31 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
+    impressions = _recall_impressions(request.companion_id)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend == "llm":
+        service = LLMCompanionDialogueService(profile=profile)
         try:
-            response = LLMCompanionDialogueService(profile=profile).reply(
-                request, history=history, memories=memories, relationship_stage=stage
+            response = service.reply(
+                request,
+                history=history,
+                memories=memories,
+                impressions=impressions,
+                relationship_stage=stage,
             )
+            topics = service.last_topics
+            salient = service.last_salient
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
+            topics = None
+            salient = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
+        topics = None
+        salient = None
     response.relationship_stage = stage
-    _record_turn(request, response)
+    _record_turn(request, response, topics=topics, salient=salient)
     return response
 
 
@@ -71,13 +84,19 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
+    impressions = _recall_impressions(request.companion_id)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend != "llm":
         return _stream_mock_reply(request, profile=profile, source="mock", stage=stage)
 
     return _stream_llm_reply(
-        request, profile=profile, history=history, memories=memories, stage=stage
+        request,
+        profile=profile,
+        history=history,
+        memories=memories,
+        impressions=impressions,
+        stage=stage,
     )
 
 
@@ -87,18 +106,29 @@ def _stream_llm_reply(
     profile: CompanionProfile,
     history: tuple,
     memories: list[MemoryEntry],
+    impressions: list,
     stage: str,
 ) -> Iterator[StreamEvent]:
+    service = LLMCompanionDialogueService(profile=profile)
     emitted_delta = False
     try:
-        for event in LLMCompanionDialogueService(profile=profile).stream_reply(
-            request, history=history, memories=memories, relationship_stage=stage
+        for event in service.stream_reply(
+            request,
+            history=history,
+            memories=memories,
+            impressions=impressions,
+            relationship_stage=stage,
         ):
             if event.kind == "delta":
                 emitted_delta = True
                 yield event
                 continue
-            _record_turn(request, event.response)
+            _record_turn(
+                request,
+                event.response,
+                topics=service.last_topics,
+                salient=service.last_salient,
+            )
             yield _with_stage(event, stage)
             return
     except LLMClientError:
@@ -129,18 +159,51 @@ def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
     return event
 
 
-def _record_turn(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:
-    """成功完成一轮后写入会话与短期记忆（与非流式路径相同副作用）。"""
+def _record_turn(
+    request: CompanionDialogueRequest,
+    response: CompanionDialogueResponse,
+    *,
+    topics: list[str] | None = None,
+    salient: bool | None = None,
+) -> None:
+    """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
+
+    双通道：``topics``/``salient`` 为 LLM 顺带返回；``None``（mock/回退
+    路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
+    复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；普通
+    发言只入印象层。艾莉自己的回复也提取主题入印象（非显著）——她记得
+    自己说过什么，反复谈起的话题同样形成印象。
+    """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
-    _remember_turn(request.companion_id, request.text)
+    if topics is None:
+        topics = extract_topics(request.text)
+    if salient is None:
+        salient = looks_salient(request.text)
+    if salient:
+        _remember_fact(request.companion_id, request.text)
+    salience_boost = _care_scaled_boost(request.companion_id) if salient else None
+    _remember_turn(
+        request.companion_id, topics, salient=salient, salience_boost=salience_boost
+    )
+    reply_topics = extract_topics(response.reply_text)
+    if reply_topics:
+        _remember_turn(request.companion_id, reply_topics)
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
     """检索长期记忆（预算内）；故障降级为空列表（FR-011）。"""
     try:
         return retrieve(get_memory_store(companion_id))
+    except MemoryStoreError:
+        return []
+
+
+def _recall_impressions(companion_id: str) -> list:
+    """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。"""
+    try:
+        return retrieve_impressions(get_memory_store(companion_id))
     except MemoryStoreError:
         return []
 
@@ -158,15 +221,51 @@ def _relationship_stage(companion_id: str) -> str:
         return ""
 
 
-def _remember_turn(companion_id: str, player_text: str) -> None:
-    """把玩家发言写入短期记忆；写失败静默降级（服务继续，不记得而已）。"""
+def _remember_turn(
+    companion_id: str,
+    topics: list[str],
+    *,
+    salient: bool = False,
+    salience_boost: float | None = None,
+) -> None:
+    """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
-        store = get_memory_store(companion_id)
-        store.append_short_term(
+        get_memory_store(companion_id).record_mention(
+            topics, salient=salient, salience_boost=salience_boost
+        )
+    except MemoryStoreError:
+        pass
+
+
+def _care_scaled_boost(companion_id: str) -> float | None:
+    """郑重声明的等效提及加成，按当前在意值缩放。
+
+    在意 = 偏离无感的程度（极爱与极厌都最在意）。关系数值读取失败时
+    返回 ``None``（用全局默认加成，不缩放）。
+    """
+    from app.services.memory.topics import care_scale
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        value = get_relationship_store(companion_id).state().value
+    except RelationshipStoreError:
+        return None
+    settings = get_settings()
+    return settings.memory_impression_salience_boost * care_scale(value)
+
+
+def _remember_fact(companion_id: str, player_text: str) -> None:
+    """郑重声明逐字入档案（双通道之一：精确复述用）；写失败静默降级。"""
+    try:
+        get_memory_store(companion_id).record_fact(
             MemoryEntry(
                 content=player_text,
+                importance="high",
                 source="player_statement",
-                tags=["dialogue"],
+                tags=["dialogue", "salient"],
             )
         )
     except MemoryStoreError:

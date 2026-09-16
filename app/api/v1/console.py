@@ -76,15 +76,26 @@ class MemoryEntryView(BaseModel):
     real_time: str
 
 
+class TopicImpressionView(BaseModel):
+    """调试视图：单条模糊印象（主题 × 提及频率）。"""
+
+    model_config = ConfigDict(extra="forbid")
+    topic: str
+    mention_count: int
+    weight: float
+    last_seen: str
+
+
 class MemoryViewResponse(BaseModel):
-    """三级长期记忆全量视图（GET /v1/console/memory）。"""
+    """长期记忆全量视图（GET /v1/console/memory），含模糊印象层。"""
 
     model_config = ConfigDict(extra="forbid")
     companion_id: str
-    counts: dict[str, int]           # short_term / summaries / archive 各层条数
+    counts: dict[str, int]           # short_term / summaries / archive / impressions 各层条数
     short_term: list[MemoryEntryView]
     summaries: list[MemoryEntryView]
     archive: list[MemoryEntryView]
+    impressions: list[TopicImpressionView]
 
 
 @router.get("/memory", response_model=MemoryViewResponse)
@@ -111,10 +122,18 @@ def view_memory(companion_id: str) -> MemoryViewResponse:
             "short_term": len(snapshot.short_term),
             "summaries": len(snapshot.summaries),
             "archive": len(snapshot.archive),
+            "impressions": len(snapshot.impressions),
         },
         short_term=[_view(e) for e in snapshot.short_term],
         summaries=[_view(e) for e in snapshot.summaries],
         archive=[_view(e) for e in snapshot.archive],
+        impressions=[
+            TopicImpressionView(
+                topic=i.topic, mention_count=i.mention_count,
+                weight=i.weight, last_seen=i.last_seen,
+            )
+            for i in snapshot.impressions
+        ],
     )
 
 
