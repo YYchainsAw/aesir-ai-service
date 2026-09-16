@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-envs", type=int, default=8)
     parser.add_argument("--eval-episodes", type=int, default=50)
     parser.add_argument("--out", type=Path, default=Path("models/rl/boss"))
-    parser.add_argument("--name", default="ppo_boss_schema_v3")
+    parser.add_argument("--name", default="ppo_boss_schema_v4")
     return parser.parse_args()
 
 

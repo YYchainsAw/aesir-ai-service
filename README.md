@@ -55,7 +55,7 @@ aesir-ai-service/
 │       ├── agency/                # 活动域与自主行为（SDD 骨架，US3）
 │       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
 ├── rl/                            # Boss 强化学习研究（可选依赖）
-│   └── boss/                      # Boss-as-agent + UE schema v3
+│   └── boss/                      # Boss-as-agent + UE schema v4
 ├── scripts/
 │   ├── command_service/           # ASR 评估与假 UE 联调
 │   └── rl/
@@ -207,7 +207,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
 - [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/command_service/mock_ue_flow.py` 全链路演示（2026-09-09）
 - [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
-- [x] Boss RL schema v3、训练模拟器、奖励和 Behavior Tree 规则基线
+- [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 
 ## 调试

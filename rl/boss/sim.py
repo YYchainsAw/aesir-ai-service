@@ -10,7 +10,7 @@ import random
 
 from rl.boss.contract import BossAction, make_observation
 
-SIMULATION_REVISION = "boss-sim-002"
+SIMULATION_REVISION = "boss-sim-003"
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,8 @@ class BossSimConfig:
     light_range: float = 0.24
     heavy_range: float = 0.31
     ability_range: float = 0.42
+    gap_closer_range: float = 0.72
+    area_skill_range: float = 0.34
     pursue_distance: float = 0.10
     disengage_distance: float = 0.14
     stun_duration_steps: int = 6
@@ -63,10 +65,16 @@ class BossCombatState:
     boss_attacking: bool = False
     target_blocking: bool = False
     target_attacking: bool = False
+    target_dodging: bool = False
+    target_guard_pressure_ratio: float = 0.0
+    distance_trend: float = 0.5
     boss_poise: float = 0.0
     cooldown_steps: dict[BossAction, int] = field(default_factory=dict)
     last_action: BossAction | None = None
     consecutive_action_count: int = 0
+    recent_target_attacks: list[float] = field(default_factory=list)
+    recent_target_blocks: list[float] = field(default_factory=list)
+    recent_target_dodges: list[float] = field(default_factory=list)
 
     @property
     def boss_stunned(self) -> bool:
@@ -88,6 +96,9 @@ class BossCombatState:
         )
 
     def observation(self):
+        recent_attack_rate = self._recent_rate(self.recent_target_attacks)
+        recent_block_rate = self._recent_rate(self.recent_target_blocks)
+        recent_dodge_rate = self._recent_rate(self.recent_target_dodges)
         return make_observation(
             (
                 self.boss_health_ratio,
@@ -100,9 +111,20 @@ class BossCombatState:
                 float(self.target_blocking),
                 float(self.target_attacking),
                 float(self.target_dead),
+                max(0.0, min(1.0, 1.0 - self.boss_poise)),
+                self.target_guard_pressure_ratio,
+                float(self.target_dodging),
+                recent_attack_rate,
+                recent_block_rate,
+                recent_dodge_rate,
+                self.distance_trend,
                 *(float(self.is_action_available(action)) for action in BossAction),
             )
         )
+
+    @staticmethod
+    def _recent_rate(samples: list[float]) -> float:
+        return sum(samples) / len(samples) if samples else 0.0
 
 
 @dataclass
@@ -153,6 +175,7 @@ class BossPolicySim:
 
         action = BossAction(action_value)
         state = self.state
+        distance_before = state.normalized_distance
         cooldowns_to_tick = set(state.cooldown_steps)
         was_stunned = state.boss_stunned
 
@@ -178,6 +201,11 @@ class BossPolicySim:
         # A simulator step spans the complete high-level action. The next
         # observation is sampled only after that action has finished.
         state.boss_attacking = False
+        distance_delta = state.normalized_distance - distance_before
+        state.distance_trend = max(
+            0.0,
+            min(1.0, 0.5 + distance_delta / 0.30),
+        )
         state.step += 1
         state.boss_health_ratio = max(0.0, state.boss_health_ratio)
         state.target_health_ratio = max(0.0, state.target_health_ratio)
@@ -188,6 +216,7 @@ class BossPolicySim:
         profile = self.profile
         state.target_attacking = False
         state.target_blocking = False
+        state.target_dodging = False
 
         if state.normalized_distance > profile.preferred_distance:
             state.normalized_distance = max(
@@ -200,6 +229,25 @@ class BossPolicySim:
                 state.target_attacking = True
             elif roll < profile.attack_probability + profile.block_probability:
                 state.target_blocking = True
+            elif roll < (
+                profile.attack_probability
+                + profile.block_probability
+                + profile.evade_probability
+            ):
+                state.target_dodging = True
+
+        self._push_recent_sample(
+            state.recent_target_attacks,
+            float(state.target_attacking),
+        )
+        self._push_recent_sample(
+            state.recent_target_blocks,
+            float(state.target_blocking),
+        )
+        self._push_recent_sample(
+            state.recent_target_dodges,
+            float(state.target_dodging),
+        )
 
     def _apply_boss_action(self, action: BossAction, events: BossStepEvents) -> None:
         state = self.state
@@ -236,6 +284,37 @@ class BossPolicySim:
             events.accepted = True
             return
 
+        if action == BossAction.GAP_CLOSER_SKILL:
+            state.boss_attacking = True
+            state.cooldown_steps[action] = 12
+            events.accepted = True
+            if (
+                not state.has_line_of_sight
+                or state.facing_alignment < 0.25
+                or state.normalized_distance > self.config.gap_closer_range
+            ):
+                events.result = "accepted_miss"
+                return
+            state.normalized_distance = max(
+                0.10,
+                state.normalized_distance - 0.30,
+            )
+            self._resolve_boss_attack(action, events)
+            return
+
+        if action == BossAction.UNBLOCKABLE_AREA_SKILL:
+            state.boss_attacking = True
+            state.cooldown_steps[action] = 18
+            events.accepted = True
+            if (
+                not state.has_line_of_sight
+                or state.normalized_distance > self.config.area_skill_range
+            ):
+                events.result = "accepted_miss"
+                return
+            self._resolve_boss_attack(action, events)
+            return
+
         range_limit = {
             BossAction.LIGHT_ATTACK: self.config.light_range,
             BossAction.HEAVY_ATTACK: self.config.heavy_range,
@@ -263,18 +342,25 @@ class BossPolicySim:
 
     def _resolve_boss_attack(self, action: BossAction, events: BossStepEvents) -> None:
         state = self.state
-        profile = self.profile
         damage = {
             BossAction.LIGHT_ATTACK: 0.075,
             BossAction.HEAVY_ATTACK: 0.16,
             BossAction.USE_ABILITY: 0.21,
+            BossAction.GAP_CLOSER_SKILL: 0.12,
+            BossAction.UNBLOCKABLE_AREA_SKILL: 0.18,
         }[action]
-        if self._rng.random() < profile.evade_probability:
+        if state.target_dodging:
             return
         if state.target_blocking and action == BossAction.LIGHT_ATTACK:
             damage *= 0.2
+            state.target_guard_pressure_ratio += 0.20
         if state.target_blocking and action == BossAction.HEAVY_ATTACK:
+            state.target_guard_pressure_ratio += 0.45
             events.interrupted_target = True
+
+        if state.target_guard_pressure_ratio >= 1.0:
+            state.target_guard_pressure_ratio = 0.0
+            state.target_blocking = False
 
         state.target_health_ratio -= damage
         events.damage_dealt = damage
@@ -298,6 +384,12 @@ class BossPolicySim:
             if state.boss_poise >= 1.0 and not state.boss_dead:
                 state.boss_poise = 0.0
                 state.boss_stunned_steps = self.config.stun_duration_steps
+
+    @staticmethod
+    def _push_recent_sample(samples: list[float], value: float) -> None:
+        samples.append(value)
+        if len(samples) > 8:
+            del samples[:-8]
 
     def _track_repetition(self, action: BossAction, events: BossStepEvents) -> None:
         state = self.state

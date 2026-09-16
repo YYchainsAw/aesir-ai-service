@@ -17,12 +17,12 @@ from rl.boss.contract import (  # noqa: E402
 from rl.boss.env import AesirBossEnv  # noqa: E402
 
 
-def test_contract_matches_unreal_schema_v3() -> None:
-    assert SCHEMA_VERSION == 3
-    assert OBSERVATION_DIM == 17
+def test_contract_matches_unreal_schema_v4() -> None:
+    assert SCHEMA_VERSION == 4
+    assert OBSERVATION_DIM == 26
     assert FEATURE_NAMES[0] == "boss_health_ratio"
-    assert FEATURE_NAMES[-1] == "use_ability_available"
-    assert [action.value for action in BossAction] == list(range(7))
+    assert FEATURE_NAMES[-1] == "unblockable_area_skill_available"
+    assert [action.value for action in BossAction] == list(range(9))
     assert BossAction.PURSUE.value == 4
     assert BossAction.USE_ABILITY.value == 6
 
@@ -45,7 +45,7 @@ def test_observation_and_reward_terms_are_explicit() -> None:
     assert isinstance(reward, float)
     assert not (terminated and truncated)
     assert info["schema_version"] == SCHEMA_VERSION
-    assert info["simulation_revision"] == "boss-sim-002"
+    assert info["simulation_revision"] == "boss-sim-003"
     assert info["accepted"] is True
     assert "decision_step" in info["reward_terms"]
 
