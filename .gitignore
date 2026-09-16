@@ -30,6 +30,9 @@ Thumbs.db
 # Generated command-service and RL runtime data
 data/runtime/
 
+# RL 回执运行期产物（record_execution 落盘，不入版本库）
+data/rl/executions/
+
 # NPC runtime memory (SDD T003: 运行期生成的持久化记忆，不入版本库)
 data/memory/
 aesir_ai_service.egg-info/

@@ -2,7 +2,15 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**362 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**354 通过 + 2 跳过**）。
+
+## 2026-09-16 — 死代码清理（合并 main 后）
+
+- **合并 main**：`develop-dyh` 合入 `origin/main`（RL 重构为 `rl/boss/`、scripts 按域拆分、UML/blueprint 证据文档），无冲突。
+- **修复 main 既有 bug**：`rl/boss/env.py` 观测空间 `Box` 的 low/high 需 `np.asarray`（gymnasium 拒绝 tuple），修复后 main 带来的 4 个失败测试全绿。
+- **死代码清理**：删除 `app/config.py` 中 6 个无代码读取的字段（`behavior_throttle_*` 已被 `agency_policy.yaml` 取代、`relationship_min/max` 已被 `_VALUE_BOUNDS` 取代、`tools_max_rounds/timeout` 属未实现的 US6 预定义）；删除 `app/schemas/ids.py` 中从未被引用的 `ABILITY_BASIC_ATTACK`、`STATE_PHASE_TWO` 常量。
+- **`.gitignore`**：补 `data/rl/executions/`（record_execution 运行期回执产物，一直以 untracked 状态遗漏）。
+- 全量测试 **354 通过 + 2 跳过**（main 合并后新测试基线）。
 
 ## 2026-09-15 — 陪伴对话流式输出（SSE，P1 清账）
 
