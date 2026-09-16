@@ -749,23 +749,23 @@ scripts/
 
 #### Tests for User Story 2 ⚠️
 
-- [ ] T032 [P] [US2] 数值与阶段测试：`tests/services/test_relationship_state.py`（阶段边界归属、上下限钳制、持久化）
-- [ ] T033 [P] [US2] 事件增减与防刷测试：`tests/services/test_relationship_rules.py`（正常增减、冷却窗口内重复不计分、日上限、未知事件忽略）
-- [ ] T034 [P] [US2] 阶段化差异测试：`tests/services/test_relationship_effect.py`（同一意图在不同阶段产出不同资源投入与服从度）
-- [ ] T035 [P] [US2] 损坏降级测试：`tests/services/test_relationship_degradation.py`（文件损坏回退初值，服务可用）
+- [x] T032 [P] [US2] 数值与阶段测试：`tests/services/test_relationship_state.py`（阶段边界归属、上下限钳制、持久化）
+- [x] T033 [P] [US2] 事件增减与防刷测试：`tests/services/test_relationship_rules.py`（正常增减、冷却窗口内重复不计分、日上限、未知事件忽略）
+- [x] T034 [P] [US2] 阶段化差异测试：`tests/services/test_relationship_effect.py`（同一意图在不同阶段产出不同资源投入与服从度）
+- [x] T035 [P] [US2] 损坏降级测试：`tests/services/test_relationship_degradation.py`（文件损坏回退初值，服务可用）
 
 #### Implementation for User Story 2
 
-- [ ] T036 [P] [US2] 关系状态模型：`app/schemas/relationship.py`（数值、阶段、近期事件、当日净变化）
-- [ ] T037 [US2] 关系状态持久化：`app/services/relationship/state.py`（读取、更新、备份、损坏隔离）
-- [ ] T038 [US2] 事件驱动规则：`app/services/relationship/rules.py`（从 `data/policy/relationship_policy.yaml` 读取事件表与幅度，实施防刷与日上限）
-- [ ] T039 [US2] 决策层接收关系：改造 `app/services/tactical/resolver.py`（资源投入意愿、服从度受阶段影响，产出原因码）
-- [ ] T040 [US2] 对话层接收关系：改造 `app/services/companion/dialogue_service.py` 与人格配置读取（阶段化称呼与语气偏移）
-- [ ] T041 [US2] 关系人格偏移配置：扩展 `data/companions/` 人格配置（各阶段称呼、语气、主动度、冒险意愿）
-- [ ] T042 [US2] 响应回带关系阶段与本次变化（`agent_step.py`、`companion.py` 响应字段）
-- [ ] T043 [US2] 阶段对比演示脚本：`scripts/demo_relationship.py`（同一指令 × 4 阶段）
+- [x] T036 [P] [US2] 关系状态模型：`app/schemas/relationship.py`（数值、阶段、近期事件、当日净变化）
+- [x] T037 [US2] 关系状态持久化：`app/services/relationship/state.py`（读取、更新、备份、损坏隔离）
+- [x] T038 [US2] 事件驱动规则：`app/services/relationship/rules.py`（从 `data/policy/relationship_policy.yaml` 读取事件表与幅度，实施防刷与日上限）
+- [x] T039 [US2] 决策层接收关系：改造 `app/services/tactical/resolver.py`（资源投入意愿、服从度受阶段影响，产出原因码；可选参数缺省时 v0.2 契约端点行为不变，完整编排待 Phase 5 T054 接入主入口）
+- [x] T040 [US2] 对话层接收关系：改造 `app/services/companion/dialogue_service.py` 与人格配置读取（阶段化称呼与语气偏移）
+- [x] T041 [US2] 关系人格偏移配置：扩展 `data/companions/` 人格配置（各阶段称呼、语气、主动度、冒险意愿）
+- [x] T042 [US2] 响应回带关系阶段与本次变化（`agent_step.py`、`companion.py` 响应字段）
+- [x] T043 [US2] 阶段对比演示脚本：`scripts/demo_relationship.py`（同一指令 × 4 阶段）
 
-**Checkpoint**: US1 与 US2 均可独立验证
+**Checkpoint**: US1 与 US2 均可独立验证（US2 于 2026-09-14 完成，阶段差异验收见 demo 脚本输出）
 
 ---
 
@@ -777,24 +777,24 @@ scripts/
 
 #### Tests for User Story 3 ⚠️
 
-- [ ] T044 [P] [US3] 活动场景判定测试：`tests/services/test_agency_domain.py`（五场景判定、非法取值 422、场景切换瞬间）
-- [ ] T045 [P] [US3] 行为目录测试：`tests/services/test_agency_catalog.py`（白名单校验、非战斗行为 ≥8 类、场景外行为被拒）
-- [ ] T046 [P] [US3] 仲裁测试：`tests/services/test_agency_arbiter.py`（六级优先级、同级按数值、多意图冲突）
-- [ ] T047 [P] [US3] 节流与去重测试：`tests/services/test_agency_throttle.py`（冷却、单周期次数上限、同触发源去重、禁打断清单）
-- [ ] T048 [P] [US3] 不可执行防护测试：`tests/services/test_agency_not_actionable.py`（目标不存在/不可达时不虚构行为）
+- [x] T044 [P] [US3] 活动场景判定测试：`tests/services/test_agency_domain.py`（五场景判定、非法取值 422、场景切换瞬间）
+- [x] T045 [P] [US3] 行为目录测试：`tests/services/test_agency_catalog.py`（白名单校验、非战斗行为 ≥8 类、场景外行为被拒）
+- [x] T046 [P] [US3] 仲裁测试：`tests/services/test_agency_arbiter.py`（六级优先级、同级按数值、多意图冲突）
+- [x] T047 [P] [US3] 节流与去重测试：`tests/services/test_agency_throttle.py`（冷却、单周期次数上限、同触发源去重、禁打断清单）
+- [x] T048 [P] [US3] 不可执行防护测试：`tests/services/test_agency_not_actionable.py`（目标不存在/不可达时不虚构行为）
 
 #### Implementation for User Story 3
 
-- [ ] T049 [P] [US3] 指令类型分文件：`app/schemas/directives/combat.py`、`movement.py`、`interaction.py`、`social.py`、`routine.py`（分别定义各域行为参数，注册到统一判别联合）
-- [ ] T050 [US3] 场景判定：`app/services/agency/domain.py`（依据世界快照判定场景，战斗域排除生活类行为）
-- [ ] T051 [US3] 行为目录：`app/services/agency/behavior_catalog.py`（从 `data/policy/agency_policy.yaml` 读取各场景白名单与参数约束）
-- [ ] T052 [US3] 跨域仲裁：`app/services/agency/arbiter.py`（危险自保 > 战斗战术 > 玩家指令 > 剧情事件 > 关系事件 > 日常自主）
-- [ ] T053 [US3] 节流、去重与禁打断：`app/services/agency/throttle.py`
-- [ ] T054 [US3] 主入口编排接入：`app/api/v1/agent.py` 串起"场景判定 → 仲裁 → 目录校验 → 输出指令"
-- [ ] T055 [US3] 表现块扩展：`app/schemas/directives/common.py` 增加注视目标与可打断标记（语音参数可留待后续）
-- [ ] T056 [US3] 非战斗 golden 场景补全并在 `scripts/mock_ue_flow.py` 中串成演示分支
+- [x] T049 [P] [US3] 指令类型分文件：`app/schemas/directives/combat.py`、`movement.py`、`interaction.py`、`social.py`、`routine.py`（分别定义各域行为参数，注册到统一判别联合）
+- [x] T050 [US3] 场景判定：`app/services/agency/domain.py`（依据世界快照判定场景，战斗域排除生活类行为）
+- [x] T051 [US3] 行为目录：`app/services/agency/behavior_catalog.py`（从 `data/policy/agency_policy.yaml` 读取各场景白名单与参数约束）
+- [x] T052 [US3] 跨域仲裁：`app/services/agency/arbiter.py`（危险自保 > 战斗战术 > 玩家指令 > 剧情事件 > 关系事件 > 日常自主）
+- [x] T053 [US3] 节流、去重与禁打断：`app/services/agency/throttle.py`
+- [x] T054 [US3] 主入口编排接入：`app/api/v1/agent.py` 串起"场景判定 → 仲裁 → 目录校验 → 输出指令"
+- [x] T055 [US3] 表现块扩展：`app/schemas/directives/common.py` 增加注视目标与可打断标记（语音参数可留待后续）
+- [x] T056 [US3] 非战斗 golden 场景补全并在 `scripts/mock_ue_flow.py` 中串成演示分支
 
-**Checkpoint**: US1/US2/US3 三者可独立验证，构成 P1 闭环
+**Checkpoint**: US1/US2/US3 三者可独立验证，构成 P1 闭环（US3 于 2026-09-15 完成，自主行为验收见 mock_ue_flow.py US3 分支输出）
 
 ---
 

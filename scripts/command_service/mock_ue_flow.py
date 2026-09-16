@@ -215,6 +215,60 @@ def main(url: str) -> int:
     _show("POST /v1/console/memory/reset", reset.status_code, reset.json())
 
     print("\nv0.3 骨架链路完成：agent/step（心跳+限流）→ world/events（幂等）→ console。")
+
+    # 9. US3 自主行为演示（T056）：四个非战斗场景 × 主入口编排。
+    #    心跳限流最小间隔 2s：每个分支之间稍作等待，保证各自独立判定。
+    import time as _time
+
+    print("\n=== US3 自主行为演示（T054 编排：禁打断 → 候选 → 仲裁 → 节流）===")
+
+    def _agent_step(snapshot: dict, title: str, note: str = "") -> dict | None:
+        _time.sleep(2.2)  # 心跳限流最小间隔 2s（AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS）
+        payload = {
+            "protocol_version": "0.3",
+            "request_id": _rid(),
+            "companion_id": "companion.alice",
+            "world_context": snapshot,
+        }
+        response = client.post("/v1/agent/step", json=payload)
+        body = response.json()
+        directive = body.get("directive")
+        print(
+            f"\n--- {title}{('（' + note + '）') if note else ''}"
+            f"\n    HTTP {response.status_code}  action={body.get('action')}"
+            f"  behavior={directive['action_type'] if directive else None}"
+            f"  gaze={directive['presentation']['gaze_target_id'] if directive and directive.get('presentation') else None}"
+            f"\n    reasons={body.get('observability', {}).get('reason_codes')}"
+        )
+        return body
+
+    camp_snapshot = json.loads((GOLDEN_DIR / "world_snapshot_camp.json").read_text(encoding="utf-8"))
+    idle_snapshot = json.loads((GOLDEN_DIR / "world_snapshot_idle.json").read_text(encoding="utf-8"))
+    exploration_snapshot = json.loads(
+        (GOLDEN_DIR / "world_snapshot_exploration.json").read_text(encoding="utf-8")
+    )
+
+    # 9a. camp 夜晚 + notable 篝火 → 休整优先（rest 40 > inspect 25，注视篝火）
+    _agent_step(camp_snapshot, "营地夜晚：篝火旁", "US3：夜深在篝火旁休整")
+
+    # 9b. idle 深夜 → 同为 night_rest 触发源 → 被 DEDUP_WINDOW 拦截（FR-022 演示）
+    _agent_step(idle_snapshot, "深夜待机（同一触发源）", "FR-022：短期内不重复休整 → 静止")
+
+    # 9c. 探索 + notable 遗迹路标 → inspect（注视路标）；首访告警已在前面演示过，
+    #     此处用 first_visit=false 的副本展示日常观察类候选
+    explore_copy = json.loads(json.dumps(exploration_snapshot))
+    explore_copy["region"]["first_visit"] = False
+    _agent_step(explore_copy, "探索：遗迹路标旁", "US3：好奇地查看路标")
+
+    # 9d. 禁打断：cutscene_playing → 静止
+    cutscene_snapshot = json.loads(json.dumps(camp_snapshot))
+    cutscene_snapshot["cutscene_playing"] = True
+    _agent_step(cutscene_snapshot, "剧情演出中", "FR-023：禁打断，静止观察")
+
+    # 9e. 节流演示：同一快照立即重发（绕过心跳限流后由 DEDUP_WINDOW 拦截）
+    #     —— 限流仍会先 429，此处直接展示服务端 THROTTLED 路径见 API 测试。
+
+    print("\nUS3 演示完成：非战斗场景产出合理且不重复的自主行为。")
     return 0
 
 

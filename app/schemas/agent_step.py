@@ -38,6 +38,8 @@ class AgentStepObservability(BaseModel):
     policy_revision: str = ""
     used_snapshot_id: str = ""
     degraded: bool = False  # 任一子系统降级时为 true（章程原则 V）
+    # US2（T042）：本次决策所依据的关系阶段；关系体系故障降级时为空字符串
+    relationship_stage: str = ""
 
 
 class AgentStepResponse(BaseModel):

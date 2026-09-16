@@ -74,8 +74,17 @@ def _not_actionable(intent_id: str, reasons: list[str], explanation: str) -> Tac
     )
 
 
-def resolve_intent(intent: TacticalIntent, ctx: CombatContext) -> TacticalDecision:
-    """按意图分发到三类策略（治疗/保护、爆发、撤退与跟随）。"""
+def resolve_intent(
+    intent: TacticalIntent,
+    ctx: CombatContext,
+    relationship_stage: str | None = None,
+) -> TacticalDecision:
+    """按意图分发到三类策略（治疗/保护、爆发、撤退与跟随）。
+
+    ``relationship_stage``（US2 / T039）非空时，决策结果再经关系阶段调制：
+    资源投入意愿与服从度随阶段变化，全部落在 reason_codes（可解释）。
+    缺省时行为与既有契约完全一致。
+    """
     mp_low = ctx.companion.mp_percent < COMPANION_MP_LOW
     handlers = {
         "support_heal_player": _heal,
@@ -89,7 +98,12 @@ def resolve_intent(intent: TacticalIntent, ctx: CombatContext) -> TacticalDecisi
     handler = handlers.get(intent.intent_id)
     if handler is None:
         return _not_actionable(intent.intent_id, ["INTENT_NOT_SUPPORTED"], "暂不支持该意图。")
-    return handler(intent, ctx, mp_low)
+    decision = handler(intent, ctx, mp_low)
+    if relationship_stage:
+        from app.services.relationship.effect import modulate_decision
+
+        decision = modulate_decision(decision, relationship_stage, ctx)
+    return decision
 
 
 # ---------------------------------------------------------------------------

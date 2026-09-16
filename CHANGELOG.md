@@ -2,7 +2,39 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-14，**286 通过 + 3 冒烟跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-15，**362 通过 + 3 冒烟跳过**）。
+
+## 2026-09-15 — 陪伴对话流式输出（SSE，P1 清账）
+
+- **`LLMClient` 流式能力**：新增 `stream_completion` 迭代器（OpenAI 兼容 `stream=true`，逐段透传 `delta.content` 原始增量、忽略 DeepSeek `reasoning_content`、异常统一包 `LLMClientError`）；`generate_json` 原样不动，非流式路径零改动。
+- **服务层**：`stream_reply` 与 `reply` 共用同一 system prompt 与校验（提取共享 `_validate_dialogue_payload`），流式只是传输层差异；`_ReplyTextStreamExtractor` 从部分 JSON 增量抽取 `reply_text`（缓冲重解码，天然处理 `\n`/`\uXXXX` 转义跨 chunk 分割）。
+- **SSE 端点**：`POST /v1/companion/chat/stream`（请求体复用 `CompanionDialogueRequest`），三种帧——`delta`（文本增量）/ `meta`（权威完整响应）/ `error`（中途故障）。契约以 v0.1 附加附录 A 形式记录（schema 零改动、不升版本）；非流式端点与全部既有契约测试不动、全绿。
+- **回退语义**：LLM 未发出任何 delta 即失败 → 静默回退 mock（`source="fallback"`）与非流式一致；已发 delta 后中断 → `error` 帧、不写记忆（唯一行为差异，已在契约注明）。未登记角色的 404 在 SSE 响应头发出之前抛出。
+- **终端调试台**：`chat_console.py` 默认改走流式端点打字机式输出（meta 帧打印来源/表现 ID 信息行），`--no-stream` 回退旧非流式路径；首字延迟从「整条生成时长」降为「首 token 时长」。
+- **测试**：新增 7 例（流式服务层 4：delta 拼接/转义跨 chunk/白名单拒绝/非法 JSON；SSE API 3：帧形状与 meta 权威字段/战斗场景 422/未知角色 404）。**362 通过 + 3 冒烟跳过**。
+
+
+## 2026-09-15 — SDD Phase 5 US3 自主行为体系（P1 闭环达成：她在没有战斗的时候也活着）
+
+- **测试先行**（T044~T048）：先写五组失败测试再实现——`test_agency_domain.py`（五场景判定/战斗域排除生活行为/禁打断聚合/scene 与内嵌战斗快照矛盾以 scene 为准）、`test_agency_catalog.py`（白名单闭集/域过滤/候选生成/kind 与距离防护/关系阶段调制/YAML 非法报错）、`test_agency_arbiter.py`（六级优先级两两顺序/同级比数值再比稳定序/未知类目丢弃）、`test_agency_throttle.py`（去重窗口/窗口过期/单周期上限/角色隔离/并发安全/reset）、`test_agency_not_actionable.py`（不虚构目标/pickup 仅 item/距离超限丢弃/战斗场景空/禁打断静止）。
+- **指令类型分文件**（T049）：`app/schemas/directives/{combat,movement,interaction,social,routine}.py` 各域 action_type 白名单 Literal，`common.py` 汇总 `DirectiveActionType` 联合与 `KNOWN_ACTION_TYPES`；信封 `action_type` 保持 `str`（白名单校验在目录层），不破坏既有契约。T055（表现块）Phase 2 已完成。
+- **场景判定**（T050）：`app/services/agency/domain.py` 纯函数——`resolve_scene` 透传 UE 上报、`allows_lifestyle`（combat → False）、`no_interrupt_reason`（四种禁打断标志聚合为单一原因名，与策略 YAML 名单对齐）。
+- **行为目录与候选生成**（T051）：`behavior_catalog.py` 参照 tactical/policy 模式加载 `agency_policy.yaml`（revision 升至 `agency-policy-002`，每行为补 `allowed_kinds`/`max_distance_m` 参数约束）；`generate_candidates` 为确定性规则驱动（无 LLM，FR-028 不猜测）——低血/夜晚休整、notable 物件查看、近距物品拾取、首访区域提醒、玩家倒地高优告警、兜底观察；三重不可执行防护：目标 ID 必须在快照、类型在白名单、距离在上限内（FR-025/FR-040）。
+- **跨域仲裁**（T052）：`arbiter.py`——六级优先级（危险自保 > 战斗战术 > 玩家指令 > 剧情事件 > 关系事件 > 日常自主）来自 YAML；同级比 priority 数值再比稳定序；被压制候选保留在 `suppressed` 供可解释。
+- **节流去重禁打断**（T053）：`throttle.py` 进程内（不落盘：语义窗口 300s 远小于进程生命周期，丢失最坏是重复一次行为且 UE 有最终否决权）；键 = (角色, 行为, 目标, 触发源)——同目标不同触发原因不算重复；OrderedDict + Lock + 有界缓存，与心跳限流同款模式。
+- **主入口编排接入**（T054）：`POST /v1/agent/step` 纯心跳路径串联「禁打断 → 候选生成（注入关系阶段）→ 目录校验 → 仲裁 → 节流 → 指令输出」；输出 `DirectiveEnvelope`（source=autonomy，presentation 带 `gaze_target_id`，人设读取失败降级为简短 reply_text）；`policy_revision` 改读策略 YAML。文本指令路径与心跳限流 429 不变；v0.1/v0.2 契约测试零改动全绿。
+- **演示**（T056）：`scripts/mock_ue_flow.py` 新增 US3 分支——营地夜晚休整（directive）、同触发源重复（THROTTLED/DEDUP_WINDOW 静止）、探索查看物件（directive + 注视目标）、剧情演出中（INTERRUPT_FORBIDDEN 静止）。
+- **测试**：新增 44 例（agency 五组 41 + 主入口编排 3，原心跳用例升级为 directive 期望并新增禁打断/节流用例）。**355 通过 + 3 冒烟跳过**。
+
+## 2026-09-14 — SDD Phase 4 US2 关系体系（关系数值/阶段/防刷/阶段化行为差异）
+
+- **测试先行**：先写四组失败测试再实现（章程原则 IV）——`test_relationship_state.py`（阶段边界/钳制/持久化/角色分区）、`test_relationship_rules.py`（增减/冷却防刷/日上限/跨日重置/未知事件忽略）、`test_relationship_effect.py`（同一指令 × ≥3 阶段可区分）、`test_relationship_degradation.py`（损坏隔离/备份恢复/回退初值后服务可用）。
+- **关系状态模型与持久化**（T036/T037）：`app/schemas/relationship.py` + `app/services/relationship/state.py`——按角色分区落盘 `data/relationship/<npc_id>/relationship.json`，原子写入 + `.bak` 单版本备份 + 损坏隔离（`.corrupt`），主文件损坏先恢复备份再回退初值（FR-018），全程服务不中断。
+- **事件驱动规则**（T038）：`rules.py` 从 `data/policy/relationship_policy.yaml` 读事件表（8 类事实事件）；防刷 = 同类事件冷却窗口（`AESIR_RELATIONSHIP_EVENT_COOLDOWN_SECONDS`）+ 每日正向净变化上限（`AESIR_RELATIONSHIP_DAILY_CAP`，负向不受限）；数值钳制边界内。
+- **阶段化行为差异**（T034/T039）：`effect.py` 对战术决策做阶段调制——distant（conservative）维持保守拒绝并追加关系原因码；close（devoted）低蓝下仍为玩家重建护盾动作；close（obedience=low）对危险指令追加抗议码但执行权归 UE。全部差异落在 `reason_codes`（可解释）。v0.2 契约端点（`/v1/tactical/*`）**行为不变**——关系调制以可选参数接入 resolver，完整编排在 Phase 5 主入口（T054）接入。
+- **对话层接线**（T040/T041/T042）：`primary_companion.yaml` 新增 `relationship_stage_personas`（四阶段称呼与语气偏移）；LLM 系统提示注入当前阶段；`/v1/companion/chat` 响应与 `/v1/agent/step` observability 均回带 `relationship_stage`（关系故障降级为空字符串，对话不中断）。
+- **演示**（T043）：`scripts/demo_relationship.py`——同一指令「护住我！」× 4 阶段决策对比；`--events` 附事件计分/防刷/日上限演示。
+- **测试**：新增 25 例（US2 四组 21 + 对话接线 4）。**311 通过 + 3 冒烟跳过**。
 
 ## 2026-09-14 — 终端对话调试台 + B1 人格语料扩充（SDD Phase 1~3 补记见下）
 

@@ -29,7 +29,11 @@ router = APIRouter(prefix="/v1/tactical", tags=["tactical"])
 def _resolve_response(
     request_id: str, intent, combat_context, source: str = "rule"
 ) -> ResolveResponse:
-    """resolve 与组合端点共用的响应组装（决策 + 人设回复 + 观察字段）。"""
+    """resolve 与组合端点共用的响应组装（决策 + 人设回复 + 观察字段）。
+
+    US2 关系调制（T039）不在此接入：v0.2 契约端点保持字节级行为不变，
+    关系阶段化决策编排统一走 /v1/agent/step 主入口（Phase 5 T054）。
+    """
     decision: TacticalDecision = resolve_intent(intent, combat_context)
     policy_backend = get_settings().tactical_policy
     # rl 后端尚未接入：按「规则系统始终保留」原则降级走规则，仅保留标记。

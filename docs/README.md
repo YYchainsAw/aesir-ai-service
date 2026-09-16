@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | [game-design-doc-v0.1.md](planning/game-design-doc-v0.1.md) | AI 队友系统总策划书：愿景、范围、分阶段计划、答辩指标 | 答辩 / 决策 |
 | [aesir-agent-sdd-v1.0.md](planning/aesir-agent-sdd-v1.0.md) | **需求规格说明书 v1.0（SDD 整合版）**：项目章程（7 条核心原则）+ 8 个用户故事 + 45 条功能需求 + 实施计划 + 任务分解 T001~T088 + 质量校验清单。系统定位由「语音→战术命令」升级为「NPC 人格与行为代理」 | 全员 / 答辩 |
+| [todo.md](planning/todo.md) | **待完成 / 待优化清单**：尚未排期的功能补全与体验优化（当前：陪伴对话流式输出） | 全员 |
 
 ## protocols — 协议契约（对外，UE 侧必读）
 
