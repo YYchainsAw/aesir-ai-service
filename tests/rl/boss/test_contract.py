@@ -188,7 +188,7 @@ def test_evaluation_reports_defense_metrics_by_profile() -> None:
         base_seed=21,
     )
     assert report.episodes == 6
-    assert report.simulation_revision == "boss-sim-004"
+    assert report.simulation_revision == "boss-sim-005"
     assert set(report.results_by_profile) == {"aggressive", "defensive", "evasive"}
     assert set(report.metrics_by_profile) == {"aggressive", "defensive", "evasive"}
     assert all(metrics.episodes == 2 for metrics in report.metrics_by_profile.values())

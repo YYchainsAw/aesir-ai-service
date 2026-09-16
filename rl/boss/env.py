@@ -22,6 +22,9 @@ from rl.boss.sim import (
     PLAYER_PROFILES,
 )
 
+EPISODE_SEED_STRATEGY = "gym_rng_per_episode_v1"
+_MAX_EPISODE_SEED = 2**31 - 1
+
 
 class AesirBossEnv(gym.Env):
     """Boss-as-agent environment with optional mixed player profiles."""
@@ -39,6 +42,7 @@ class AesirBossEnv(gym.Env):
             raise ValueError(f"unknown player profile: {profile}")
         self._configured_profile = profile
         self._active_profile = "aggressive" if profile == "mixed" else profile
+        self._active_episode_seed = seed
         self._sim = BossPolicySim(
             seed=seed,
             profile=self._active_profile,
@@ -65,7 +69,15 @@ class AesirBossEnv(gym.Env):
         if requested_profile not in PLAYER_PROFILES:
             raise ValueError(f"unknown player profile: {requested_profile}")
         self._active_profile = requested_profile
-        self._sim.reset(seed=seed, profile=requested_profile)
+        # Explicit seeds reproduce a complete run. Automatic resets derive a
+        # fresh deterministic episode seed from Gym's seeded RNG.
+        episode_seed = (
+            int(seed)
+            if seed is not None
+            else int(self.np_random.integers(0, _MAX_EPISODE_SEED))
+        )
+        self._active_episode_seed = episode_seed
+        self._sim.reset(seed=episode_seed, profile=requested_profile)
         return self._observation(), self._base_info()
 
     def step(self, action: int):
@@ -111,6 +123,8 @@ class AesirBossEnv(gym.Env):
             "feature_names": FEATURE_NAMES,
             "reward_revision": REWARD_REVISION,
             "player_profile": self._active_profile,
+            "episode_seed": self._active_episode_seed,
+            "episode_seed_strategy": EPISODE_SEED_STRATEGY,
         }
 
     def _observation(self) -> np.ndarray:

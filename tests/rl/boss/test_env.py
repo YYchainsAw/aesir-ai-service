@@ -45,7 +45,9 @@ def test_observation_and_reward_terms_are_explicit() -> None:
     assert isinstance(reward, float)
     assert not (terminated and truncated)
     assert info["schema_version"] == SCHEMA_VERSION
-    assert info["simulation_revision"] == "boss-sim-004"
+    assert info["simulation_revision"] == "boss-sim-005"
+    assert info["episode_seed"] == 3
+    assert info["episode_seed_strategy"] == "gym_rng_per_episode_v1"
     assert info["accepted"] is True
     assert "decision_step" in info["reward_terms"]
 
@@ -71,6 +73,25 @@ def test_same_seed_and_profile_are_reproducible() -> None:
         else:
             assert np.array_equal(first[0], second[0])
             assert first[1] == second[1]
+
+
+def test_automatic_resets_use_new_reproducible_episode_seeds() -> None:
+    seed_sequences = []
+    for _ in range(2):
+        env = AesirBossEnv(seed=23, profile="aggressive")
+        _, first_info = env.reset(seed=23)
+        _, second_info = env.reset()
+        _, third_info = env.reset()
+        seed_sequences.append(
+            (
+                first_info["episode_seed"],
+                second_info["episode_seed"],
+                third_info["episode_seed"],
+            )
+        )
+
+    assert seed_sequences[0] == seed_sequences[1]
+    assert len(set(seed_sequences[0])) == len(seed_sequences[0])
 
 
 def test_invalid_action_receives_penalty() -> None:

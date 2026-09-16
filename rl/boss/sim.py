@@ -10,7 +10,7 @@ import random
 
 from rl.boss.contract import BossAction, make_observation
 
-SIMULATION_REVISION = "boss-sim-004"
+SIMULATION_REVISION = "boss-sim-005"
 
 
 @dataclass(frozen=True)

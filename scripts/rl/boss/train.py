@@ -93,7 +93,7 @@ def main() -> None:
         from stable_baselines3.common.env_util import make_vec_env
         from stable_baselines3.common.monitor import Monitor
 
-        from rl.boss.env import AesirBossEnv
+        from rl.boss.env import AesirBossEnv, EPISODE_SEED_STRATEGY
     except ImportError as exc:
         raise SystemExit(
             "RL dependencies are missing. Run: "
@@ -222,6 +222,7 @@ def main() -> None:
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "schema_version": SCHEMA_VERSION,
         "simulation_revision": SIMULATION_REVISION,
+        "episode_seed_strategy": EPISODE_SEED_STRATEGY,
         "simulation_config": asdict(BossSimConfig()),
         "player_profiles": {
             name: asdict(profile) for name, profile in PLAYER_PROFILES.items()

@@ -24,14 +24,14 @@ TensorBoard event files. Example:
 .\.venv\Scripts\python scripts\rl\boss\train.py `
   --timesteps 1000000 --seed 0 --n-envs 8 --eval-episodes 100 `
   --checkpoint-freq 100000 --periodic-eval-freq 100000 `
-  --periodic-eval-episodes 30 --name ppo_boss_schema_v4_sim004_seed_0
+  --periodic-eval-episodes 30 --name ppo_boss_schema_v4_sim005_seed_0
 
 .\.venv\Scripts\python -m tensorboard.main --logdir models\rl\boss\tensorboard
 ```
 
-`boss-sim-004` clamps damage to remaining health and calibrates defensive and
-evasive player profiles so evaluation is not dominated by ceiling results.
-The observation/action contract remains schema v4.
+`boss-sim-005` keeps the effective-damage and calibrated-profile changes from
+sim004, and derives a new reproducible simulator seed for every automatic Gym
+episode reset. The observation/action contract remains schema v4.
 `boss-reward-003` adds an explicit penalty when the player perfect-guards a
 Boss attack.
 
