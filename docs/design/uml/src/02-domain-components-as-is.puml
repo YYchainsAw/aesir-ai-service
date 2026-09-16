@@ -1,0 +1,186 @@
+@startuml 02-domain-components-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: UE-PLAYER-001, UE-ENEMY-001, UE-COMBAT-001, UE-MATCH-001,
+'           UE-AI-001, UE-CMD-001, UE-CHAT-001, UE-VOICE-001, UE-ORDER-001,
+'           UE-BP-PRESENTATION-001, UE-HUD-BP-001, UE-HUD-BP-CONSTRUCT-001,
+'           UE-HUD-BP-FUNCTION-001,
+'           UE-ENEMY-HUD-BP-001, UE-ENEMY-HUD-BP-CALL-001,
+'           UE-LOCKON-HUD-BP-001, UE-LOCKON-HUD-BP-CALL-001,
+'           UE-RESULT-HUD-BP-001, UE-RESULT-HUD-BP-CALL-001,
+'           UE-INPUT-IMC-COMBAT-001, UE-INPUT-IMC-LOCOMOTION-001,
+'           UE-INPUT-ACTIONS-001,
+'           PY-APP-001, PY-ROUTES-001, PY-PARSER-001, PY-TACTICAL-001,
+'           PY-COMPANION-001, PY-SCHEMA-001, PY-DATA-001, PY-RECEIPT-001
+
+title Aesir Combat Prototype — 业务组件（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam ArrowThickness 1.1
+skinparam component {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam package {
+  BackgroundColor #F7F8FA
+  BorderColor #64748B
+  FontColor #1E293B
+}
+skinparam database {
+  BackgroundColor #EAF5EA
+  BorderColor #3C7650
+  FontColor #183B24
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+  FontColor #3F3308
+}
+
+left to right direction
+
+package "Unreal Engine 5.8 客户端" as UE {
+  package "交互与表现" as UEPresentation {
+    component "输入 / HUD / 动画蓝图\n[UE-BP-PRESENTATION-001]\n[UE-INPUT-ACTIONS-001] [UE-INPUT-IMC-COMBAT-001]\n[UE-INPUT-IMC-LOCOMOTION-001]\n[UE-HUD-BP-001] [UE-ENEMY-HUD-BP-001]\n[UE-LOCKON-HUD-BP-001] [UE-RESULT-HUD-BP-001]" as Presentation <<Blueprint>>
+  }
+
+  package "权威战斗域" as UECombat {
+    component "玩家战斗\nAAesirPlayerCharacter\n[UE-PLAYER-001]" as PlayerCombat
+    component "敌人 / Boss 战斗\nAAesirEnemyCharacter\n[UE-ENEMY-001]" as EnemyCombat
+    component "战斗基础组件\nCombat / Health / Poise\nTargeting / CombatState\n[UE-COMBAT-001]" as CombatComponents
+    component "战局结果\nAAesirCombatPrototypeGameMode\n[UE-MATCH-001]" as MatchFlow
+  }
+
+  package "AI 与战术执行域" as UEExecution {
+    component "AI 执行\nAIController / Behavior Tree\n[UE-AI-001]" as AIExecution
+    component "战术订单权威校验\nUTacticalOrderComponent\n[UE-ORDER-001]" as OrderAuthority
+  }
+
+  package "输入与服务接入域" as UEIntegration {
+    component "语音采集\nUVoiceCaptureComponent\n[UE-VOICE-001]" as VoiceCapture
+    component "命令 / 战术 HTTP 网关\nUCommandServiceSubsystem\n[UE-CMD-001]" as CommandGateway
+    component "陪伴对话 HTTP 网关\nUCompanionChatSubsystem\n[UE-CHAT-001]" as ChatGateway
+  }
+
+  PlayerCombat --> CombatComponents : 创建并协调组件
+  EnemyCombat --> CombatComponents : 创建并协调组件
+  PlayerCombat --> EnemyCombat : 锁定、攻击辅助与伤害目标
+  PlayerCombat --> VoiceCapture : 主要玩家 Push-to-talk 已核验
+  PlayerCombat --> CommandGateway : 录音完成后 ParseVoiceCommand
+  AIExecution --> EnemyCombat : Boss 攻击与状态读取
+  MatchFlow --> CombatComponents : 监听玩家/敌人死亡委托
+  MatchFlow --> Presentation : OnCombatEnded 创建结果 Widget\n设置结果、输入状态并暂停
+
+  Presentation --> ChatGateway : WBP 文本聊天调用已核验
+  Presentation --> PlayerCombat : WBP_CombatHUD 获取 HealthComponent\n绑定 OnHealthChanged
+  Presentation --> PlayerCombat : IMC_AesirCombat 映射\n攻击、锁定与闪避输入
+  Presentation --> PlayerCombat : IMC_AesirLocomotion 映射\n移动、视角、姿态与 Push-to-talk
+  EnemyCombat --> Presentation : 持有 EnemyHealthBar / LockOnIndicator\n更新生命与锁定标记可见性
+}
+
+package "Python AI 服务" as Python {
+  component "FastAPI 路由层\n7 组 Router\n[PY-APP-001] [PY-ROUTES-001]" as ApiLayer
+  component "语音与命令理解\ntranscribers / parsers\n[PY-PARSER-001]" as Understanding
+  component "上下文战术决策\nresolver / policy / event_policy\n[PY-TACTICAL-001]" as TacticalDecision
+  component "陪伴对话\ndialogue_service / profile_repository\n[PY-COMPANION-001]" as CompanionDialogue
+  component "协议 Schema\nPydantic models\n[PY-SCHEMA-001]" as Schemas
+  component "执行回执存储\nreceipt_store\n[PY-RECEIPT-001]" as ReceiptStore
+
+  database "配置与数据\n人设 YAML / 策略 YAML\nGolden JSON / 回执 JSONL\n[PY-DATA-001]" as PythonData
+
+  ApiLayer --> Understanding : voice / speech / commands
+  ApiLayer --> TacticalDecision : tactical / combat
+  ApiLayer --> CompanionDialogue : companion/chat
+  ApiLayer --> ReceiptStore : tactical/executions
+  ApiLayer --> Schemas : 请求与响应校验
+  Understanding --> Schemas : 生成受限命令
+  TacticalDecision --> Schemas : 读取上下文 / 生成决策
+  Understanding --> CompanionDialogue : 创建战术确认回复
+  TacticalDecision --> CompanionDialogue : 读取人设化表达
+  Understanding --> PythonData : 读取解析配置
+  TacticalDecision --> PythonData : 读取战术策略
+  CompanionDialogue --> PythonData : 读取同伴人设
+  ReceiptStore --> PythonData : 追加执行回执
+}
+
+CommandGateway --> ApiLayer : 已接入\n/health\n/v1/commands/parse\n/v1/voice/command\n/v1/tactical/resolve
+ChatGateway --> ApiLayer : 已接入\n/v1/companion/chat
+
+note bottom of ApiLayer
+  Python 还提供 /v1/tactical/command、
+  /v1/tactical/executions、/v1/combat/events、
+  /v1/speech/transcribe；当前 UE C++ 接入证据不足，
+  所以没有画成 UE 已接入关系。
+end note
+
+note bottom of OrderAuthority
+  本组件负责最终接受、触发时复核、
+  完成与取消订单；Python 决策不能绕过它。
+
+  当前 BP_AliceCompanion EventGraph 为空，
+  BT_Alice 仅实现跟随玩家，尚无
+  TacticalOrder → AI/技能执行关系。
+  见 GAP-BP-001 / GAP-BP-003。
+end note
+
+note bottom of Presentation
+  已核验 WBP_CompanionChatTest：
+  当前只接入 CompanionChatSubsystem，
+  未发现 VoiceCapture、CommandService
+  或 TacticalOrder 调用。
+
+  已核验 WBP_CombatHUD：构造时获取
+  玩家 HealthComponent，绑定 OnHealthChanged，
+  初始化及变化时调用 SetPlayerHealth；函数以
+  Max(MaxHealth, 1) 保护分母，比例 Clamp 到
+  [0, 1] 后写入 PB_PlayerHealth。
+
+  已核验 WBP_EnemyHealthBar：自身 EventGraph
+  为空，由 BP_AesirEnemyCharacter 初始化并在
+  OnHealthChanged 时调用 SetEnemyHealth。
+
+  已核验 WBP_LockOnIndicator：自身 EventGraph
+  为空；BP_AesirEnemyCharacter 的 override
+  直接控制 Widget Component 可见性。
+
+  已核验 WBP_CombatResult：显示胜负文本；
+  Restart 解除暂停、恢复 GameOnly 输入和隐藏鼠标，
+  然后重载 L_AesirCombatTest。
+
+  已核验 IMC_AesirCombat 的 5 个 Action、
+  10 个键鼠/手柄映射；用户确认全部 Mapping 级
+  Triggers 与 Modifiers 保持默认、无自定义项。
+
+  6 个 Aesir Action 均为 Digital (bool)，
+  Action 级 Triggers / Modifiers 均为 0，
+  其余 Details 设置也已确认为一致。
+
+  用户确认当前使用 IMC_AesirLocomotion；
+  16 个 Action / 29 个键位已核验。
+  当前 Controller 默认 Context 已确认为
+  IMC_AesirLocomotion + IMC_AesirCombat。
+  IA_Move 键盘方向已完整核验：W/S 使用
+  YXZ Swizzle，S/A 使用全轴 Negate，D 无 Modifier。
+  IA_Move_WorldSpace 的方向键采用对应的同套配置。
+end note
+
+note bottom of PlayerCombat
+  主要玩家资产为 BP_AesirPlayer_MM_Reference。
+  已核验 IA_PushToTalk → VoiceRecorder →
+  ParseVoiceCommand；尚未发现 TryAcceptOrder。
+end note
+
+legend bottom
+  |= 表示 |= 含义 |
+  | 实线箭头 | 当前源码可确认的依赖或调用 |
+  | [证据编号] | 对应 evidence/traceability.csv |
+endlegend
+
+@enduml

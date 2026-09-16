@@ -1,0 +1,117 @@
+@startuml 09-voice-tactical-command-to-be
+
+' Model: To-Be
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: DOC-GDD-001, DOC-PROTO-002, UE-VOICE-001, UE-CMD-001,
+'           UE-ORDER-001, PY-API-SPEECH-001, PY-API-TACTICAL-001,
+'           PY-RECEIPT-001
+' Planned gaps: GAP-BP-001, GAP-BP-002, GAP-BP-003
+
+title 语音战术命令端到端目标时序（To-Be）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam participant {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam actor {
+  BackgroundColor #F8E7C4
+  BorderColor #8A5A20
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+}
+
+actor 玩家 as User
+participant "主要玩家 Blueprint" as PlayerBP
+control "UVoiceCaptureComponent\n<<existing>>" as Voice
+control "UCommandServiceSubsystem\n<<partly existing>>" as Gateway
+control "CombatContext Builder\n<<planned>>" as ContextBuilder
+boundary "POST /v1/speech/transcribe\n<<backend existing; UE not connected>>" as SpeechApi
+boundary "POST /v1/tactical/command\n<<backend existing; UE not connected>>" as TacticalApi
+control "Typed Decision Parser / Adapter\n<<planned>>" as Adapter
+control "UTacticalOrderComponent\n<<existing>>" as Order
+control "Alice Ability Executor + GAS\n<<planned>>" as Executor
+boundary "战术反馈 UI\n<<planned>>" as Feedback
+boundary "POST /v1/tactical/executions\n<<backend existing; UE not connected>>" as ReceiptApi
+
+User -> PlayerBP : 按住 Push-to-talk
+PlayerBP -> Voice : StartRecording()
+User -> PlayerBP : 松开 Push-to-talk
+PlayerBP -> Voice : StopRecording()
+Voice --> PlayerBP : OnRecordingFinished(WavData)
+
+PlayerBP -> Gateway : SubmitVoiceTacticalCommand(WavData) <<planned>>
+Gateway -> SpeechApi : multipart WAV + request_id
+SpeechApi --> Gateway : text + confidence + language
+
+alt 转写失败或置信度不足
+  Gateway --> Feedback : 显示失败 / 请求玩家重述
+else 得到可用文本
+  Gateway -> ContextBuilder : CaptureCombatContext()
+  ContextBuilder --> Gateway : CombatContext + encounter_id + snapshot_id
+  Gateway -> TacticalApi : text + CombatContext
+  TacticalApi --> Gateway : ResolveResponse / TacticalDecision
+  Gateway -> Adapter : 解析并校验协议、request/encounter/snapshot
+
+  alt decision 非 actionable 或响应过期
+    Adapter --> Feedback : 显示解释 / 建议 / 澄清
+  else actionable
+    Adapter -> Order : TryAcceptOrder(mapped FTacticalOrder)
+
+    alt 本地订单校验拒绝
+      Order --> Adapter : false + FailureReason
+      Adapter --> Feedback : 显示拒绝原因
+      Adapter -> ReceiptApi : rejected receipt
+    else 订单接受
+      Order --> Adapter : true
+      Adapter --> Feedback : companion_reply + accepted
+      Adapter -> ReceiptApi : accepted receipt
+
+      Executor -> Order : 读取活动订单并等待触发条件
+      Executor -> Order : ValidateActiveOrderAtTrigger(...)
+      alt 触发时复核失败 / 订单过期
+        Order --> Executor : false + FailureReason
+        Executor -> Order : CancelActiveOrder(Reason)
+        Executor -> ReceiptApi : rejected / expired / cancelled receipt
+        Executor --> Feedback : 显示未执行原因
+      else 触发时复核通过
+        Order --> Executor : true
+        Executor -> Executor : GameplayTag → GAS Ability\n检查资源、冷却、状态并激活
+        alt GAS 激活或执行失败
+          Executor -> Order : CancelActiveOrder(Reason)
+          Executor -> ReceiptApi : rejected receipt
+        else 实际能力完成
+          Executor -> Order : CompleteActiveOrder()
+          Executor -> ReceiptApi : executed receipt
+          Executor --> Feedback : 可读执行结果
+        end
+      end
+    end
+  end
+end
+
+note over PlayerBP,Gateway
+  当前 As-Is 已有 Push-to-talk → ParseVoiceCommand；
+  本图改为 v0.2 的“转写 + 上下文决策”目标链路。
+end note
+
+note over Adapter,Executor
+  Python 只提出候选动作；UE 保留最终权威。
+  后端 ability_id 必须经项目映射为 GameplayTag，
+  由 GAS 再检查资源、冷却、标签和合法激活。
+end note
+
+note over Order,Executor
+  这段接线目前尚未实现：Alice EventGraph 为空，
+  BT_Alice 当前只跟随玩家。图中全部明确标为 planned。
+end note
+
+@enduml

@@ -1,0 +1,84 @@
+@startuml 08-deployment-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: UE-CMD-001, UE-CHAT-001, PY-APP-001, PY-ROUTES-001,
+'           PY-DATA-001, PY-DEPLOY-001
+
+title 本地开发部署（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam node {
+  BackgroundColor #F7F8FA
+  BorderColor #64748B
+  FontColor #1E293B
+}
+skinparam component {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam database {
+  BackgroundColor #EAF5EA
+  BorderColor #3C7650
+  FontColor #183B24
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+  FontColor #3F3308
+}
+
+left to right direction
+
+node "开发者 Windows 主机" as Host {
+  node "Unreal Engine 5.8 进程\nAesirCombatPrototype" as UEProcess {
+    component "UCommandServiceSubsystem\nBaseUrl = 127.0.0.1:8011" as CommandGateway
+    component "UCompanionChatSubsystem\nBaseUrl = 127.0.0.1:8001" as ChatGateway
+    component "权威战斗 / AI / UI" as UERuntime
+  }
+
+  node "Python 3.11 虚拟环境" as PythonProcess {
+    component "uvicorn\napp.main:app" as Uvicorn
+    component "FastAPI 路由\nhealth + 6 个 v1 Router" as Api
+    component "规则解析 / 战术策略 / 对话\n默认 parser=rule, tactical=rule\ncompanion=mock, asr=mock" as Services
+    database "本地 data/\nYAML / JSON / JSONL" as Data
+  }
+}
+
+UERuntime --> CommandGateway : 命令、语音与战术请求
+UERuntime --> ChatGateway : 非战斗文本聊天
+
+CommandGateway --> Api : HTTP loopback\n目标端口 8011
+ChatGateway --> Api : HTTP loopback\n目标端口 8001
+
+Uvicorn --> Api : 托管应用
+Api --> Services : 路由到服务层
+Services --> Data : 读取配置 / 追加回执
+
+note bottom of Uvicorn
+  start.bat 与文档默认监听 127.0.0.1:8000；
+  start.bat 可通过第一个参数改端口。
+end note
+
+note bottom of Api
+  当前存在端口配置差异：
+  - CommandService 固定 8011
+  - CompanionChat 固定 8001
+  - Python 默认 8000
+
+  因而单个默认启动实例不能同时满足两个 UE 子系统。
+  这是部署配置缺口，不在 UML 中假装已经统一。
+end note
+
+legend bottom
+  所有进程均部署在同一开发机，通过 127.0.0.1 通信。
+  本图不表示公网服务、容器或独立服务器。
+endlegend
+
+@enduml

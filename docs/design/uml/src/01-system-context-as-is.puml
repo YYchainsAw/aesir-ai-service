@@ -1,0 +1,80 @@
+@startuml 01-system-context-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: DOC-GDD-001, UE-CMD-001, UE-CHAT-001, UE-AUTH-001,
+'           PY-APP-001, PY-API-CMD-001, PY-API-VOICE-001,
+'           PY-API-TACTICAL-001, PY-API-CHAT-001
+
+title Aesir Combat Prototype — 系统上下文（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 14
+skinparam ArrowColor #334155
+skinparam ArrowThickness 1.2
+skinparam actor {
+  BackgroundColor #F8E7C4
+  BorderColor #8A5A20
+  FontColor #422006
+}
+skinparam component {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam rectangle {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam database {
+  BackgroundColor #EAF5EA
+  BorderColor #3C7650
+  FontColor #183B24
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+  FontColor #3F3308
+}
+
+left to right direction
+
+actor "玩家\n[DOC-GDD-001]" as Player
+
+rectangle "**Unreal Engine 5.8 客户端**\nAesir Combat Prototype\n\n采集输入并展示反馈\n权威校验、战斗结算和 AI 行为执行\n[UE-AUTH-001] [UE-AI-001] [UE-CMD-001] [UE-CHAT-001]" as UE
+
+rectangle "**Python AI 服务**\nFastAPI\n\n语音转写、命令理解、上下文战术决策\n生成受限 JSON 和人设化回复\n[PY-APP-001] [PY-PARSER-001] [PY-TACTICAL-001]" as PythonService
+
+database "本地配置与运行数据\nYAML / Golden JSON / JSONL\n[PY-DATA-001]" as LocalData
+
+Player -right-> UE : 操作、文字或语音输入\n以及战斗、HUD 与同伴反馈
+
+UE -right-> PythonService : HTTP 请求 / JSON 响应\n/health\n/v1/commands/parse\n/v1/voice/command\n/v1/tactical/resolve\n/v1/companion/chat
+PythonService -right-> LocalData : 读取 YAML / Golden JSON\n写入运行时 JSONL
+
+note bottom of UE
+  UE 是权威端：
+  最终校验目标、距离、资源、冷却、角色状态，
+  并负责伤害结算与行为执行。
+end note
+
+note bottom of PythonService
+  Python 只负责理解、建议与编排，
+  不直接修改 UE 战斗数值。
+end note
+
+note "端口差异：\n后端文档默认 8000；\nUCommandServiceSubsystem 当前固定 8011；\nUCompanionChatSubsystem 当前固定 8001。\n见 GAP-001 / GAP-002。" as PortGap
+PortGap .. UE
+
+legend right
+  |= 标记 |= 含义 |
+  | 实线 | 当前源码已确认的系统交互 |
+  | [证据编号] | 可在 traceability.csv 追溯 |
+  | GAP-* | 已发现但尚未裁定的实现差异 |
+endlegend
+
+@enduml

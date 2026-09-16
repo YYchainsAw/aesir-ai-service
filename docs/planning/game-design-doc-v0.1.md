@@ -380,7 +380,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 
 | 风险 | 等级 | 缓解措施 |
 | --- | --- | --- |
-| UE 侧进度（当前 0%）阻塞全部端到端验收 | 高 | Python 侧已备 golden 快照 JSON（`data/golden/`）与全链路脚本 `scripts/mock_ue_flow.py`，UE 可直接作 fixture；协议契约与接入指南已就绪 |
+| UE 侧进度阻塞全部端到端验收 | 高 | Python 侧已备 golden 快照 JSON（`data/golden/`）与全链路脚本 `scripts/command_service/mock_ue_flow.py`，UE 可直接作 fixture；协议契约与接入指南已就绪 |
 | LLM 延迟接近 3s 战术预算（实测 0.6–1.4s） | 中 | UE 3s 超时本地取消；`rule_fallback` 回退路径已实现并有测试；高危动作可本地规则立即执行 |
-| RL 结论不可外推到真实战斗 | 中 | RL 文档已声明数值为编造近似，仅作策略间相对比较；上线判定四条件（含真实数值复评）见 `docs/design/rl-feasibility-design.md` §8 |
+| 离线 Boss 模拟结果不能直接代表 UE 实战 | 中 | 保持 UE/Python schema 和动作编号一致，并使用 UE telemetry 在同一玩家画像与种子配置下复评 BT 和 PPO |
 | 策略阈值试玩后需返工 | 低 | 阈值/优先级已迁 `data/policy/tactical_policy.yaml`，调参不改代码、不破坏回归基线 |

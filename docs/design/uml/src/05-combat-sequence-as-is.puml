@@ -1,0 +1,127 @@
+@startuml 05-combat-sequence-as-is
+
+' Model: As-Is
+' UE baseline: dead903156946ec6956342f02d587612baab1717
+' AI service baseline: f548c1ad64c5d284eace084132616d171d45403f
+' Evidence: UE-INPUT-IMC-COMBAT-001, UE-INPUT-LIGHT-001,
+'           UE-INPUT-HEAVY-001, UE-PLAYER-001, UE-TARGETING-001,
+'           UE-COMBAT-001, UE-HEALTH-001, UE-POISE-001,
+'           UE-COMBAT-STATE-001, UE-ENEMY-001, UE-ENEMY-BP-001, UE-MATCH-001,
+'           UE-HUD-BP-HEALTH-001, UE-ENEMY-HUD-BP-CALL-001,
+'           UE-RESULT-HUD-BP-CALL-001
+
+title 玩家近战攻击结算时序（As-Is）
+
+skinparam backgroundColor #FAFAF7
+skinparam shadowing false
+skinparam defaultFontName Microsoft YaHei
+skinparam defaultFontSize 13
+skinparam ArrowColor #334155
+skinparam participant {
+  BackgroundColor #E8F0FE
+  BorderColor #315A93
+  FontColor #172554
+}
+skinparam actor {
+  BackgroundColor #F8E7C4
+  BorderColor #8A5A20
+}
+skinparam note {
+  BackgroundColor #FFF8DB
+  BorderColor #9A7B16
+}
+
+actor 玩家 as User
+boundary "IMC_AesirCombat\nIA_LightAttack / IA_HeavyAttack" as Input
+participant "AAesirPlayerCharacter" as Player
+control "UAesirTargetingComponent" as Targeting
+control "UAesirCombatComponent" as Combat
+boundary "AnimInstance / Montage" as Animation
+participant "BP_AesirEnemyCharacter\n(AAesirEnemyCharacter)" as Enemy
+control "UAesirHealthComponent" as Health
+control "UAesirPoiseComponent" as Poise
+control "UAesirCombatStateComponent" as State
+boundary "WBP_EnemyHealthBar" as HealthBar
+control "AAesirCombatPrototypeGameMode" as GameMode
+boundary "WBP_CombatResult" as ResultUI
+
+User -> Input : 按下轻击或重击键
+Input -> Player : Enhanced Input Started
+
+alt 玩家死亡、受击硬直或正在闪避
+  Player --> Input : 忽略输入
+else 允许攻击
+  Player -> Targeting : GetCurrentTarget()
+  alt 没有锁定目标
+    Player -> Targeting : FindBestTarget(AssistRadius, MaxViewAngle)
+    Targeting --> Player : 最优敌人或 null
+  else 已锁定
+    Targeting --> Player : CurrentTarget
+  end
+
+  Player -> Combat : TryLightAttack() / TryHeavyAttack()
+  Combat -> Animation : Montage_Play(当前连段片段)
+  Animation --> Combat : 播放成功
+  Combat --> Player : OnAttackStateChanged(true)
+  Player -> State : SetCombatState(Attacking)
+
+  Animation -> Combat : NotifyBegin(AttackWindow)
+  Combat -> Combat : BeginAttackTrace()
+
+  loop AttackWindow 每帧
+    Combat -> Combat : 读取武器 TraceStart/TraceEnd Socket
+    Combat -> Enemy : SweepMultiByObjectType(ECC_Pawn)
+    alt 本次攻击尚未命中过该 Actor
+      Combat -> Enemy : ApplyPointDamage(轻/重攻击伤害)
+
+      group UE Damage Event 分发（不声明回调先后）
+        Enemy -> Health : OnTakePointDamage
+        Health --> Enemy : OnHitReceived(Location, Causer, Fatal)
+        Enemy -> Health : OnTakeAnyDamage
+        Health -> Health : Clamp(CurrentHealth - Damage)
+        Health --> Enemy : OnHealthChanged(Current, Max, Delta)
+        Enemy -> HealthBar : SetEnemyHealth(Current, Max)
+      end
+
+      Combat -> Poise : ApplyPoiseDamage(轻/重韧性伤害)
+      alt 韧性降至 0
+        Poise --> Enemy : OnPoiseBroken
+        Enemy -> State : SetCombatState(Stunned)
+        Enemy -> Combat : CancelAttack()
+      end
+
+      alt 生命降至 0
+        Health --> Enemy : OnDeath(Instigator, Causer)
+        Enemy -> State : SetCombatState(Dead)
+        Health --> GameMode : OnDeath(Instigator, Causer)
+        GameMode -> GameMode : RemainingEnemies -= 1
+        opt RemainingEnemies == 0
+          GameMode -> GameMode : FinishCombat(Victory)
+          GameMode --> ResultUI : OnCombatEnded(Victory)
+        end
+      end
+    else 已命中过
+      Combat -> Combat : 跳过重复结算
+    end
+  end
+
+  Animation -> Combat : NotifyEnd(AttackWindow)
+  Combat -> Combat : EndAttackTrace()
+  Animation -> Combat : OnMontageEnded
+  Combat --> Player : OnAttackStateChanged(false)
+  Player -> State : SetCombatState(Combat 或 Idle)
+end
+
+note over Combat,Poise
+  轻/重攻击的生命与韧性数值来自 CombatComponent 配置。
+  MiniBoss 与普通敌人的 Health、Poise 差异目前为临时值，
+  本图不把临时数值固化成领域规则。
+end note
+
+note over Health,GameMode
+  HealthComponent 同时监听 AnyDamage 与 PointDamage：
+  前者扣血并广播 Health/Death，后者广播命中反馈。
+  图只表达因果，不依赖两个引擎委托的具体先后顺序。
+end note
+
+@enduml
