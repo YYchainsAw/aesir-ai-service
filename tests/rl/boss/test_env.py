@@ -45,7 +45,7 @@ def test_observation_and_reward_terms_are_explicit() -> None:
     assert isinstance(reward, float)
     assert not (terminated and truncated)
     assert info["schema_version"] == SCHEMA_VERSION
-    assert info["simulation_revision"] == "boss-sim-003"
+    assert info["simulation_revision"] == "boss-sim-004"
     assert info["accepted"] is True
     assert "decision_step" in info["reward_terms"]
 

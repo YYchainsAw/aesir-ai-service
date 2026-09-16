@@ -83,6 +83,7 @@ class AesirBossEnv(gym.Env):
                 "action_result": events.result,
                 "damage_dealt": events.damage_dealt,
                 "damage_received": events.damage_received,
+                "target_perfect_guarded": events.target_perfect_guarded,
                 "repeat_count": events.repeat_count,
                 "reward_terms": terms,
             }

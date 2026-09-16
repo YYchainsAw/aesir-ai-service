@@ -10,7 +10,7 @@ import random
 
 from rl.boss.contract import BossAction, make_observation
 
-SIMULATION_REVISION = "boss-sim-003"
+SIMULATION_REVISION = "boss-sim-004"
 
 
 @dataclass(frozen=True)
@@ -24,17 +24,18 @@ class PlayerProfile:
     approach_per_step: float
     attack_damage: float
     poise_damage: float
+    perfect_guard_probability: float
 
 
 PLAYER_PROFILES: dict[str, PlayerProfile] = {
     "aggressive": PlayerProfile(
-        "aggressive", 0.78, 0.08, 0.08, 0.14, 0.25, 0.09, 0.065, 0.20
+        "aggressive", 0.78, 0.08, 0.08, 0.14, 0.25, 0.09, 0.065, 0.20, 0.08
     ),
     "defensive": PlayerProfile(
-        "defensive", 0.38, 0.52, 0.08, 0.22, 0.27, 0.055, 0.045, 0.14
+        "defensive", 0.50, 0.40, 0.08, 0.22, 0.27, 0.055, 0.080, 0.19, 0.70
     ),
     "evasive": PlayerProfile(
-        "evasive", 0.42, 0.08, 0.48, 0.36, 0.23, 0.045, 0.05, 0.15
+        "evasive", 0.58, 0.04, 0.36, 0.36, 0.23, 0.045, 0.080, 0.19, 0.18
     ),
 }
 
@@ -137,6 +138,7 @@ class BossStepEvents:
     successful_dodge: bool = False
     successful_defend: bool = False
     interrupted_target: bool = False
+    target_perfect_guarded: bool = False
     repeat_count: int = 1
     reward_terms: dict[str, float] = field(default_factory=dict)
 
@@ -351,10 +353,31 @@ class BossPolicySim:
         }[action]
         if state.target_dodging:
             return
+
+        can_perfect_guard = action in (
+            BossAction.LIGHT_ATTACK,
+            BossAction.HEAVY_ATTACK,
+            BossAction.GAP_CLOSER_SKILL,
+        )
+        if (
+            state.target_blocking
+            and can_perfect_guard
+            and self._rng.random() < self.profile.perfect_guard_probability
+        ):
+            events.target_perfect_guarded = True
+            state.boss_poise += 0.25
+            if state.boss_poise >= 1.0 and not state.boss_dead:
+                state.boss_poise = 0.0
+                state.boss_stunned_steps = self.config.stun_duration_steps
+            return
+
         if state.target_blocking and action == BossAction.LIGHT_ATTACK:
             damage *= 0.2
             state.target_guard_pressure_ratio += 0.20
-        if state.target_blocking and action == BossAction.HEAVY_ATTACK:
+        if state.target_blocking and action in (
+            BossAction.HEAVY_ATTACK,
+            BossAction.GAP_CLOSER_SKILL,
+        ):
             state.target_guard_pressure_ratio += 0.45
             events.interrupted_target = True
 
@@ -362,8 +385,9 @@ class BossPolicySim:
             state.target_guard_pressure_ratio = 0.0
             state.target_blocking = False
 
-        state.target_health_ratio -= damage
-        events.damage_dealt = damage
+        effective_damage = min(damage, max(state.target_health_ratio, 0.0))
+        state.target_health_ratio -= effective_damage
+        events.damage_dealt = effective_damage
 
     def _resolve_player_action(self, action: BossAction, events: BossStepEvents) -> None:
         state = self.state
@@ -377,8 +401,9 @@ class BossPolicySim:
             damage *= 0.2
             events.successful_defend = True
 
-        state.boss_health_ratio -= damage
-        events.damage_received = damage
+        effective_damage = min(damage, max(state.boss_health_ratio, 0.0))
+        state.boss_health_ratio -= effective_damage
+        events.damage_received = effective_damage
         if not events.successful_defend:
             state.boss_poise += self.profile.poise_damage
             if state.boss_poise >= 1.0 and not state.boss_dead:
