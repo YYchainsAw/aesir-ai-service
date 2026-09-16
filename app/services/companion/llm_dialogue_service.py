@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
@@ -17,8 +17,8 @@ from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
-from app.services.memory.retrieval import format_memory_block
-from app.schemas.memory import MemoryEntry
+from app.services.memory.retrieval import format_impression_block, format_memory_block
+from app.schemas.memory import MemoryEntry, TopicImpression
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,11 @@ class _ReplyTextStreamExtractor:
 
 
 class _DialoguePayload(BaseModel):
-    """LLM 可输出的最小对话负载；封套字段由服务端生成。"""
+    """LLM 可输出的最小对话负载；封套字段由服务端生成。
+
+    ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
+    由 LLM 顺带返回，零额外请求。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -110,6 +114,7 @@ class _DialoguePayload(BaseModel):
     gesture_id: str
     facial_expression_id: str
     interruptible: bool = True
+    topics: list[str] = Field(default_factory=list, max_length=3)
 
 
 class LLMCompanionDialogueService:
@@ -123,6 +128,8 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
+        # 最近一次成功生成提取的主题（实例按请求创建，见 dialogue_service）。
+        self.last_topics: list[str] = []
 
     def reply(
         self,
@@ -130,6 +137,7 @@ class LLMCompanionDialogueService:
         *,
         history: tuple[DialogueTurn, ...] = (),
         memories: list[MemoryEntry] = (),
+        impressions: list[TopicImpression] = (),
         relationship_stage: str = "",
     ) -> CompanionDialogueResponse:
         payload = self._client.generate_json(
@@ -137,6 +145,7 @@ class LLMCompanionDialogueService:
                 self._profile,
                 history=history,
                 memories=list(memories),
+                impressions=list(impressions),
                 relationship_stage=relationship_stage,
             ),
             user_prompt=request.text,
@@ -146,6 +155,7 @@ class LLMCompanionDialogueService:
             response_payload = _validate_dialogue_payload(payload, self._profile)
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+        self.last_topics = response_payload.topics
 
         return CompanionDialogueResponse(
             companion_id=request.companion_id,
@@ -164,6 +174,7 @@ class LLMCompanionDialogueService:
         *,
         history: tuple[DialogueTurn, ...] = (),
         memories: list[MemoryEntry] = (),
+        impressions: list[TopicImpression] = (),
         relationship_stage: str = "",
     ) -> Iterator[StreamEvent]:
         """流式变体：先 yield delta（reply_text 增量），最后 yield meta。
@@ -179,6 +190,7 @@ class LLMCompanionDialogueService:
                 self._profile,
                 history=history,
                 memories=list(memories),
+                impressions=list(impressions),
                 relationship_stage=relationship_stage,
             ),
             user_prompt=request.text,
@@ -199,6 +211,7 @@ class LLMCompanionDialogueService:
             response_payload = _validate_dialogue_payload(payload, self._profile)
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+        self.last_topics = response_payload.topics
 
         yield StreamEvent(
             kind="meta",
@@ -233,6 +246,7 @@ def _build_system_prompt(
     *,
     history: tuple[DialogueTurn, ...] = (),
     memories: list[MemoryEntry] | None = None,
+    impressions: list[TopicImpression] | None = None,
     relationship_stage: str = "",
 ) -> str:
     identity = profile.raw.get("identity", {})
@@ -276,6 +290,9 @@ def _build_system_prompt(
     if memories:
         lines.append(format_memory_block(memories, display_name=profile.display_name))
 
+    if impressions:
+        lines.append(format_impression_block(impressions, display_name=profile.display_name))
+
     if history:
         lines.append(
             "Recent conversation with the player (oldest first; continue naturally "
@@ -291,7 +308,9 @@ def _build_system_prompt(
         )
 
     lines += [
-        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible.",
+        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics.",
+        'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
+        '(things worth remembering about them, not your own reply); empty list if nothing salient.',
         f"Allowed emotion_id values: {sorted(profile.allowed_emotion_ids)}.",
         f"Allowed gesture_id values: {sorted(profile.allowed_gesture_ids)}.",
         f"Allowed facial_expression_id values: {sorted(profile.allowed_facial_expression_ids)}.",

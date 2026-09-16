@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     memory_summary_limit: int = 80              # 跨会话经历摘要条数上限
     memory_archive_limit: int = 40              # 长期档案条数上限（承诺/重大事件优先保留）
     memory_injection_budget: int = 12           # 单次生成注入 prompt 的记忆条数预算
+    # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
+    memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
+    memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）
+    memory_impression_min_mentions: int = 3     # 达到该提及次数才注入 prompt
+    memory_impression_injection_share: int = 3  # 单次注入的印象条数份额（不挤占记忆预算）
 
     # -- 心跳（SDD US3 / T002）------------------------------------------------
     # 注：自主行为节流参数在 data/policy/agency_policy.yaml（不在此处）

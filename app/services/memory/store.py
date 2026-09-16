@@ -1,6 +1,7 @@
-"""分级记忆存储（SDD T025 / FR-006~FR-008）。
+"""分级记忆存储（SDD T025 / FR-006~FR-008 + 模糊印象层）。
 
-三级存储（短期 / 摘要 / 档案）+ 容量淘汰 + 原子落盘 + 单版本备份 + 按角色分区。
+四级存储（短期 / 摘要 / 档案 / 模糊印象）+ 容量淘汰 + 原子落盘 + 单版本备份
++ 按角色分区。模糊印象按主题合并计数、权重随半衰期衰减，见 ``topics.py``。
 持久化为本地文件 ``data/memory/<npc_id>/memory.json``（不引入数据库，章程原则 VII）。
 
 故障语义（FR-011 / T030 的降级基础）：
@@ -17,11 +18,32 @@ import threading
 from pathlib import Path
 
 from app.config import get_settings
-from app.schemas.memory import MemoryEntry, MemorySnapshot
+from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
 from app.services.memory.summarizer import summarize_experiences
+from app.services.memory.topics import extract_topics as _extract_topics
+from app.services.memory.topics import impression_weight as _impression_weight
 
 # 淘汰序：重要性越低越先淘汰；同级别按时间越旧越先淘汰（FR-008）
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _days_since(iso_timestamp: str) -> float:
+    """ISO 时间戳距今天数；解析失败按 0（宁可高估印象不强算丢失）。"""
+    from datetime import datetime, timezone
+
+    try:
+        parsed = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds() / 86400.0)
 
 
 class MemoryStoreError(RuntimeError):
@@ -39,6 +61,7 @@ class MemoryStore:
         short_term_limit: int | None = None,
         summary_limit: int | None = None,
         archive_limit: int | None = None,
+        impression_limit: int | None = None,
     ) -> None:
         settings = get_settings()
         self.npc_id = npc_id
@@ -47,6 +70,7 @@ class MemoryStore:
         self._short_term_limit = short_term_limit if short_term_limit is not None else settings.memory_short_term_limit
         self._summary_limit = summary_limit if summary_limit is not None else settings.memory_summary_limit
         self._archive_limit = archive_limit if archive_limit is not None else settings.memory_archive_limit
+        self._impression_limit = impression_limit if impression_limit is not None else settings.memory_impression_limit
         self._lock = threading.Lock()
         self._snapshot = MemorySnapshot()
 
@@ -73,6 +97,80 @@ class MemoryStore:
             return self._snapshot.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
+    def record_mention(self, topics: list[str]) -> None:
+        """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
+
+        正式路径 ``topics`` 由 LLM 顺带返回；空列表直接跳过（如 LLM
+        未返回或本轮无显著主题）。写失败抛 ``MemoryStoreError``，
+        由调用方静默降级（与 ``append_short_term`` 同语义）。
+        """
+        if not topics:
+            return
+        now = _utc_now_iso()
+        with self._lock:
+            self._merge_mentions_locked(topics, now=now)
+            self._evict_impressions_locked()
+            self._persist_locked()
+
+    def migrate_verbatim_to_impressions(self) -> int:
+        """一次性迁移：逐字玩家发言转为主题印象后从短期层移除。
+
+        每条历史发言按一次提及计（频率语义与在线路径一致）。无显著主题的
+        条目也一并移出短期层（不再逐字长期保留）。返回迁移的条数。
+        """
+        with self._lock:
+            dialogue = [
+                entry
+                for entry in self._snapshot.short_term
+                if entry.source == "player_statement" and "dialogue" in entry.tags
+            ]
+            if not dialogue:
+                return 0
+            self._snapshot.short_term = [
+                entry for entry in self._snapshot.short_term if entry not in dialogue
+            ]
+            for entry in dialogue:
+                topics = _extract_topics(entry.content)
+                if topics:
+                    self._merge_mentions_locked(
+                        topics, now=entry.real_time or _utc_now_iso()
+                    )
+            self._evict_impressions_locked()
+            self._persist_locked()
+            return len(dialogue)
+
+    def _merge_mentions_locked(self, topics: list[str], *, now: str) -> None:
+        """按主题合并计数并刷新权重（调用方须持锁）。"""
+        existing = {i.topic: i for i in self._snapshot.impressions}
+        for topic in topics:
+            prior = existing.get(topic)
+            if prior is None:
+                impression = TopicImpression(topic=topic, last_seen=now)
+                self._snapshot.impressions.append(impression)
+                existing[topic] = impression
+                continue
+            prior.mention_count += 1
+            prior.last_seen = now
+            prior.weight = _impression_weight(
+                mention_count=prior.mention_count,
+                last_seen_days_ago=_days_since(prior.last_seen),
+            )
+
+    def _evict_impressions_locked(self) -> None:
+        """超出印象容量时淘汰权重最低的（调用方须持锁）。"""
+        limit = self._impression_limit
+        overflow = len(self._snapshot.impressions) - limit
+        if overflow <= 0:
+            return
+        by_weight = sorted(
+            self._snapshot.impressions,
+            key=lambda i: (i.weight, i.last_seen),
+        )
+        drop = {i.topic for i in by_weight[:overflow]}
+        self._snapshot.impressions = [
+            i for i in self._snapshot.impressions if i.topic not in drop
+        ]
+
     def append_short_term(self, entry: MemoryEntry) -> None:
         """会话内短期上下文：滚动窗口淘汰最旧。"""
         with self._lock:
