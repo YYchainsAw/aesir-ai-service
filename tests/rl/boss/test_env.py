@@ -38,11 +38,14 @@ def test_observation_and_reward_terms_are_explicit() -> None:
     assert observation.dtype == np.float32
     assert env.observation_space.contains(observation)
     assert reset_info["player_profile"] == "defensive"
+    assert env.action_masks().shape == (len(BossAction),)
+    assert env.action_masks().dtype == np.bool_
 
     _, reward, terminated, truncated, info = env.step(BossAction.PURSUE)
     assert isinstance(reward, float)
     assert not (terminated and truncated)
     assert info["schema_version"] == SCHEMA_VERSION
+    assert info["simulation_revision"] == "boss-sim-002"
     assert info["accepted"] is True
     assert "decision_step" in info["reward_terms"]
 
@@ -73,6 +76,7 @@ def test_same_seed_and_profile_are_reproducible() -> None:
 def test_invalid_action_receives_penalty() -> None:
     env = AesirBossEnv(seed=7, profile="aggressive")
     env.reset(seed=7)
-    _, _, _, _, info = env.step(BossAction.HEAVY_ATTACK)
+    env.unwrapped_sim.state.normalized_distance = 0.05
+    _, _, _, _, info = env.step(BossAction.PURSUE)
     assert info["accepted"] is False
     assert info["reward_terms"]["invalid_action"] < 0.0

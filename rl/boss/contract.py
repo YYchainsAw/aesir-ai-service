@@ -62,3 +62,15 @@ def make_observation(values: Iterable[float]) -> tuple[float, ...]:
     ):
         raise ValueError("observation contains values outside the schema-v3 bounds")
     return observation
+
+
+def make_action_mask(values: Iterable[float]) -> tuple[bool, ...]:
+    """Return the seven GAS-aligned action availability flags.
+
+    A fully locked state exposes no legal action. MaskablePPO still needs one
+    selectable action to advance the environment, so all choices are enabled
+    in that case and the simulator ignores the selected action as state-locked.
+    """
+    observation = make_observation(values)
+    mask = tuple(bool(value >= 0.5) for value in observation[-ACTION_COUNT:])
+    return mask if any(mask) else (True,) * ACTION_COUNT

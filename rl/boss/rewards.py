@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from rl.boss.sim import BossStepEvents
 
-REWARD_REVISION = "boss-reward-001"
+REWARD_REVISION = "boss-reward-002"
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class BossRewardWeights:
     interrupt: float = 0.15
     invalid_action: float = -0.25
     repeated_action: float = -0.05
+    repeated_action_penalty_cap: int = 5
     decision_step: float = -0.01
     victory: float = 10.0
     defeat: float = -10.0
@@ -42,7 +43,11 @@ def compute_reward(
     if not events.accepted and events.result != "state_locked":
         terms["invalid_action"] = w.invalid_action
     if events.repeat_count > 2:
-        terms["repeated_action"] = w.repeated_action * (events.repeat_count - 2)
+        repeated_steps = min(
+            events.repeat_count - 2,
+            w.repeated_action_penalty_cap,
+        )
+        terms["repeated_action"] = w.repeated_action * repeated_steps
     if terminal_reason == "boss_victory":
         terms["terminal"] = w.victory
     elif terminal_reason == "boss_defeat":

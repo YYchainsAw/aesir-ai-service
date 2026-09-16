@@ -3,4 +3,5 @@
 # 注：Windows 下 PyPI 的 torch 即 CPU 版；MLP 策略 GPU 收益极小，且避免与 faster-whisper 抢 8GB 显存。
 gymnasium==1.2.3
 stable-baselines3==2.7.1
+sb3-contrib==2.7.1
 torch==2.7.1

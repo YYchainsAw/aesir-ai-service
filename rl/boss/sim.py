@@ -10,6 +10,8 @@ import random
 
 from rl.boss.contract import BossAction, make_observation
 
+SIMULATION_REVISION = "boss-sim-002"
+
 
 @dataclass(frozen=True)
 class PlayerProfile:
@@ -239,16 +241,24 @@ class BossPolicySim:
             BossAction.HEAVY_ATTACK: self.config.heavy_range,
             BossAction.USE_ABILITY: self.config.ability_range,
         }[action]
+        state.boss_attacking = True
+        state.cooldown_steps[action] = {
+            BossAction.LIGHT_ATTACK: 3,
+            BossAction.HEAVY_ATTACK: 7,
+            BossAction.USE_ABILITY: 16,
+        }[action]
+        events.accepted = True
+
         if (
             state.normalized_distance > range_limit
             or not state.has_line_of_sight
             or state.facing_alignment < 0.25
         ):
-            events.result = "invalid_range_or_facing"
+            # GAS accepted and committed the action, but the attack did not
+            # connect. This matches UE more closely than rejecting activation.
+            events.result = "accepted_miss"
             return
 
-        state.boss_attacking = True
-        events.accepted = True
         self._resolve_boss_attack(action, events)
 
     def _resolve_boss_attack(self, action: BossAction, events: BossStepEvents) -> None:
@@ -259,12 +269,6 @@ class BossPolicySim:
             BossAction.HEAVY_ATTACK: 0.16,
             BossAction.USE_ABILITY: 0.21,
         }[action]
-        state.cooldown_steps[action] = {
-            BossAction.LIGHT_ATTACK: 3,
-            BossAction.HEAVY_ATTACK: 7,
-            BossAction.USE_ABILITY: 16,
-        }[action]
-
         if self._rng.random() < profile.evade_probability:
             return
         if state.target_blocking and action == BossAction.LIGHT_ATTACK:

@@ -6,12 +6,20 @@ import json
 from pathlib import Path
 import sys
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from rl.boss.contract import BossAction, FEATURE_NAMES, SCHEMA_VERSION
+from rl.boss.contract import (
+    BossAction,
+    FEATURE_NAMES,
+    SCHEMA_VERSION,
+    make_action_mask,
+)
 from rl.boss.evaluation import evaluate_policy
 from rl.boss.policy import RuleBossPolicy
 from rl.boss.rewards import REWARD_REVISION
+from rl.boss.sim import SIMULATION_REVISION
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,14 +39,19 @@ class PPOBossPolicy:
 
     def select_action(self, observation, state) -> BossAction:
         del state
-        action, _ = self._model.predict(observation, deterministic=True)
+        action_mask = np.asarray(make_action_mask(observation), dtype=np.bool_)
+        action, _ = self._model.predict(
+            observation,
+            deterministic=True,
+            action_masks=action_mask,
+        )
         return BossAction(int(action))
 
 
 def main() -> None:
     args = parse_args()
     try:
-        from stable_baselines3 import PPO
+        from sb3_contrib import MaskablePPO
         from stable_baselines3.common.env_util import make_vec_env
         from stable_baselines3.common.monitor import Monitor
 
@@ -61,7 +74,7 @@ def main() -> None:
         env_kwargs={"profile": "mixed"},
         wrapper_class=Monitor,
     )
-    model = PPO(
+    model = MaskablePPO(
         "MlpPolicy",
         env,
         seed=args.seed,
@@ -85,6 +98,7 @@ def main() -> None:
     )
     manifest = {
         "schema_version": SCHEMA_VERSION,
+        "simulation_revision": SIMULATION_REVISION,
         "feature_names": FEATURE_NAMES,
         "actions": {action.name: action.value for action in BossAction},
         "reward_revision": REWARD_REVISION,

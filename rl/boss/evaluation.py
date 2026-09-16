@@ -6,7 +6,7 @@ import statistics
 
 from rl.boss.policy import BossPolicy
 from rl.boss.rewards import REWARD_REVISION, compute_reward
-from rl.boss.sim import BossPolicySim, PLAYER_PROFILES
+from rl.boss.sim import SIMULATION_REVISION, BossPolicySim, PLAYER_PROFILES
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,7 @@ class EpisodeMetrics:
 class EvaluationReport:
     policy_name: str
     schema_version: int
+    simulation_revision: str
     reward_revision: str
     episodes: int
     boss_win_rate: float
@@ -127,6 +128,7 @@ def evaluate_policy(
     return EvaluationReport(
         policy_name=policy_name,
         schema_version=SCHEMA_VERSION,
+        simulation_revision=SIMULATION_REVISION,
         reward_revision=REWARD_REVISION,
         episodes=len(episodes),
         boss_win_rate=result_counts["boss_victory"] / len(episodes),

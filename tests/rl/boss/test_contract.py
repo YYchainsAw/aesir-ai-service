@@ -9,11 +9,12 @@ from rl.boss.contract import (
     OBSERVATION_HIGH,
     OBSERVATION_LOW,
     SCHEMA_VERSION,
+    make_action_mask,
 )
 from rl.boss.evaluation import evaluate_policy, run_episode
 from rl.boss.policy import RuleBossPolicy
-from rl.boss.rewards import compute_reward
-from rl.boss.sim import BossPolicySim
+from rl.boss.rewards import REWARD_REVISION, BossRewardWeights, compute_reward
+from rl.boss.sim import BossPolicySim, BossStepEvents
 
 
 def test_contract_matches_unreal_schema_v3() -> None:
@@ -49,9 +50,26 @@ def test_action_availability_tracks_stun_and_cooldown() -> None:
 
     sim.state.cooldown_steps[BossAction.DODGE] = 2
     assert sim.state.observation()[13] == 0.0
+    assert make_action_mask(sim.state.observation())[BossAction.DODGE] is False
 
     sim.state.boss_stunned_steps = 2
     assert sim.state.observation()[10:] == (0.0,) * len(BossAction)
+    assert make_action_mask(sim.state.observation()) == (True,) * len(BossAction)
+
+
+def test_repeated_action_penalty_is_capped() -> None:
+    weights = BossRewardWeights()
+    events = BossStepEvents(
+        action=BossAction.HEAVY_ATTACK,
+        accepted=False,
+        result="invalid_range_or_facing",
+        repeat_count=100,
+    )
+    _, terms = compute_reward(events, terminal_reason=None, weights=weights)
+    assert REWARD_REVISION == "boss-reward-002"
+    assert terms["repeated_action"] == pytest.approx(
+        weights.repeated_action * weights.repeated_action_penalty_cap
+    )
 
 
 def test_same_seed_and_profile_are_reproducible() -> None:
@@ -84,12 +102,24 @@ def test_player_profiles_produce_different_trajectories() -> None:
     assert len({tuple(value) for value in trajectories.values()}) == 3
 
 
-def test_invalid_action_has_named_negative_reward() -> None:
+def test_committed_attack_miss_is_accepted_and_starts_cooldown() -> None:
     sim = BossPolicySim(seed=7, profile="aggressive")
     _, events, terminal_reason = sim.step(BossAction.HEAVY_ATTACK)
     reward, terms = compute_reward(events, terminal_reason)
+    assert events.accepted is True
+    assert events.result == "accepted_miss"
+    assert sim.state.cooldown_steps[BossAction.HEAVY_ATTACK] == 7
+    assert "invalid_action" not in terms
+    assert reward < 0.0
+
+
+def test_invalid_movement_action_has_named_negative_reward() -> None:
+    sim = BossPolicySim(seed=7, profile="aggressive")
+    sim.state.normalized_distance = 0.05
+    _, events, terminal_reason = sim.step(BossAction.PURSUE)
+    reward, terms = compute_reward(events, terminal_reason)
     assert events.accepted is False
-    assert events.result == "invalid_range_or_facing"
+    assert events.result == "already_at_goal"
     assert terms["invalid_action"] < 0.0
     assert reward < 0.0
 
@@ -112,6 +142,7 @@ def test_evaluation_reports_defense_metrics_by_profile() -> None:
         base_seed=21,
     )
     assert report.episodes == 6
+    assert report.simulation_revision == "boss-sim-002"
     assert set(report.results_by_profile) == {"aggressive", "defensive", "evasive"}
     assert 0.0 <= report.boss_win_rate <= 1.0
     assert 0.0 <= report.rejected_action_rate <= 1.0

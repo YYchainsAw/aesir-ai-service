@@ -12,9 +12,15 @@ from rl.boss.contract import (
     OBSERVATION_HIGH,
     OBSERVATION_LOW,
     SCHEMA_VERSION,
+    make_action_mask,
 )
 from rl.boss.rewards import REWARD_REVISION, compute_reward
-from rl.boss.sim import BossPolicySim, BossSimConfig, PLAYER_PROFILES
+from rl.boss.sim import (
+    SIMULATION_REVISION,
+    BossPolicySim,
+    BossSimConfig,
+    PLAYER_PROFILES,
+)
 
 
 class AesirBossEnv(gym.Env):
@@ -86,6 +92,13 @@ class AesirBossEnv(gym.Env):
     def render(self):  # pragma: no cover
         return None
 
+    def action_masks(self) -> np.ndarray:
+        """Action mask consumed directly by sb3-contrib MaskablePPO."""
+        return np.asarray(
+            make_action_mask(self._sim.state.observation()),
+            dtype=np.bool_,
+        )
+
     @property
     def unwrapped_sim(self) -> BossPolicySim:
         return self._sim
@@ -93,6 +106,7 @@ class AesirBossEnv(gym.Env):
     def _base_info(self) -> dict[str, Any]:
         return {
             "schema_version": SCHEMA_VERSION,
+            "simulation_revision": SIMULATION_REVISION,
             "feature_names": FEATURE_NAMES,
             "reward_revision": REWARD_REVISION,
             "player_profile": self._active_profile,
