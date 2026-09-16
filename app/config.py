@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）
     memory_impression_min_mentions: int = 3     # 达到该提及次数才注入 prompt
     memory_impression_injection_share: int = 3  # 单次注入的印象条数份额（不挤占记忆预算）
+    memory_impression_salience_boost: float = 2.0  # 郑重声明的等效提及加成（首提即达注入阈值）
+    memory_impression_salient_half_life_days: float = 28.0  # 显著话题半衰期（重要的事遗忘更慢）
 
     # -- 心跳（SDD US3 / T002）------------------------------------------------
     # 注：自主行为节流参数在 data/policy/agency_policy.yaml（不在此处）

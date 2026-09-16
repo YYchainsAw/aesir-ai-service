@@ -97,18 +97,20 @@ class MemoryStore:
             return self._snapshot.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
-    def record_mention(self, topics: list[str]) -> None:
+    def record_mention(self, topics: list[str], *, salient: bool = False) -> None:
         """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
 
         正式路径 ``topics`` 由 LLM 顺带返回；空列表直接跳过（如 LLM
-        未返回或本轮无显著主题）。写失败抛 ``MemoryStoreError``，
-        由调用方静默降级（与 ``append_short_term`` 同语义）。
+        未返回或本轮无显著主题）。``salient`` 为郑重声明（双通道之一）：
+        等效提及加成 + 更长半衰期；主题一旦显著不回退。写失败抛
+        ``MemoryStoreError``，由调用方静默降级（与 ``append_short_term``
+        同语义）。
         """
         if not topics:
             return
         now = _utc_now_iso()
         with self._lock:
-            self._merge_mentions_locked(topics, now=now)
+            self._merge_mentions_locked(topics, now=now, salient=salient)
             self._evict_impressions_locked()
             self._persist_locked()
 
@@ -139,21 +141,28 @@ class MemoryStore:
             self._persist_locked()
             return len(dialogue)
 
-    def _merge_mentions_locked(self, topics: list[str], *, now: str) -> None:
+    def _merge_mentions_locked(
+        self, topics: list[str], *, now: str, salient: bool = False
+    ) -> None:
         """按主题合并计数并刷新权重（调用方须持锁）。"""
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
             prior = existing.get(topic)
             if prior is None:
-                impression = TopicImpression(topic=topic, last_seen=now)
+                impression = TopicImpression(
+                    topic=topic, salient=salient, last_seen=now
+                )
                 self._snapshot.impressions.append(impression)
                 existing[topic] = impression
                 continue
             prior.mention_count += 1
             prior.last_seen = now
+            if salient:
+                prior.salient = True
             prior.weight = _impression_weight(
                 mention_count=prior.mention_count,
                 last_seen_days_ago=_days_since(prior.last_seen),
+                salient=prior.salient,
             )
 
     def _evict_impressions_locked(self) -> None:

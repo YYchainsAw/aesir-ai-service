@@ -68,11 +68,12 @@ def retrieve_impressions(
     now = datetime.now(timezone.utc)
     ranked: list[tuple[float, TopicImpression]] = []
     for impression in snapshot.impressions:
-        if tier_of(impression.mention_count) is None:
+        if tier_of(impression.mention_count, salient=impression.salient) is None:
             continue
         weight = impression_weight(
             mention_count=impression.mention_count,
             last_seen_days_ago=_days_ago(impression.last_seen, now),
+            salient=impression.salient,
         )
         ranked.append((weight, impression))
     ranked.sort(key=lambda pair: pair[0], reverse=True)
@@ -102,7 +103,7 @@ def format_impression_block(
         "relevant, never recite counts):"
     ]
     for impression in impressions:
-        if tier_of(impression.mention_count) == "deep":
+        if tier_of(impression.mention_count, salient=impression.salient) == "deep":
             lines.append(
                 f"- {impression.topic} is something the player often brings up; "
                 f"{display_name} has a deep impression of it."

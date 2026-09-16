@@ -52,6 +52,7 @@ class TopicImpression(BaseModel):
 
     topic: str = Field(min_length=1, max_length=32)
     mention_count: int = Field(default=1, ge=1)
+    salient: bool = False  # 郑重声明过：等效提及加成 + 衰减更慢（一旦显著不回退）
     first_seen: str = Field(default_factory=_utc_now_iso)
     last_seen: str = Field(default_factory=_utc_now_iso)
     weight: float = Field(default=1.0, ge=0.0)

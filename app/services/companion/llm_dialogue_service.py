@@ -115,6 +115,7 @@ class _DialoguePayload(BaseModel):
     facial_expression_id: str
     interruptible: bool = True
     topics: list[str] = Field(default_factory=list, max_length=3)
+    salient: bool = False
 
 
 class LLMCompanionDialogueService:
@@ -128,8 +129,9 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
-        # 最近一次成功生成提取的主题（实例按请求创建，见 dialogue_service）。
+        # 最近一次成功生成提取的主题与显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
+        self.last_salient: bool = False
 
     def reply(
         self,
@@ -156,6 +158,7 @@ class LLMCompanionDialogueService:
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
+        self.last_salient = response_payload.salient
 
         return CompanionDialogueResponse(
             companion_id=request.companion_id,
@@ -212,6 +215,7 @@ class LLMCompanionDialogueService:
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
+        self.last_salient = response_payload.salient
 
         yield StreamEvent(
             kind="meta",
@@ -308,9 +312,12 @@ def _build_system_prompt(
         )
 
     lines += [
-        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics.",
+        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, salient.",
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
         '(things worth remembering about them, not your own reply); empty list if nothing salient.',
+        'salient: true only if the player solemnly declares something important about themselves '
+        'and clearly wants it remembered (e.g. "记住：...", "有件重要的事情告诉你", promises, '
+        'strong likes/dislikes); false for ordinary chat.',
         f"Allowed emotion_id values: {sorted(profile.allowed_emotion_ids)}.",
         f"Allowed gesture_id values: {sorted(profile.allowed_gesture_ids)}.",
         f"Allowed facial_expression_id values: {sorted(profile.allowed_facial_expression_ids)}.",

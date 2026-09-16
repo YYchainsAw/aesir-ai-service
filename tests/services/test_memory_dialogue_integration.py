@@ -68,7 +68,7 @@ def test_dialogue_continues_when_memory_store_fails(monkeypatch, tmp_path) -> No
     """记忆写入故障 → 对话仍正常返回（FR-011：降级不中断）。"""
     from app.services.memory import store as store_module
 
-    def _broken_record(self, topics):
+    def _broken_record(self, topics, **_kwargs):
         raise store_module.MemoryStoreError("模拟写入失败")
 
     monkeypatch.setenv("AESIR_MEMORY_ROOT", str(tmp_path))
@@ -77,6 +77,28 @@ def test_dialogue_continues_when_memory_store_fails(monkeypatch, tmp_path) -> No
     response = _chat("艾莉，今天天气不错。")
     assert response.status_code == 200
     assert response.json()["reply_text"]
+
+
+def test_solemn_statement_archived_verbatim_and_impressed(_fresh_memory) -> None:
+    """双通道：郑重声明逐字入档案（精确复述）+ 主题入印象（显著性加成）。"""
+    _chat("记住：我最讨厌蘑菇。", session_id="s4")
+
+    snapshot = get_memory_store("companion.alice").snapshot()
+    assert any(
+        "蘑菇" in entry.content and entry.importance == "high"
+        for entry in snapshot.archive
+    )
+    salient_topics = [i for i in snapshot.impressions if "蘑菇" in i.topic]
+    assert salient_topics and salient_topics[0].salient is True
+
+
+def test_plain_chat_is_not_archived(_fresh_memory) -> None:
+    """普通闲聊只入印象层，不进档案（档案留给郑重声明/承诺/经历）。"""
+    _chat("钓鱼、钓鱼，还是钓鱼。", session_id="s5")
+
+    snapshot = get_memory_store("companion.alice").snapshot()
+    assert snapshot.archive == []
+    assert all(not i.salient for i in snapshot.impressions)
 
 
 def test_verbatim_migration_converts_statements_to_impressions(_fresh_memory) -> None:

@@ -73,10 +73,26 @@ def impression_weight(
     mention_count: int,
     last_seen_days_ago: float,
     half_life_days: float | None = None,
+    salient: bool = False,
+    salience_boost: float | None = None,
+    salient_half_life_days: float | None = None,
 ) -> float:
-    """主题印象权重：log 增长 × 半衰期衰减。"""
+    """主题印象权重：log 增长 × 半衰期衰减。
+
+    显著性（双通道之一）：郑重提过一次的话题按 ``次数 + salience_boost``
+    计等效提及（首提即达注入阈值），且衰减用更长的半衰期——重要的事
+    遗忘更慢。
+    """
+    settings = get_settings()
     if half_life_days is None:
-        half_life_days = get_settings().memory_impression_half_life_days
+        half_life_days = settings.memory_impression_half_life_days
+    if salience_boost is None:
+        salience_boost = settings.memory_impression_salience_boost
+    if salient:
+        if salient_half_life_days is None:
+            salient_half_life_days = settings.memory_impression_salient_half_life_days
+        half_life_days = max(half_life_days, salient_half_life_days)
+        mention_count = mention_count + salience_boost
     decay = 0.5 ** (max(0.0, last_seen_days_ago) / max(half_life_days, 1e-9))
     return math.log2(1 + max(0, mention_count)) * decay
 
@@ -84,14 +100,39 @@ def impression_weight(
 def tier_of(
     mention_count: int,
     *,
+    salient: bool = False,
     faint_threshold: int | None = None,
     deep_threshold: int = 5,
 ) -> str | None:
-    """注入档位：None（不注入）| faint（有点印象）| deep（印象很深）。"""
+    """注入档位：None（不注入）| faint（有点印象）| deep（印象很深）。
+
+    显著性计入等效提及（``tier_of(1, salient=True)`` 即达 faint）。
+    """
     if faint_threshold is None:
         faint_threshold = get_settings().memory_impression_min_mentions
+    if salient:
+        mention_count = mention_count + get_settings().memory_impression_salience_boost
     if mention_count < faint_threshold:
         return None
     if mention_count >= deep_threshold:
         return "deep"
     return "faint"
+
+
+# 郑重声明线索（规则兜底；正式路径走 LLM 顺带返回的 salient 标记）。
+_SALIENT_CUES = (
+    "记住",
+    "重要",
+    "别忘",
+    "认真",
+    "郑重",
+    "一定要",
+    "我发誓",
+    "答应我",
+    "告诉你",
+)
+
+
+def looks_salient(text: str) -> bool:
+    """规则兜底判定：玩家是否郑重其事地说了什么。"""
+    return any(cue in text for cue in _SALIENT_CUES)

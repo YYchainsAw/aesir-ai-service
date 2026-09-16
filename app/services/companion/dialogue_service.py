@@ -19,7 +19,7 @@ from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
 from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
 from app.services.memory.retrieval import retrieve, retrieve_impressions
-from app.services.memory.topics import extract_topics
+from app.services.memory.topics import extract_topics, looks_salient
 
 
 def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
@@ -52,14 +52,17 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 relationship_stage=stage,
             )
             topics = service.last_topics
+            salient = service.last_salient
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
+            salient = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
+        salient = None
     response.relationship_stage = stage
-    _record_turn(request, response, topics=topics)
+    _record_turn(request, response, topics=topics, salient=salient)
     return response
 
 
@@ -120,7 +123,12 @@ def _stream_llm_reply(
                 emitted_delta = True
                 yield event
                 continue
-            _record_turn(request, event.response, topics=service.last_topics)
+            _record_turn(
+                request,
+                event.response,
+                topics=service.last_topics,
+                salient=service.last_salient,
+            )
             yield _with_stage(event, stage)
             return
     except LLMClientError:
@@ -156,18 +164,24 @@ def _record_turn(
     response: CompanionDialogueResponse,
     *,
     topics: list[str] | None = None,
+    salient: bool | None = None,
 ) -> None:
-    """成功完成一轮后写入会话记忆与模糊印象（与非流式路径相同副作用）。
+    """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    ``topics`` 为 LLM 顺带提取的主题；``None``（mock/回退路径）时退化为
-    规则提取。模糊印象取代了旧「逐字存玩家发言」：长期只留主题印象。
+    双通道：``topics``/``salient`` 为 LLM 顺带返回；``None``（mock/回退
+    路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
+    复述）+ 主题入印象层（等效提及加成、衰减更慢）；普通发言只入印象层。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
     if topics is None:
         topics = extract_topics(request.text)
-    _remember_turn(request.companion_id, topics)
+    if salient is None:
+        salient = looks_salient(request.text)
+    if salient:
+        _remember_fact(request.companion_id, request.text)
+    _remember_turn(request.companion_id, topics, salient=salient)
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
@@ -199,10 +213,25 @@ def _relationship_stage(companion_id: str) -> str:
         return ""
 
 
-def _remember_turn(companion_id: str, topics: list[str]) -> None:
+def _remember_turn(companion_id: str, topics: list[str], *, salient: bool = False) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
-        get_memory_store(companion_id).record_mention(topics)
+        get_memory_store(companion_id).record_mention(topics, salient=salient)
+    except MemoryStoreError:
+        pass
+
+
+def _remember_fact(companion_id: str, player_text: str) -> None:
+    """郑重声明逐字入档案（双通道之一：精确复述用）；写失败静默降级。"""
+    try:
+        get_memory_store(companion_id).record_fact(
+            MemoryEntry(
+                content=player_text,
+                importance="high",
+                source="player_statement",
+                tags=["dialogue", "salient"],
+            )
+        )
     except MemoryStoreError:
         pass
 

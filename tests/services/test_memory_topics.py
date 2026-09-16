@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from app.services.memory.topics import (
     extract_topics,
     impression_weight,
+    looks_salient,
     tier_of,
 )
 
@@ -72,3 +73,38 @@ class TestTierOf:
 
     def test_frequent_mentions_reach_deep_tier(self):
         assert tier_of(mention_count=5) == "deep"
+
+
+# -- 显著性（双通道：郑重声明一次就该被记得）--------------------------------
+class TestSalience:
+    def test_salient_single_mention_beats_normal_single(self):
+        normal = impression_weight(mention_count=1, last_seen_days_ago=0)
+        salient = impression_weight(
+            mention_count=1, last_seen_days_ago=0, salient=True
+        )
+        assert salient > normal
+
+    def test_salient_first_mention_reaches_injection_tier(self):
+        """郑重提过一次 ≈ 等效 3 次普通提及，直接跨过注入阈值。"""
+        assert tier_of(mention_count=1, salient=True) == "faint"
+
+    def test_salient_topic_decays_slower(self):
+        normal = impression_weight(mention_count=3, last_seen_days_ago=14)
+        salient = impression_weight(
+            mention_count=3, last_seen_days_ago=14, salient=True
+        )
+        assert salient > normal
+
+    def test_repeated_normal_mentions_do_not_make_topic_salient(self):
+        assert looks_salient("钓鱼、钓鱼，还是钓鱼") is False
+
+    def test_solemn_cues_flag_salience(self):
+        for text in (
+            "记住：我最讨厌蘑菇。",
+            "有件重要的事情告诉你，我下个月要搬去上海。",
+            "别忘记下周陪我去医院。",
+        ):
+            assert looks_salient(text) is True
+
+    def test_plain_smalltalk_is_not_salient(self):
+        assert looks_salient("今天天气不错") is False
