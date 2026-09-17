@@ -55,8 +55,9 @@ class Settings(BaseSettings):
     # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
     memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
     memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）
-    memory_impression_min_mentions: int = 3     # 达到该提及次数才注入 prompt
-    memory_impression_injection_share: int = 3  # 单次注入的印象条数份额（不挤占记忆预算）
+    memory_impression_inject_weight: float = 0.75  # 注入权重阈值：近期哪怕只提过 1 次也记得，随时间衰减后淡出
+    memory_impression_deep_weight: float = 2.5    # 印象很深的权重阈值（多次提及/郑重声明 + 近期）
+    memory_impression_injection_share: int = 5  # 单次注入的印象条数份额（不挤占记忆预算）
     memory_impression_salience_boost: float = 2.0  # 郑重声明的等效提及加成（首提即达注入阈值）
     memory_impression_salient_half_life_days: float = 28.0  # 显著话题半衰期（重要的事遗忘更慢）
     memory_impression_care_neutral: float = 50.0  # 在意值中性锚点：显著性加成按「偏离该值的程度」缩放（极爱与极厌都最在意）

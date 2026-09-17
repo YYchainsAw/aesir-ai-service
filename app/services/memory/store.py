@@ -23,6 +23,7 @@ from app.services.memory.summarizer import summarize_experiences
 from app.services.memory.topics import extract_topics as _extract_topics
 from app.services.memory.topics import impression_weight as _impression_weight
 from app.services.memory.topics import is_blocked_topic as _is_blocked_topic
+from app.services.memory.topics import looks_like_noise as _looks_like_noise
 
 # 淘汰序：重要性越低越先淘汰；同级别按时间越旧越先淘汰（FR-008）
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
@@ -164,7 +165,7 @@ class MemoryStore:
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
-            if _is_blocked_topic(topic):
+            if _is_blocked_topic(topic) or _looks_like_noise(topic):
                 continue
             effective_boost = salience_boost if salient else None
             prior = existing.get(topic)

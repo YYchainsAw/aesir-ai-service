@@ -486,7 +486,9 @@ def _build_system_prompt(
     lines += [
         "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, salient.",
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
-        '(things worth remembering about them, not your own reply); empty list if nothing salient.',
+        '(things worth remembering about them, not your own reply); each keyword must be a '
+        'concrete noun or topic word (2-6 chars), never connectives, fillers, or fragments '
+        'like 不过/然后/意思; empty list if nothing salient.',
         'salient: true only if the player solemnly declares something important about themselves '
         'and clearly wants it remembered (e.g. "记住：...", "有件重要的事情告诉你", promises, '
         'strong likes/dislikes); false for ordinary chat.',

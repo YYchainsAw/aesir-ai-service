@@ -1,8 +1,9 @@
 """模糊印象层（主题 × 提及频率）单元测试。
 
-设计：真人不会逐字记住所有对话，但对反复出现的主题形成强印象。
+设计：真人不会逐字记住所有对话，但近期聊过的都记得，随时间衰减。
 - 每次提及 count+1；权重 = log2(1+次数) × 半衰期时间衰减；
-- 次数不足阈值（默认 3）不注入——只提过一两次的闲聊不留印象；
+- 注入按权重阈值（默认 0.75）：近期哪怕只提过 1 次也注入，3 天左右淡出；
+- 提及越频繁、越郑重（显著性/在意值），存活越久；
 - 长期不提自然淡忘（weight 随半衰期减半）。
 """
 
@@ -15,6 +16,7 @@ from app.services.memory.topics import (
     extract_topics,
     impression_weight,
     is_blocked_topic,
+    looks_like_noise,
     looks_salient,
     tier_of,
 )
@@ -64,6 +66,25 @@ class TestTopicBlacklist:
         assert "艾莉" not in extract_topics("艾莉，我们聊聊钓鱼吧")
 
 
+# -- 口语噪声碎片（连接词 / 应付词 / 语气词尾巴不构成话题）------------------
+class TestNoiseTopics:
+    def test_connective_fragments_are_noise(self):
+        # 迁移实测出现过的碎片：LLM 顺带返回了「不过」「趁天」「意思呀」。
+        for topic in ("不过", "趁天", "意思呀", "正好", "然后"):
+            assert looks_like_noise(topic) is True
+
+    def test_real_topics_are_not_noise(self):
+        for topic in ("钓鱼", "上海搬家", "下周去医院复查", "不过如此"):
+            assert looks_like_noise(topic) is False
+
+    def test_modal_particle_tails_are_noise(self):
+        assert looks_like_noise("挺好吧") is True
+        assert looks_like_noise("去钓鱼呀") is False  # 语气词结尾但内容够长
+
+    def test_single_char_is_noise(self):
+        assert looks_like_noise("鱼") is True
+
+
 # -- 强化与衰减 -------------------------------------------------------------
 class TestImpressionWeight:
     def test_weight_grows_logarithmically_with_count(self):
@@ -85,16 +106,30 @@ class TestImpressionWeight:
         )
 
 
-# -- 阈值分档（注入口吻）---------------------------------------------------
+# -- 阈值分档（权重 × 衰减判定注入口吻）-------------------------------------
 class TestTierOf:
-    def test_below_threshold_is_not_injected(self):
-        assert tier_of(mention_count=2) is None
+    def test_recent_single_mention_is_injected(self):
+        """近期哪怕只提过一次的闲聊也记得（用户语义：时间不过太久就记得）。"""
+        assert tier_of(mention_count=1, last_seen_days_ago=0.0) == "faint"
 
-    def test_threshold_reaches_faint_tier(self):
-        assert tier_of(mention_count=3) == "faint"
+    def test_yesterday_single_mention_still_remembered(self):
+        assert tier_of(mention_count=1, last_seen_days_ago=1.0) == "faint"
 
-    def test_frequent_mentions_reach_deep_tier(self):
-        assert tier_of(mention_count=5) == "deep"
+    def test_stale_single_mention_fades_out(self):
+        """3 天前提过一次的闲聊淡出到阈值以下（默认半衰期 7 天）。"""
+        assert tier_of(mention_count=1, last_seen_days_ago=3.0) is None
+
+    def test_frequent_mentions_survive_longer_than_single(self):
+        """提及频率强化存活：1 次的 3 天淡出，5 次的 3 天仍在。"""
+        assert tier_of(mention_count=1, last_seen_days_ago=3.0) is None
+        assert tier_of(mention_count=5, last_seen_days_ago=3.0) is not None
+
+    def test_frequent_recent_mentions_reach_deep_tier(self):
+        assert tier_of(mention_count=5, last_seen_days_ago=0.0) == "deep"
+
+    def test_frequent_stale_mentions_fade_out_too(self):
+        """哪怕提过很多次，长期不再提及也会淡忘（约 2 周半衰期后）。"""
+        assert tier_of(mention_count=9, last_seen_days_ago=60.0) is None
 
 
 # -- 显著性（双通道：郑重声明一次就该被记得）--------------------------------
@@ -106,9 +141,10 @@ class TestSalience:
         )
         assert salient > normal
 
-    def test_salient_first_mention_reaches_injection_tier(self):
-        """郑重提过一次 ≈ 等效 3 次普通提及，直接跨过注入阈值。"""
-        assert tier_of(mention_count=1, salient=True) == "faint"
+    def test_salient_first_mention_survives_longer_than_trivial(self):
+        """郑重提过一次（等效 3 次提及 + 28 天长半衰期）淡忘远慢于闲聊。"""
+        assert tier_of(mention_count=1, salient=True, last_seen_days_ago=7.0) == "faint"
+        assert tier_of(mention_count=1, last_seen_days_ago=7.0) is None
 
 
 # -- 在意值缩放（太不喜欢也是在意的一部分）---------------------------------
@@ -129,16 +165,44 @@ class TestCareScale:
         assert care_scale(70) == care_scale(30)
 
     def test_scaled_boost_moves_tier_with_care(self):
-        """在意深 → 加成大：同样首提郑重声明，档位随在意值提升。"""
+        """在意深 → 加成大：同样首提郑重声明，档位随在意值提升、淡出更晚。"""
         settings_boost = 2.0
-        indifferent = tier_of(
-            1, salient=True, salience_boost=settings_boost * care_scale(50)
+        # 刚声明时：无感只是有点印象（加成 0.5），极在意首提即 deep（加成 4.0）。
+        assert (
+            tier_of(
+                1,
+                salient=True,
+                salience_boost=settings_boost * care_scale(50),
+            )
+            == "faint"
         )
-        devoted = tier_of(
-            1, salient=True, salience_boost=settings_boost * care_scale(100)
+        assert (
+            tier_of(
+                1,
+                salient=True,
+                salience_boost=settings_boost * care_scale(100),
+            )
+            == "deep"
         )
-        assert indifferent is None  # 无感：1 + 0.5 = 1.5 < 3，不注入
-        assert devoted == "deep"  # 极在意：1 + 4 = 5，首提即 deep
+        # 25 天后：无感的淡出，极在意的仍有点印象（加成把存活期拉长）。
+        assert (
+            tier_of(
+                1,
+                last_seen_days_ago=25.0,
+                salient=True,
+                salience_boost=settings_boost * care_scale(50),
+            )
+            is None
+        )
+        assert (
+            tier_of(
+                1,
+                last_seen_days_ago=25.0,
+                salient=True,
+                salience_boost=settings_boost * care_scale(100),
+            )
+            == "faint"
+        )
 
     def test_salient_topic_decays_slower(self):
         normal = impression_weight(mention_count=3, last_seen_days_ago=14)

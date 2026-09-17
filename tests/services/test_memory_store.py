@@ -53,20 +53,76 @@ def test_record_mention_filters_blacklisted_topics(store: MemoryStore) -> None:
     assert [i.topic for i in snapshot.impressions] == ["钓鱼"]
 
 
-def test_record_mention_persists_care_scaled_boost(store: MemoryStore) -> None:
-    """郑重声明的等效提及加成（在意值缩放后）持久化，检索按其分档。"""
+def test_record_mention_filters_noise_fragments(store: MemoryStore) -> None:
+    """合并入口统一过滤口语噪声：LLM 顺带返回「不过」「意思呀」也不入印象。"""
+    store.record_mention(["钓鱼", "不过", "意思呀", "趁天"])
+    snapshot = store.snapshot()
+    assert [i.topic for i in snapshot.impressions] == ["钓鱼"]
+
+
+def test_record_mention_persists_care_scaled_boost(
+    store: MemoryStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """郑重声明的等效提及加成（在意值缩放后）持久化，检索按其分档。
+
+    提高注入权重阈值到 2.0 隔离「近期闲聊也记得」的默认语义，专测加成
+    档位随在意值分档：无感加成 0.5（权重 1.32）不入注入，极在意加成
+    4.0（权重 2.59）首提即 deep。
+    """
+    monkeypatch.setenv("AESIR_MEMORY_IMPRESSION_INJECT_WEIGHT", "2.0")
+
     from app.services.memory.retrieval import retrieve_impressions
 
-    # 无感时缩放后的加成 0.5：1 + 0.5 = 1.5 < 3，声明不入注入档。
+    # 无感时缩放后的加成 0.5：权重 1.32 < 2.0，声明不入注入档。
     store.record_mention(["搬家"], salient=True, salience_boost=0.5)
     assert retrieve_impressions(store) == []
 
-    # 极在意时缩放后的加成 4.0：1 + 4 = 5，首提即 deep。
+    # 极在意时缩放后的加成 4.0：首提即 deep。
     store.record_mention(["上海"], salient=True, salience_boost=4.0)
     ranked = retrieve_impressions(store)
     assert [i.topic for i in ranked] == ["上海"]
     shanghai = next(i for i in store.snapshot().impressions if i.topic == "上海")
     assert shanghai.salience_boost == 4.0
+
+
+def test_recent_single_mention_is_retrieved(store: MemoryStore) -> None:
+    """近期单次提及的闲聊也进检索（用户语义：时间不过太久就记得）。"""
+    from app.services.memory.retrieval import retrieve_impressions
+
+    store.record_mention(["钓鱼"])
+    ranked = retrieve_impressions(store)
+    assert [i.topic for i in ranked] == ["钓鱼"]
+
+
+def test_stored_noise_fragments_are_not_retrieved(store: MemoryStore) -> None:
+    """检索侧兜底：旧数据里已落的噪声碎片（不过 / 意思呀）不再注入。"""
+    from app.services.memory.retrieval import retrieve_impressions
+
+    store.record_mention(["钓鱼"])
+    with store._lock:
+        store._snapshot.impressions.append(
+            type(store._snapshot.impressions[0])(topic="不过")
+        )
+    assert [i.topic for i in retrieve_impressions(store)] == ["钓鱼"]
+
+
+def test_stale_single_mention_fades_out_of_retrieval(
+    store: MemoryStore,
+) -> None:
+    """三天前的单次提及淡出检索；再提一次（当天）又被记起。"""
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.memory.retrieval import retrieve_impressions
+
+    store.record_mention(["钓鱼"])
+    # snapshot() 返回深拷贝，直接改存储内部状态的 last_seen 模拟「3 天没提」。
+    with store._lock:
+        store._snapshot.impressions[0].last_seen = (
+            datetime.now(timezone.utc) - timedelta(days=3)
+        ).isoformat(timespec="seconds").replace("+00:00", "Z")
+    assert retrieve_impressions(store) == []
+    store.record_mention(["钓鱼"])
+    assert [i.topic for i in retrieve_impressions(store)] == ["钓鱼"]
 
 
 def test_salience_boost_takes_max_not_retreat(store: MemoryStore) -> None:

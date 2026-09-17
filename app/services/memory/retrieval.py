@@ -15,7 +15,7 @@ from typing import Protocol
 
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.config import get_settings
-from app.services.memory.topics import impression_weight, tier_of
+from app.services.memory.topics import impression_weight, looks_like_noise, tier_of
 
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
 
@@ -68,9 +68,13 @@ def retrieve_impressions(
     now = datetime.now(timezone.utc)
     ranked: list[tuple[float, TopicImpression]] = []
     for impression in snapshot.impressions:
+        if looks_like_noise(impression.topic):  # 旧数据里已落的噪声碎片不再注入
+            continue
+        days_ago = _days_ago(impression.last_seen, now)
         if (
             tier_of(
                 impression.mention_count,
+                last_seen_days_ago=days_ago,
                 salient=impression.salient,
                 salience_boost=impression.salience_boost,
             )
@@ -79,7 +83,7 @@ def retrieve_impressions(
             continue
         weight = impression_weight(
             mention_count=impression.mention_count,
-            last_seen_days_ago=_days_ago(impression.last_seen, now),
+            last_seen_days_ago=days_ago,
             salient=impression.salient,
             salience_boost=impression.salience_boost,
         )
@@ -102,26 +106,38 @@ def _days_ago(iso_timestamp: str, now: datetime) -> float:
 def format_impression_block(
     impressions: list[TopicImpression], display_name: str = "她"
 ) -> str:
-    """把模糊印象格式化为注入 LLM prompt 的文本块（档位化口吻）。"""
+    """把模糊印象格式化为注入 LLM prompt 的文本块（档位化口吻）。
+
+    口吻按档位与近期程度区分：deep（印象很深）> 近期刚聊过（哪怕只提过
+    一次）> 久远的模糊印象。指令要求自然带出（近期话题可主动提及拉回），
+    绝不逐字背诵、不复述次数。
+    """
     if not impressions:
         return ""
+    now = datetime.now(timezone.utc)
     lines = [
         f"Fuzzy impressions of the player's recurring topics ({display_name} "
-        "does not recall them word for word; weave them in naturally only when "
-        "relevant, never recite counts):"
+        "does not recall them word for word; weave them in naturally when "
+        "relevant, never recite counts; topics talked about recently may be "
+        "brought up first as a natural callback):"
     ]
     for impression in impressions:
-        if (
-            tier_of(
-                impression.mention_count,
-                salient=impression.salient,
-                salience_boost=impression.salience_boost,
-            )
-            == "deep"
-        ):
+        days_ago = _days_ago(impression.last_seen, now)
+        tier = tier_of(
+            impression.mention_count,
+            last_seen_days_ago=days_ago,
+            salient=impression.salient,
+            salience_boost=impression.salience_boost,
+        )
+        if tier == "deep":
             lines.append(
                 f"- {impression.topic} is something the player often brings up; "
                 f"{display_name} has a deep impression of it."
+            )
+        elif days_ago <= 1.0:
+            lines.append(
+                f"- {display_name} was talking with the player about "
+                f"{impression.topic} recently ({_recency_phrase(days_ago)})."
             )
         else:
             lines.append(
@@ -129,6 +145,12 @@ def format_impression_block(
                 f"{impression.topic} more than once."
             )
     return "\n".join(lines)
+
+
+def _recency_phrase(days_ago: float) -> str:
+    if days_ago < 0.5:
+        return "today"
+    return "yesterday or the day before"
 
 
 def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -> str:
