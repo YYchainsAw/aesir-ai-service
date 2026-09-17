@@ -178,6 +178,12 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 正式训练会额外生成 TensorBoard 日志、周期 Checkpoint、周期评估结果和最佳模型；
 最终 manifest 同时记录总体指标及每种玩家画像的胜率、伤害与动作分布。
 
+冻结后的 Boss 策略由独立服务提供推理，不与玩家指令服务混合：
+
+```powershell
+.\.venv\Scripts\python scripts\rl\boss\serve.py  # http://127.0.0.1:8012
+```
+
 目录边界与旧实验说明见 [`rl/README.md`](rl/README.md)。RL 尚未接入 HTTP 推理路径；后续会通过独立 Boss policy adapter 接入，而不是混进玩家指令解析器。
 
 ## 测试

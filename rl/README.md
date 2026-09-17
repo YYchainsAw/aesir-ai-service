@@ -41,3 +41,18 @@ hyperparameters are explicit CLI options and are copied into the manifest.
 logging enabled for formal runs.
 
 The command service in `app/` never imports this package.
+
+## Frozen runtime inference
+
+The Boss policy is served separately from the companion command service. The
+default deployment artifact is
+`models/rl/boss/deployment/boss_policy_schema_v4_sim005.zip`.
+
+```powershell
+.\.venv\Scripts\python scripts\rl\boss\serve.py
+```
+
+This starts `aesir-boss-policy-service` on `http://127.0.0.1:8012`.
+`POST /v1/boss/policy/decide` accepts the schema-v4 26-value observation and
+returns one high-level action. Unreal still performs GAS legality checks and
+automatically falls back to the Behavior Tree after repeated service failures.
