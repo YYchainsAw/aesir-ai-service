@@ -73,3 +73,13 @@ def _isolate_relationship_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Non
     relationship_state_module.reset_relationship_stores()
     yield
     relationship_state_module.reset_relationship_stores()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dialogue_signals_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """对话信号埋点隔离：测试的 JSONL 一律落临时目录，不污染真实信号数据。
+
+    信号数据是 RL 前置资产，混入测试 mock 回复会污染日后训练/分析。
+    """
+    monkeypatch.setenv("AESIR_DIALOGUE_SIGNALS_DIR", str(tmp_path / "signals"))
+    yield

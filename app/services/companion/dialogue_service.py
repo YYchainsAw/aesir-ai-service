@@ -15,6 +15,7 @@ from app.services.companion.profile_repository import (
     UnknownCompanionError,
     get_profile,
 )
+from app.services.companion.dialogue_signals import record_turn_signal
 from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
 from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
@@ -63,7 +64,13 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         topics = None
         salient = None
     response.relationship_stage = stage
-    _record_turn(request, response, topics=topics, salient=salient)
+    _record_turn(
+        request,
+        response,
+        topics=topics,
+        salient=salient,
+        injected_topics=[i.topic for i in impressions],
+    )
     return response
 
 
@@ -130,6 +137,7 @@ def _stream_llm_reply(
                 event.response,
                 topics=service.last_topics,
                 salient=service.last_salient,
+                injected_topics=[i.topic for i in impressions],
             )
             yield _with_stage(event, stage)
             return
@@ -167,6 +175,7 @@ def _record_turn(
     *,
     topics: list[str] | None = None,
     salient: bool | None = None,
+    injected_topics: list[str] | None = None,
 ) -> None:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
@@ -174,9 +183,11 @@ def _record_turn(
     路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
     复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；普通
     发言只入印象层。艾莉自己的回复也提取主题入印象（非显著）——她记得
-    自己说过什么，反复谈起的话题同样形成印象。
+    自己说过什么，反复谈起的话题同样形成印象。``injected_topics`` 为
+    本轮注入 prompt 的印象主题（埋点用，见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
+    prior_history = memory.history(request.session_id) if request.session_id else ()
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
     if topics is None:
@@ -194,6 +205,23 @@ def _record_turn(
         # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
         _remember_turn(request.companion_id, reply_topics, origin="companion")
+
+    # 信号埋点（RL 前置）：先用记录前的会话历史算复读度/话题延续，再落 JSONL；
+    # 任何故障静默（绝不阻塞对话）。
+    record_turn_signal(
+        request.companion_id,
+        request.session_id,
+        player_text=request.text,
+        reply_text=response.reply_text,
+        source=response.source or "mock",
+        emotion_id=response.emotion_id,
+        gesture_id=response.gesture_id,
+        facial_expression_id=response.facial_expression_id,
+        game_state=request.game_state,
+        injected_topics=injected_topics,
+        previous_player_texts=[t.user_text for t in prior_history],
+        previous_reply_texts=[t.reply_text for t in prior_history],
+    )
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:

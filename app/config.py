@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # -- 回执与 LLM Provider -------------------------------------------------
     receipts_dir: str = "data/runtime/command_service/executions"
+    dialogue_signals_dir: str = "data/runtime/dialogue_signals"  # 对话信号埋点（RL 前置数据，JSONL 按角色分文件）
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
     llm_model: str = Field(default="", alias="LLM_MODEL")
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
