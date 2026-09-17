@@ -704,3 +704,21 @@ v0.1 完全一致，属附加式扩展、不升版本。
   只读查证工具**查证本轮快照**再作答，不用过期状态（US6 验收场景 3）。
 - 建议传法：UE 发起对话时附带当前快照（与心跳同一份即可）；不传时上述三类
   问题她将明确表示「说不清」，而不是凭印象编。
+
+### 附加扩展（2026-09-17）：语音陪伴对话 `POST /v1/companion/chat/voice`
+
+`/v1/companion/chat` 的**语音入口**：multipart 音频 → ASR 转写 → 既有对话
+链路（记忆 / 关系 / 信号埋点全部生效）。与 `POST /v1/voice/command` 同款
+模式，尾部接陪伴对话而非战术指令解析。
+
+- **请求**（multipart/form-data）：`audio`（WAV 16kHz / 单声道 / 16bit，同
+  `/v1/speech/transcribe` 约定）+ `companion_id`（默认 `companion.alice`）+
+  `game_state`（`exploration|conversation`，默认前者）+ 可选 `session_id` +
+  可选 `world_context_json`（`WorldContext` 的 JSON 字符串，同上）。
+- **响应**：`CompanionDialogueResponse` 全部字段 + `transcribed_text`（ASR
+  转写文本，供 UE 展示「你说了什么」与调试转写质量）。
+- **错误语义**：转写后端故障 → 502；未识别出语音内容 → 422（对话里「听错
+  还硬答」比「明确听不清」更糟，**不**回退 mock 文本）；参数非法 → 422；
+  未登记角色 → 404。
+- `AESIR_ASR_BACKEND` 与转写端点共用：`mock` 返回 `AESIR_ASR_MOCK_TEXT`，
+  `faster_whisper` 走真实本机 Whisper。
