@@ -5,8 +5,9 @@ This directory is isolated from the Unreal command service in `app/`.
 ## `rl/boss/`
 
 Boss-as-agent research for the semester defense. It mirrors Unreal observation
-schema v2 and `EAesirBossAction`, contains the deterministic training simulator,
+schema v4 and `EAesirBossAction`, contains the deterministic training simulator,
 reward terms, Behavior Tree-style baseline, Gymnasium environment, and metrics.
+Training uses `sb3-contrib` MaskablePPO so GAS-unavailable actions are excluded.
 
 Commands:
 
@@ -15,4 +16,43 @@ Commands:
 .\.venv\Scripts\python scripts\rl\boss\train.py --timesteps 20000
 ```
 
+Formal training writes the final model and manifest plus periodic checkpoints,
+balanced per-profile evaluation metrics, a best periodic-evaluation model, and
+TensorBoard event files. Example:
+
+```powershell
+.\.venv\Scripts\python scripts\rl\boss\train.py `
+  --timesteps 1000000 --seed 0 --n-envs 8 --eval-episodes 100 `
+  --checkpoint-freq 100000 --periodic-eval-freq 100000 `
+  --periodic-eval-episodes 30 --name ppo_boss_schema_v4_sim005_seed_0
+
+.\.venv\Scripts\python -m tensorboard.main --logdir models\rl\boss\tensorboard
+```
+
+`boss-sim-005` keeps the effective-damage and calibrated-profile changes from
+sim004, and derives a new reproducible simulator seed for every automatic Gym
+episode reset. The observation/action contract remains schema v4.
+`boss-reward-003` adds an explicit penalty when the player perfect-guards a
+Boss attack.
+
+Use `--resume <checkpoint.zip>` to continue an interrupted run. PPO
+hyperparameters are explicit CLI options and are copied into the manifest.
+`--disable-tensorboard` exists only for lightweight smoke tests; keep event
+logging enabled for formal runs.
+
 The command service in `app/` never imports this package.
+
+## Frozen runtime inference
+
+The Boss policy is served separately from the companion command service. The
+default deployment artifact is
+`models/rl/boss/deployment/boss_policy_schema_v4_sim005.zip`.
+
+```powershell
+.\.venv\Scripts\python scripts\rl\boss\serve.py
+```
+
+This starts `aesir-boss-policy-service` on `http://127.0.0.1:8012`.
+`POST /v1/boss/policy/decide` accepts the schema-v4 26-value observation and
+returns one high-level action. Unreal still performs GAS legality checks and
+automatically falls back to the Behavior Tree after repeated service failures.
