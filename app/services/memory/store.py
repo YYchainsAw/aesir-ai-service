@@ -100,7 +100,12 @@ class MemoryStore:
 
     # -- 写入 ---------------------------------------------------------------
     def record_mention(
-        self, topics: list[str], *, salient: bool = False, salience_boost: float | None = None
+        self,
+        topics: list[str],
+        *,
+        salient: bool = False,
+        salience_boost: float | None = None,
+        origin: str = "player",
     ) -> None:
         """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
 
@@ -117,7 +122,8 @@ class MemoryStore:
         now = _utc_now_iso()
         with self._lock:
             self._merge_mentions_locked(
-                topics, now=now, salient=salient, salience_boost=salience_boost
+                topics, now=now, salient=salient,
+                salience_boost=salience_boost, origin=origin
             )
             self._evict_impressions_locked()
             self._persist_locked()
@@ -156,12 +162,15 @@ class MemoryStore:
         now: str,
         salient: bool = False,
         salience_boost: float | None = None,
+        origin: str = "player",
     ) -> None:
         """按主题合并计数并刷新权重（调用方须持锁）。
 
         黑名单主题统一在此过滤——LLM 顺带返回、规则提取、迁移脚本三条
         路径都汇到本入口。显著话题的 ``salience_boost`` 取历史最大值：
         在意加深可以强化，淡化不回退（与 ``salient`` 旗标同一语义）。
+        ``origin`` 记录谁先提的（player/companion）；companion 主题被
+        玩家随后提及时升级为 player。
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
@@ -174,6 +183,7 @@ class MemoryStore:
                     topic=topic,
                     salient=salient,
                     salience_boost=effective_boost,
+                    origin=origin,
                     last_seen=now,
                 )
                 impression.weight = _impression_weight(
@@ -187,6 +197,8 @@ class MemoryStore:
                 continue
             prior.mention_count += 1
             prior.last_seen = now
+            if origin == "player":
+                prior.origin = "player"
             if salient:
                 prior.salient = True
                 if effective_boost is not None:

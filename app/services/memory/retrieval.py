@@ -116,10 +116,13 @@ def format_impression_block(
         return ""
     now = datetime.now(timezone.utc)
     lines = [
-        f"Fuzzy impressions of the player's recurring topics ({display_name} "
+        f"Fuzzy impressions of topics ({display_name} "
         "does not recall them word for word; weave them in naturally when "
         "relevant, never recite counts; topics talked about recently may be "
-        "brought up first as a natural callback):"
+        "brought up first as a natural callback; NEVER claim the player said "
+        "any specific sentence you were not shown — these are topic-level "
+        "memories only, so phrase them vaguely or ask instead of inventing "
+        "details):"
     ]
     for impression in impressions:
         days_ago = _days_ago(impression.last_seen, now)
@@ -129,6 +132,13 @@ def format_impression_block(
             salient=impression.salient,
             salience_boost=impression.salience_boost,
         )
+        if impression.origin == "companion":
+            # 她自己说过的话：措辞必须是「她提过」，绝不能记成玩家说的。
+            lines.append(
+                f"- {impression.topic} is something {display_name} herself "
+                f"brought up recently — her own words, NOT the player's."
+            )
+            continue
         if tier == "deep":
             lines.append(
                 f"- {impression.topic} is something the player often brings up; "

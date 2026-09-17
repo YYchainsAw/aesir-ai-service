@@ -191,7 +191,9 @@ def _record_turn(
     )
     reply_topics = extract_topics(response.reply_text)
     if reply_topics:
-        _remember_turn(request.companion_id, reply_topics)
+        # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
+        # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
+        _remember_turn(request.companion_id, reply_topics, origin="companion")
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
@@ -229,11 +231,12 @@ def _remember_turn(
     *,
     salient: bool = False,
     salience_boost: float | None = None,
+    origin: str = "player",
 ) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
         get_memory_store(companion_id).record_mention(
-            topics, salient=salient, salience_boost=salience_boost
+            topics, salient=salient, salience_boost=salience_boost, origin=origin
         )
     except MemoryStoreError:
         pass

@@ -119,6 +119,24 @@ def test_companion_own_reply_topics_recorded(_fresh_memory) -> None:
     assert "钓鱼" in [i.topic for i in impressions]
     assert all(not i.salient for i in impressions)  # 她自己的话不显著
 
+    # 她自己说的主题标 origin=companion——注入文案按「她说过」而非「玩家提过」。
+    from app.services.memory.retrieval import format_impression_block
+
+    reply_impression = next(i for i in impressions if i.topic == "钓鱼")
+    assert reply_impression.origin == "companion"
+    line = format_impression_block([reply_impression], "艾莉").splitlines()[-1]
+    assert "her own words" in line
+    assert "player often brings up" not in line
+
+    # 玩家随后也提及时升级为 player（双方便都算数）。
+    from app.services.memory.store import get_memory_store as _get_store
+
+    _get_store("companion.alice").record_mention(["钓鱼"], origin="player")
+    upgraded = next(
+        i for i in _get_store("companion.alice").snapshot().impressions if i.topic == "钓鱼"
+    )
+    assert upgraded.origin == "player"
+
 
 def test_plain_chat_is_not_archived(_fresh_memory) -> None:
     """普通闲聊只入印象层，不进档案（档案留给郑重声明/承诺/经历）。"""

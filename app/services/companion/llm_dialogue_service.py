@@ -469,6 +469,18 @@ def _build_system_prompt(
             "from it, do not repeat yourself):\n"
             + "\n".join(f"Player: {t.user_text}\n{profile.display_name}: {t.reply_text}" for t in history)
         )
+        lines.append(
+            "Anti-repetition: do NOT reuse sentence structures, catchphrases, or "
+            "openings from the recent turns above (e.g. the same '...' + '不过' "
+            "pattern); vary your phrasing, length, and rhythm each turn. Also "
+            "vary emotion_id / gesture_id / facial_expression_id choices instead "
+            "of defaulting to the same ones."
+        )
+        lines.append(
+            "Memory honesty: never claim the player said or agreed to something "
+            "not shown in the recent conversation or memories above. If unsure, "
+            "phrase it as a vague impression or simply ask the player."
+        )
 
     examples = _format_dialogue_examples(profile)
     if examples:

@@ -84,6 +84,7 @@ class TopicImpressionView(BaseModel):
     mention_count: int
     weight: float
     last_seen: str
+    origin: str
 
 
 class MemoryViewResponse(BaseModel):
@@ -130,7 +131,7 @@ def view_memory(companion_id: str) -> MemoryViewResponse:
         impressions=[
             TopicImpressionView(
                 topic=i.topic, mention_count=i.mention_count,
-                weight=i.weight, last_seen=i.last_seen,
+                weight=i.weight, last_seen=i.last_seen, origin=i.origin,
             )
             for i in snapshot.impressions
         ],

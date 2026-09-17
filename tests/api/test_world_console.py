@@ -83,6 +83,8 @@ def test_console_memory_view_shows_tiers_after_chat() -> None:
     assert body["counts"]["impressions"] >= 1
     assert any("蘑菇" in impression["topic"] for impression in body["impressions"])
     assert all(impression["mention_count"] >= 1 for impression in body["impressions"])
+    # 玩家说的话 origin=player；视图带 origin 供调试区分「玩家提过/她自己说过」。
+    assert all(impression["origin"] in ("player", "companion") for impression in body["impressions"])
 
 
 def test_console_memory_view_unknown_companion_returns_404() -> None:
