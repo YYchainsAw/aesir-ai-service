@@ -10,22 +10,25 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.tactical_decision import DecisionAction
 from app.schemas.world_context import WorldContext
 
-# 事件类型白名单：既有战斗六类（v0.2）+ 生活类首版（T060 扩展前的骨架集合）
+# 事件类型白名单：既有战斗六类（v0.2）+ 生活类首版六类（T060）
 WorldEventType = Literal[
-    # 战斗类（v0.2 既有）
+    # 战斗类（v0.2 既有；经世界通道上报时复用同一决策表）
     "player_hp_critical",
     "boss_stun_near",
     "boss_stunned",
     "boss_enraged",
     "companion_mp_low",
     "boss_defeated",
-    # 生活类（US5 首版 6 类中先入 4 类，反应配置见 T060）
+    # 生活类（US5 首版 6 类，反应配置见 T060）
     "region_first_entered",
     "weather_changed",
     "gift_given",
     "companion_recovered",
+    "player_protected_companion",
+    "promise_kept",
 ]
 
 
@@ -77,6 +80,9 @@ class WorldEventObservability(BaseModel):
     policy_revision: str = ""
     used_snapshot_id: str = ""
     reason_codes: list[str] = Field(default_factory=list)
+    # 关系联动留痕（FR-014 / US7 可解释）：未触发关系计分时为空串与 0
+    relationship_stage: str = ""
+    relationship_delta: int = 0
 
 
 class WorldEventResponse(BaseModel):
@@ -89,4 +95,7 @@ class WorldEventResponse(BaseModel):
     duplicate: bool = False          # 重复上报回放首次结果（FR-033）
     reaction: WorldEventReaction | None = None
     recommendation_text: str | None = None  # 建议展示文本；无建议时为 null
+    # 战斗类事件经世界通道上报时复用战斗决策表产出的候选动作；
+    # 生活类事件恒为 null（UE 无动作可执行）。
+    companion_action: DecisionAction | None = None
     observability: WorldEventObservability

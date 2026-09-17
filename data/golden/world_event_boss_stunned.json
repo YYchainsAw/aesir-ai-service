@@ -1,0 +1,59 @@
+{
+  "protocol_version": "0.3",
+  "request_id": "req.world.golden.002",
+  "companion_id": "companion.alice",
+  "event": {
+    "event_id": "event.world.combat.stun.001",
+    "event_type": "boss_stunned",
+    "occurred_at": "2026-09-13T12:00:05Z",
+    "sequence": 43,
+    "details": {"stunned_remaining_seconds": "4.5"}
+  },
+  "world_context": {
+    "snapshot_id": "44444444-4444-4444-8444-444444444444",
+    "captured_at": "2026-09-13T12:00:05Z",
+    "scene": "combat",
+    "world_time": {"game_clock": "14:20", "time_of_day": "noon", "weather": "clear"},
+    "region": {"region_id": "region.ruins.inner", "first_visit": false},
+    "player": {"id": "party.player", "hp_percent": 65, "is_downed": false},
+    "companion": {"id": "companion.alice", "hp_percent": 83, "mp_percent": 72, "current_behavior": "ranged_attack", "is_casting": false},
+    "interactables": [],
+    "ui_popup": false,
+    "cutscene_playing": false,
+    "player_speaking": false,
+    "combat": {
+      "encounter_id": "encounter.test.001",
+      "snapshot_id": "a59b0eb4-79b8-49b0-a17c-f4c6ae5119bd",
+      "captured_at": "2026-09-03T12:00:00Z",
+      "mode": "combat",
+      "player": {
+        "id": "party.player",
+        "hp_percent": 65.0,
+        "is_downed": false,
+        "distance_to_boss_m": 4.5
+      },
+      "companion": {
+        "id": "companion.alice",
+        "hp_percent": 83.0,
+        "mp_percent": 72.0,
+        "current_behavior": "ranged_attack",
+        "ability_states": {
+          "ability.alice.basic_attack": "ready",
+          "ability.alice.explosion": "ready",
+          "ability.alice.quick_heal": "ready",
+          "ability.alice.major_heal": "ready",
+          "ability.alice.shield": "ready"
+        }
+      },
+      "boss": {
+        "id": "encounter.primary_hostile",
+        "hp_percent": 42.0,
+        "stun_percent": 100.0,
+        "state_tags": ["state.stunned"],
+        "stunned_remaining_seconds": 4.5,
+        "phase": 2,
+        "is_enraged": false
+      }
+    }
+  }
+}

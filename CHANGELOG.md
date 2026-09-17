@@ -2,7 +2,18 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**388 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**408 通过 + 2 跳过**）。
+
+## 2026-09-16 — SDD Phase 6（US5）：世界事件统一处理 + 幂等 + 关系联动
+
+- **统一决策层**（`services/tactical/event_policy.py`）：抽出与响应 schema 无关的 `EventEvaluation`，v0.2 `/v1/combat/events` 与 v0.3 `/v1/world/events` 共享同一张幂等表——缓存的是评估结果而非响应对象，两个通道各自组装自己的响应格式。同一 `event_id` 无论经哪个通道上报，都只评估一次、只产生一次副作用。
+- **幂等键含遭遇维度**：`companion_id + encounter_id + event_id`（生活类以空串占位）。评估在锁内进行——关系计分是副作用，若挪到锁外，并发重试可能在两次查表之间都未命中而重复计分（SC-007）。
+- **关系数值有了 HTTP 上报入口**（T062）：生活事件按 `data/policy/relationship_policy.yaml` 调 `relationship` 计分，`observability` 新增 `relationship_stage` / `relationship_delta` 留痕；事件不在策略表内时**跳过而非谎报「未变化」**（不加载不写盘），存储故障按 FR-041 降级不中断事件处理。原因码区分 `RELATIONSHIP_UPDATED` / `RELATIONSHIP_UNCHANGED` / `RELATIONSHIP_UNAVAILABLE`。
+- **生活事件六类**（T060）：`region_first_entered`、`weather_changed`、`gift_given`、`companion_recovered`、`player_protected_companion`、`promise_kept`；人设反应新增 `world_event_reactions` 段（结构同 `combat_event_reactions`，共用白名单校验路径）。
+- **战斗类经世界通道**（T061）：内嵌 `combat` 快照折成 v0.2 请求复用既有决策表，不重写策略；快照缺失时只给反应 + 保守建议，`companion_action` 恒为 `null`（FR-025 不虚构）。
+- **路由瘦身**（T063）：`app/api/v1/world.py` 从 83 行降到 35 行，只留 HTTP 边界（未登记角色 404），策略全部下沉到 `event_policy`。
+- **golden 样例 +2**：`world_event_gift_given.json`（关系 +3 留痕）、`world_event_boss_stunned.json`（战斗事件内嵌快照 → 爆发动作），由 `tests/api/test_world_events.py` 直接回放校验，保证 fixture 与真实端点不脱节。
+- **测试**：新增 `tests/api/test_world_events.py`、`tests/api/test_world_events_idempotency.py`、`tests/services/test_event_no_fabrication.py`，净增 20 例（388 → **408 通过 + 2 跳过**）。
 
 ## 2026-09-16 — 记忆三补：主题黑名单 + 自述入印象 + 在意值缩放
 

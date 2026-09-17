@@ -806,18 +806,19 @@ scripts/
 
 #### Tests for User Story 5 ⚠️
 
-- [ ] T057 [P] [US5] 事件白名单与校验测试：`tests/api/test_world_events.py`（未知类型 422、时间非法 422）
-- [ ] T058 [P] [US5] 幂等测试：`tests/api/test_world_events_idempotency.py`（重复上报回放首次、跨遭遇同标识独立）
-- [ ] T059 [P] [US5] 不虚构动作测试：`tests/services/test_event_no_fabrication.py`（能力不可用时动作为空但仍返回反应与建议）
+- [x] T057 [P] [US5] 事件白名单与校验测试：`tests/api/test_world_events.py`（未知类型 422、时间非法 422）
+- [x] T058 [P] [US5] 幂等测试：`tests/api/test_world_events_idempotency.py`（重复上报回放首次、跨遭遇同标识独立）
+- [x] T059 [P] [US5] 不虚构动作测试：`tests/services/test_event_no_fabrication.py`（能力不可用时动作为空但仍返回反应与建议）
 
 #### Implementation for User Story 5
 
-- [ ] T060 [P] [US5] 非战斗事件类型扩展：`app/schemas/world_event.py` 与 `data/companions/` 事件反应配置（首版 6 类）
-- [ ] T061 [US5] 事件处理统一：改造 `app/services/tactical/event_policy.py` 支持两类事件并复用幂等键（含角色维度）
-- [ ] T062 [US5] 关系事件联动：事件处理链路调用 `app/services/relationship/rules.py`
-- [ ] T063 [US5] 路由并入：`app/api/v1/world.py` 与既有战斗事件入口保持兼容
+- [x] T060 [P] [US5] 非战斗事件类型扩展：`app/schemas/world_event.py` 与 `data/companions/` 事件反应配置（首版 6 类）
+- [x] T061 [US5] 事件处理统一：改造 `app/services/tactical/event_policy.py` 支持两类事件并复用幂等键（含角色维度）
+- [x] T062 [US5] 关系事件联动：事件处理链路调用 `app/services/relationship/rules.py`
+- [x] T063 [US5] 路由并入：`app/api/v1/world.py` 与既有战斗事件入口保持兼容
 
-**Checkpoint**: US5 独立可验
+**Checkpoint**: US5 独立可验（2026-09-16 完成，408 用例全绿；关系数值自此有了 HTTP 上报入口，
+重复上报不重复计分由 `test_world_events_idempotency.py` 守住）
 
 ---
 

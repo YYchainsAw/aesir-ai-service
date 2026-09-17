@@ -24,7 +24,12 @@
 | `world_snapshot_danger.json` | 非战斗危险：深夜暴雨、玩家 35% HP、洞口 | 同上（危险自保优先级输入） |
 | `agent_step_heartbeat_request.json` | 主入口心跳请求完整样例 | UE 直接照此结构上传 |
 | `agent_step_heartbeat_response.json` | 心跳空动作响应样例 | 联调对照；字段变更须先改 v0.3 契约 |
-| `world_event_region_first_entered.json` | 世界事件请求完整样例 | `/v1/world/events` 上传结构 |
+| `world_event_region_first_entered.json` | 生活事件：首次进入新区域（不涉及关系数值） | `/v1/world/events` 上传结构 |
+| `world_event_gift_given.json` | 生活事件：赠礼（关系 +3，`relationship_delta` 留痕） | 同上；关系联动对照 |
+| `world_event_boss_stunned.json` | 战斗事件经世界通道：内嵌 `combat` 快照（眩晕窗口） | 同上；返回 `companion_action` 爆发动作 |
+
+三份世界事件样例由 `tests/api/test_world_events.py` 直接回放校验，
+保证 fixture 与真实端点不脱节。
 
 世界快照 schema 见 `app/schemas/world_context.py`（契约细节待 v0.3 协议文档定稿，
 SDD 见 `docs/planning/aesir-agent-sdd-v1.0.md`）。
