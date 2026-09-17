@@ -3,22 +3,26 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from app.config import get_settings
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
     CompanionDialogueResponse,
 )
+from app.schemas.world_context import WorldContext
 from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
 from app.services.memory.retrieval import format_impression_block, format_memory_block
 from app.schemas.memory import MemoryEntry, TopicImpression
+from app.services.skills.tools import ToolResult, run_lookup, tool_menu
 
 
 @dataclass(frozen=True)
@@ -105,10 +109,14 @@ class _DialoguePayload(BaseModel):
 
     ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
     由 LLM 顺带返回，零额外请求。
+
+    ``action`` 默认 ``reply``，老模型输出（不带该键）行为不变；只有
+    ``lookup`` 才走查证分支（见 ``_lookup_request``）。
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    action: Literal["reply"] = "reply"
     reply_text: str
     emotion_id: str
     gesture_id: str
@@ -141,7 +149,9 @@ class LLMCompanionDialogueService:
         memories: list[MemoryEntry] = (),
         impressions: list[TopicImpression] = (),
         relationship_stage: str = "",
+        world_context: WorldContext | None = None,
     ) -> CompanionDialogueResponse:
+        deadline = _lookup_deadline()
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
@@ -151,6 +161,11 @@ class LLMCompanionDialogueService:
                 relationship_stage=relationship_stage,
             ),
             user_prompt=request.text,
+        )
+        payload = self._verify_if_requested(
+            payload, request=request, world_context=world_context, deadline=deadline,
+            history=history, memories=memories, impressions=impressions,
+            relationship_stage=relationship_stage,
         )
 
         try:
@@ -171,6 +186,66 @@ class LLMCompanionDialogueService:
             source="llm",
         )
 
+    def _verify_if_requested(
+        self,
+        payload: dict[str, Any],
+        *,
+        request: CompanionDialogueRequest,
+        world_context: WorldContext | None,
+        deadline: float,
+        history: tuple[DialogueTurn, ...] = (),
+        memories: list[MemoryEntry] = (),
+        impressions: list[TopicImpression] = (),
+        relationship_stage: str = "",
+    ) -> dict[str, Any]:
+        """第一轮若索取查证，执行只读查证并带着结果再生成一次（FR-036~FR-038）。
+
+        上限 2 轮：第二轮若仍索取查证，说明模型在超限要求——宁可报错让上层
+        回退候选回复，也不无限查下去（FR-038「超限后降级为直接回应」）。
+        """
+        lookup = _lookup_request(payload)
+        if lookup is None:
+            return payload
+
+        result = run_lookup(
+            lookup,
+            companion_id=request.companion_id,
+            world_context=world_context,
+            deadline=deadline,
+        )
+        second = self._client.generate_json(
+            system_prompt=_build_system_prompt(
+                self._profile,
+                history=history,
+                memories=list(memories),
+                impressions=list(impressions),
+                relationship_stage=relationship_stage,
+                lookup_result=result,
+            ),
+            user_prompt=request.text,
+        )
+        if _lookup_request(second) is not None:
+            raise LLMClientError("LLM exceeded the lookup round limit.")
+        return second
+
+    def _stream_round(
+        self, *, system_prompt: str, user_prompt: str
+    ) -> Iterator[tuple[str, Any]]:
+        """跑一轮流式生成：先逐段 yield ``("delta", 文本)``，最后 yield ``("payload", 解析结果)``。
+
+        查证轮与正式回复轮共用本方法——两轮的唯一差别只有 system prompt。
+        """
+        extractor = _ReplyTextStreamExtractor()
+        raw_content = ""
+        for delta in self._client.stream_completion(
+            system_prompt=system_prompt, user_prompt=user_prompt
+        ):
+            raw_content += delta
+            new_text = extractor.feed(delta)
+            if new_text:
+                yield "delta", new_text
+        yield "payload", _parse_json_object(raw_content)
+
     def stream_reply(
         self,
         request: CompanionDialogueRequest,
@@ -179,16 +254,20 @@ class LLMCompanionDialogueService:
         memories: list[MemoryEntry] = (),
         impressions: list[TopicImpression] = (),
         relationship_stage: str = "",
+        world_context: WorldContext | None = None,
     ) -> Iterator[StreamEvent]:
         """流式变体：先 yield delta（reply_text 增量），最后 yield meta。
 
         与 ``reply`` 共用同一 system prompt 与校验规则——流式只是传输层差异，
         不会改变回复内容。中途失败（LLMClientError）直接向上抛，由调用方
         按是否已发出 delta 决定回退或报错。
+
+        查证轮是安全的：索取查证的负载里没有 ``reply_text``，抽取器一个字符
+        都不会吐出去，因此换轮不会让玩家看到半截话。
         """
-        extractor = _ReplyTextStreamExtractor()
-        raw_content = ""
-        for delta in self._client.stream_completion(
+        deadline = _lookup_deadline()
+        payload: dict[str, Any] = {}
+        for kind, value in self._stream_round(
             system_prompt=_build_system_prompt(
                 self._profile,
                 history=history,
@@ -198,17 +277,36 @@ class LLMCompanionDialogueService:
             ),
             user_prompt=request.text,
         ):
-            raw_content += delta
-            new_text = extractor.feed(delta)
-            if new_text:
-                yield StreamEvent(kind="delta", text=new_text)
+            if kind == "delta":
+                yield StreamEvent(kind="delta", text=value)
+            else:
+                payload = value
 
-        try:
-            payload = json.loads(raw_content)
-        except json.JSONDecodeError as error:
-            raise LLMClientError("LLM streamed response is not valid JSON.") from error
-        if not isinstance(payload, dict):
-            raise LLMClientError("LLM streamed response root must be a JSON object.")
+        lookup = _lookup_request(payload)
+        if lookup is not None:
+            result = run_lookup(
+                lookup,
+                companion_id=request.companion_id,
+                world_context=world_context,
+                deadline=deadline,
+            )
+            for kind, value in self._stream_round(
+                system_prompt=_build_system_prompt(
+                    self._profile,
+                    history=history,
+                    memories=list(memories),
+                    impressions=list(impressions),
+                    relationship_stage=relationship_stage,
+                    lookup_result=result,
+                ),
+                user_prompt=request.text,
+            ):
+                if kind == "delta":
+                    yield StreamEvent(kind="delta", text=value)
+                else:
+                    payload = value
+            if _lookup_request(payload) is not None:
+                raise LLMClientError("LLM exceeded the lookup round limit.")
 
         try:
             response_payload = _validate_dialogue_payload(payload, self._profile)
@@ -232,6 +330,73 @@ class LLMCompanionDialogueService:
         )
 
 
+def _lookup_deadline() -> float:
+    """本轮查证的时间预算终点（``time.monotonic()`` 口径，FR-038）。"""
+    return time.monotonic() + get_settings().tools_lookup_timeout_seconds
+
+
+def _parse_json_object(raw_content: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(raw_content)
+    except json.JSONDecodeError as error:
+        raise LLMClientError("LLM streamed response is not valid JSON.") from error
+    if not isinstance(payload, dict):
+        raise LLMClientError("LLM streamed response root must be a JSON object.")
+    return payload
+
+
+def _lookup_request(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """本轮输出是否在索取查证；不是则返回 ``None``（按普通回复处理）。
+
+    配置关掉查证轮（``AESIR_TOOLS_MAX_ROUNDS < 2``）时一律视为普通回复，
+    prompt 里也不会给工具清单——模型无从索取，也就不会索取。
+    同时带 ``reply_text`` 的畸形负载交给 schema 校验去拒绝，避免流式路径
+    已经吐出的半截话与查证轮重复。
+    """
+    if get_settings().tools_max_rounds < 2:
+        return None
+    if payload.get("action") != "lookup" or "reply_text" in payload:
+        return None
+    return payload
+
+
+def _format_lookup_menu() -> str:
+    """第一轮 prompt 里的工具清单：告诉模型「不确定就先查，别猜」。"""
+    lines = [
+        "Before answering, you may verify facts. If the player asks about the world, "
+        "your own condition, the surroundings, or something you two talked about, and "
+        "you are NOT certain, request one lookup instead of guessing.",
+        'To do that, return exactly: {"action": "lookup", "tool": "<tool>", "query": "<what to look up>"}',
+        "Available tools:",
+    ]
+    lines += [f"- {spec.name}: {spec.description}" for spec in tool_menu()]
+    lines.append(
+        'Otherwise answer normally and include "action": "reply" in your JSON.'
+    )
+    return "\n".join(lines)
+
+
+def _format_lookup_result(result: ToolResult) -> str:
+    """第二轮 prompt 里的查证回填块。
+
+    未命中时明确要求「说不确定」，因为编造最容易发生在「查了但没查到」
+    这个当口——模型此时有强烈的把话说圆的本能（FR-037）。
+    """
+    if result.found:
+        return (
+            "Verification result for your lookup (authoritative; use ONLY this, "
+            "do not add facts beyond it):\n"
+            f"{result.content}\n"
+            "Now answer the player, staying in character."
+        )
+    return (
+        "Verification result for your lookup:\n"
+        f"{result.content}\n"
+        "Nothing reliable was found. Tell the player plainly that you do not know or "
+        "cannot confirm it — do NOT invent any fact. Now answer, staying in character."
+    )
+
+
 def _validate_dialogue_payload(payload: dict, profile: CompanionProfile) -> "_DialoguePayload":
     """校验 LLM 对话负载：schema + 情绪/手势/表情白名单（reply 与 stream_reply 共用）。"""
     response_payload = _DialoguePayload.model_validate(payload)
@@ -252,6 +417,7 @@ def _build_system_prompt(
     memories: list[MemoryEntry] | None = None,
     impressions: list[TopicImpression] | None = None,
     relationship_stage: str = "",
+    lookup_result: ToolResult | None = None,
 ) -> str:
     identity = profile.raw.get("identity", {})
     persona = profile.raw.get("persona", {})
@@ -311,8 +477,14 @@ def _build_system_prompt(
             "to the type of player input; do not reuse the literal sentences):\n" + examples
         )
 
+    # 查证（US6 / T069）：第一轮给工具清单，第二轮把结果回填并要求据此作答。
+    if lookup_result is not None:
+        lines.append(_format_lookup_result(lookup_result))
+    elif get_settings().tools_max_rounds >= 2:
+        lines.append(_format_lookup_menu())
+
     lines += [
-        "Return only one JSON object with exactly these keys: reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, salient.",
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
         '(things worth remembering about them, not your own reply); empty list if nothing salient.',
         'salient: true only if the player solemnly declares something important about themselves '

@@ -830,19 +830,24 @@ scripts/
 
 #### Tests for User Story 6 ⚠️
 
-- [ ] T064 [P] [US6] 能力注册表测试：`tests/services/test_skill_registry.py`（登记、查询、按场景过滤）
-- [ ] T065 [P] [US6] 工具命中与未命中测试：`tests/services/test_tools_lore.py`（命中一致、未命中明确不确定）
-- [ ] T066 [P] [US6] 工具降级测试：`tests/services/test_tools_degradation.py`（超时、轮次上限、未注册工具、非法调用 JSON）
+- [x] T064 [P] [US6] 能力注册表测试：`tests/services/test_skill_registry.py`（登记、查询、按场景过滤）
+- [x] T065 [P] [US6] 工具命中与未命中测试：`tests/services/test_tools_lore.py`（命中一致、未命中明确不确定）
+- [x] T066 [P] [US6] 工具降级测试：`tests/services/test_tools_degradation.py`（超时、轮次上限、未注册工具、非法调用 JSON）
 
 #### Implementation for User Story 6
 
-- [ ] T067 [P] [US6] 能力注册表：`app/services/skills/registry.py`（统一登记战斗行为、生活行为、信息工具）
-- [ ] T068 [US6] 只读查证工具：`app/services/skills/tools.py`（世界观知识库、战况快照、环境可交互物、自身状态、记忆检索；全部只读 + 输出裁剪）
-- [ ] T069 [US6] 模型侧两轮调用：改造 `app/services/companion/llm_dialogue_service.py`（发出查证请求 → 回填 → 再生成；上限 2 轮）
-- [ ] T070 [US6] 知识库资产：填充 `data/world/lore.yaml` 首版条目并登记来源
-- [ ] T071 [US6] 战斗链路禁用查证（保延迟），仅在非战斗对话链路启用
+- [x] T067 [P] [US6] 能力注册表：`app/services/skills/registry.py`（统一登记战斗行为、生活行为、信息工具）
+- [x] T068 [US6] 只读查证工具：`app/services/skills/tools.py`（世界观知识库、战况快照、环境可交互物、自身状态、记忆检索；全部只读 + 输出裁剪）
+- [x] T069 [US6] 模型侧两轮调用：改造 `app/services/companion/llm_dialogue_service.py`（发出查证请求 → 回填 → 再生成；上限 2 轮）
+- [x] T070 [US6] 知识库资产：填充 `data/world/lore.yaml` 首版条目并登记来源
+- [x] T071 [US6] 战斗链路禁用查证（保延迟），仅在非战斗对话链路启用
 
-**Checkpoint**: US6 独立可验
+**Checkpoint**: US6 独立可验（2026-09-17 完成，462 用例全绿）。注册表是既有配置源的
+投影而非第二份真相：战斗能力 ID 从此只在 `tactical_policy.yaml` 写一次（resolver 常量
+改为派生），生活行为沿用 `agency_policy.yaml`，工具清单在 `tools.py`。「查不到就明确
+查不到」由 `test_tools_lore.py` 成对守住；轮次上限（1 轮查证 + 1 轮作答）由
+`test_tools_degradation.py` 守住。知识库收录纪律：只收设计文档已确立的事实，
+「遗迹是谁建的」刻意留空作为「明确不确定」的验收用例。
 
 ---
 

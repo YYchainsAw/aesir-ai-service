@@ -693,3 +693,14 @@ data: {"detail":"LLM stream interrupted; this turn is incomplete."}
 - HTTP 状态恒为 200；流开始前的错误照常返回 404（未登记角色）/ 422（参数
   校验）。
 - 建议代理层禁用缓冲（服务端已带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`）。
+
+### 附加扩展（2026-09-17，SDD US6）：可选 `world_context` 请求字段
+
+`CompanionDialogueRequest` 新增**可选**字段 `world_context`（`WorldContext` 结构，
+与 `/v1/agent/step`、`/v1/world/events` 使用的世界快照同构）。缺省不传时行为与
+v0.1 完全一致，属附加式扩展、不升版本。
+
+- 用途：艾莉回答「现在战况如何 / 周围有什么 / 你状态怎样」这类问题时，先经
+  只读查证工具**查证本轮快照**再作答，不用过期状态（US6 验收场景 3）。
+- 建议传法：UE 发起对话时附带当前快照（与心跳同一份即可）；不传时上述三类
+  问题她将明确表示「说不清」，而不是凭印象编。

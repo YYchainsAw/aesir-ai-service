@@ -19,17 +19,18 @@ from app.schemas.tactical_decision import (
 )
 from app.schemas.tactical_intent import TacticalIntent
 
-# 能力目录（与 v0.2 草案 §3 的示例快照一致；UE 上传什么就用什么，这里只做映射）
-ABIL_MAJOR_HEAL = "ability.alice.major_heal"
-ABIL_QUICK_HEAL = "ability.alice.quick_heal"
-ABIL_SHIELD = "ability.alice.shield"
-ABIL_EXPLOSION = "ability.alice.explosion"
-
-# 阈值与优先级来自 data/policy/tactical_policy.yaml（策划书 §5.1/§6.2），
+# 阈值、优先级与能力目录都来自 data/policy/tactical_policy.yaml（策划书 §5.1/§6.2），
 # 进程启动时加载快照——改 YAML 后重启生效。保留原常量名供 rl/ 基线引用。
 from app.services.tactical.policy import get_policy  # noqa: E402
 
 _policy = get_policy()
+
+# 能力目录（FR-035）：ID 只在 tactical_policy.yaml 写一次，这里派生常量，
+# 不再在代码里另写一份字面量。UE 上传什么就用什么，Python 只做映射。
+ABIL_MAJOR_HEAL = _policy.abilities["major_heal"].id
+ABIL_QUICK_HEAL = _policy.abilities["quick_heal"].id
+ABIL_SHIELD = _policy.abilities["shield"].id
+ABIL_EXPLOSION = _policy.abilities["explosion"].id
 PLAYER_HP_CRITICAL = _policy.thresholds.player_hp_critical   # 低于此阈值用强效治疗
 PLAYER_HP_LOW = _policy.thresholds.player_hp_low             # 低于此阈值用快速治疗
 COMPANION_MP_LOW = _policy.thresholds.companion_mp_low       # 艾莉蓝量低于此值走保守策略

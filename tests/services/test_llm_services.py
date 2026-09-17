@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -238,3 +239,144 @@ def test_stream_reply_rejects_invalid_json() -> None:
 
     with pytest.raises(LLMClientError, match="not valid JSON"):
         list(service.stream_reply(CompanionDialogueRequest(text="测试")))
+
+
+# ---------------------------------------------------------------------------
+# 两轮查证调用（SDD T069 / FR-036~FR-038）
+# ---------------------------------------------------------------------------
+
+_REPLY = {
+    "action": "reply",
+    "reply_text": "我查过了：护盾就是短期减伤，危险的时候我会给你套上的。",
+    "emotion_id": "emotion.pleased",
+    "gesture_id": "gesture.cheerful_idle",
+    "facial_expression_id": "face.bright_smile",
+    "interruptible": True,
+    "topics": ["护盾"],
+    "salient": False,
+}
+
+
+class TwoRoundStubClient:
+    """第一轮索取查证、第二轮据此作答的模型替身；记录每轮 system prompt。"""
+
+    def __init__(self, lookup: dict[str, Any], final: dict[str, Any]) -> None:
+        self._lookup = lookup
+        self._final = final
+        self.prompts: list[str] = []
+        self.calls = 0
+
+    def generate_json(
+        self, *, system_prompt: str, user_prompt: str, temperature: float = 0.2
+    ) -> dict[str, Any]:
+        self.prompts.append(system_prompt)
+        self.calls += 1
+        return self._lookup if self.calls == 1 else self._final
+
+
+def test_first_round_prompt_offers_the_tool_menu() -> None:
+    stub = TwoRoundStubClient(_REPLY, _REPLY)
+
+    LLMCompanionDialogueService(stub).reply(CompanionDialogueRequest(text="护盾是什么效果"))
+
+    assert "tool.lore.query" in stub.prompts[0]
+    assert "tool.memory.recall" in stub.prompts[0]
+
+
+def test_direct_reply_stays_single_round() -> None:
+    """不索取查证的普通对话仍是老行为：一次调用，v0.1 语义不变。"""
+    stub = TwoRoundStubClient(_REPLY, _REPLY)
+
+    response = LLMCompanionDialogueService(stub).reply(
+        CompanionDialogueRequest(text="聊点什么吧")
+    )
+
+    assert response.source == "llm"
+    assert stub.calls == 1
+
+
+def test_lookup_round_feeds_the_verified_fact_into_the_second_prompt() -> None:
+    stub = TwoRoundStubClient(
+        {"action": "lookup", "tool": "tool.lore.query", "query": "护盾是什么效果"},
+        _REPLY,
+    )
+
+    response = LLMCompanionDialogueService(stub).reply(
+        CompanionDialogueRequest(text="护盾是什么效果")
+    )
+
+    assert response.source == "llm"
+    assert stub.calls == 2
+    assert "查证结果" in stub.prompts[1]
+    assert "护盾" in stub.prompts[1]
+
+
+def test_lookup_miss_tells_the_model_not_to_invent() -> None:
+    """查不到时的回填块必须明确压住编造本能（FR-037）。"""
+    stub = TwoRoundStubClient(
+        {"action": "lookup", "tool": "tool.lore.query", "query": "这个遗迹是谁建的"},
+        _REPLY,
+    )
+
+    LLMCompanionDialogueService(stub).reply(
+        CompanionDialogueRequest(text="这个遗迹是谁建的")
+    )
+
+    assert "没有记载" in stub.prompts[1]
+    assert "NOT invent" in stub.prompts[1]
+
+
+def test_lookup_disabled_by_config_keeps_single_round(monkeypatch) -> None:
+    monkeypatch.setenv("AESIR_TOOLS_MAX_ROUNDS", "1")
+    stub = TwoRoundStubClient(
+        {"action": "lookup", "tool": "tool.lore.query", "query": "护盾"}, _REPLY
+    )
+
+    # prompt 里不给工具清单；模型若仍索取查证属于违例输出，按 schema 失败
+    # 报错（上层回退候选回复），且绝不出现第二轮
+    with pytest.raises(LLMClientError):
+        LLMCompanionDialogueService(stub).reply(
+            CompanionDialogueRequest(text="护盾是什么效果")
+        )
+
+    assert stub.calls == 1
+    assert "tool.lore.query" not in stub.prompts[0]
+
+
+class _TwoRoundStreamStub:
+    """流式版两轮替身：第一轮索取查证，第二轮流式作答。"""
+
+    def __init__(self, lookup: dict[str, Any], final: dict[str, Any]) -> None:
+        self._rounds = [
+            json.dumps(lookup, ensure_ascii=False),
+            json.dumps(final, ensure_ascii=False),
+        ]
+        self.prompts: list[str] = []
+
+    def generate_json(self, *, system_prompt, user_prompt, temperature: float = 0.2):
+        raise AssertionError("流式路径不应走非流式调用")
+
+    def stream_completion(self, *, system_prompt: str, user_prompt: str, temperature: float = 0.2):
+        self.prompts.append(system_prompt)
+        raw = self._rounds[min(len(self.prompts) - 1, 1)]
+        for i in range(0, len(raw), 24):
+            yield raw[i : i + 24]
+
+
+def test_stream_reply_streams_the_second_round_after_a_lookup() -> None:
+    stub = _TwoRoundStreamStub(
+        {"action": "lookup", "tool": "tool.lore.query", "query": "护盾是什么效果"},
+        _REPLY,
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    events = list(
+        service.stream_reply(CompanionDialogueRequest(text="护盾是什么效果"))
+    )
+
+    assert len(stub.prompts) == 2
+    deltas = [e.text for e in events if e.kind == "delta"]
+    meta = [e for e in events if e.kind == "meta"]
+    assert len(meta) == 1
+    # 第一轮是查证请求（无 reply_text），玩家看到的全部增量都来自第二轮
+    assert "".join(deltas) == _REPLY["reply_text"]

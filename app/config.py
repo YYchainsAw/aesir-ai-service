@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     memory_impression_salient_half_life_days: float = 28.0  # 显著话题半衰期（重要的事遗忘更慢）
     memory_impression_care_neutral: float = 50.0  # 在意值中性锚点：显著性加成按「偏离该值的程度」缩放（极爱与极厌都最在意）
 
+    # -- 查证工具（SDD US6 / T067~T071）---------------------------------------
+    tools_output_max_chars: int = 400            # 单次查证结果回填 prompt 的字符上限（FR-009 同纪律）
+    tools_lookup_timeout_seconds: float = 2.0    # 查证总预算；超限降级为直接回应（FR-038）
+    tools_max_rounds: int = 2                    # 模型侧轮次上限：1 轮查证 + 1 轮正式回复
+
     # -- 心跳（SDD US3 / T002）------------------------------------------------
     # 注：自主行为节流参数在 data/policy/agency_policy.yaml（不在此处）
     heartbeat_min_interval_seconds: float = 2.0  # /v1/agent 心跳最小间隔（限流用）

@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**408 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-17，**462 通过 + 2 跳过**）。
+
+## 2026-09-17 — SDD Phase 7（US6）：能力注册表 + 只读查证 + 两轮调用
+
+- **能力注册表**（`services/skills/registry.py`，T067）：统一登记战斗行为 / 生活行为 / 信息工具三类（FR-035），且是既有配置源的**投影**而非第二份真相——测试守住「注册表与策略不漂移」。为此把战斗能力目录沉到 `tactical_policy.yaml` 新增 `abilities:` 段（ID / 展示名 / 描述），`resolver.py` 的 `ABIL_*` 常量改为从策略**派生**：能力 ID 从此只写一次，不在代码里另留一份字面量。
+- **只读查证工具**（`services/skills/tools.py`，T068）：`tool.lore.query`（世界观）、`tool.world.snapshot`（战况）、`tool.world.interactables`（环境）、`tool.self.status`（自身）、`tool.memory.recall`（记忆）五个工具全部只读，输出按 `AESIR_TOOLS_OUTPUT_MAX_CHARS` 裁剪（默认 400）。未命中一律 `found=False` + `TOOL_NO_RESULT` +「没有记载」文案——**编造在工具层就是不可能的**，不是「不鼓励」（FR-037）。模型给的查证请求先过 `run_lookup` 的结构校验（类型 / 白名单）才执行。
+- **两轮调用**（T069）：`llm_dialogue_service` 第一轮 prompt 附工具清单，模型可返回 `{"action":"lookup",...}` 索取查证；服务端执行只读查证后把结果回填第二轮 prompt。上限 2 轮 + 时间预算（`AESIR_TOOLS_LOOKUP_TIMEOUT_SECONDS`，超限降级为直接回应，FR-038）。流式路径复用同一逻辑：查证轮负载不含 `reply_text`，玩家不会看到半截话。`CompanionDialogueRequest` 新增**可选** `world_context` 字段（v0.1 向后兼容）——战况/环境/自身状态类查证以请求内快照为准，不用过期缓存。
+- **知识库**（T070，`data/world/lore.yaml`）：首版 4 条目（艾莉 / 能力目录 / 战斗分工 / Boss 眩晕），全部登记来源（FR-012）；加载器强制「没出处不进库」。收录纪律：**只收设计文档已确立的事实**——「这个遗迹是谁建的」刻意留空，正是「明确不确定」验收路径的用例。
+- **战斗链路禁用查证**（T071）：工具场景白名单不含 combat，注册表层面 `for_scene("combat", kind="info_tool")` 恒为空；查证只存在于非战斗对话链路。
+- **配置**：新增 `AESIR_TOOLS_{OUTPUT_MAX_CHARS,LOOKUP_TIMEOUT_SECONDS,MAX_ROUNDS}`。
+- **测试**：新增 54 例（注册表 17 + 工具命中/未命中 17 + 降级 14 + 两轮调用 6），408 → **462 通过 + 2 跳过**。
 
 ## 2026-09-16 — SDD Phase 6（US5）：世界事件统一处理 + 幂等 + 关系联动
 

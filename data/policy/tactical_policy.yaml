@@ -6,6 +6,30 @@
 revision: support-policy-001
 event_revision: event-policy-001
 
+# 能力目录（FR-035：能力注册表据此登记战斗行为）。ID 空间与策划书 §3.2 一致，
+# resolver 的 ABIL_* 常量从这里派生——能力 ID 只有这一份来源，不在代码里另写。
+abilities:
+  basic_attack:
+    id: ability.alice.basic_attack
+    display_name: 奥术弹
+    description: "低风险远程输出；常规攻击手段。"
+  explosion:
+    id: ability.alice.explosion
+    display_name: 爆裂魔法
+    description: "高伤害爆发；Boss 眩晕窗口优先使用。"
+  quick_heal:
+    id: ability.alice.quick_heal
+    display_name: 快速治疗
+    description: "小额快速治疗；玩家中低风险掉血时使用。"
+  major_heal:
+    id: ability.alice.major_heal
+    display_name: 强效治疗
+    description: "大额治疗、冷却较长；玩家濒危时优先。"
+  shield:
+    id: ability.alice.shield
+    display_name: 魔法护盾
+    description: "短期减伤；高危 Boss 行为或治疗不可用时使用。"
+
 thresholds:
   player_hp_critical: 30   # 低于此阈值用强效治疗
   player_hp_low: 70        # 低于此阈值用快速治疗

@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.world_context import WorldContext
+
 
 class CompanionDialogueRequest(BaseModel):
     """玩家发送给非战斗队友的文字消息。"""
@@ -31,6 +33,10 @@ class CompanionDialogueRequest(BaseModel):
             "N 轮滚动记忆并注入 LLM；缺省时本请求完全无状态（v0.1 行为不变）。"
         ),
     )
+    # US6（T069）：随本轮对话携带的世界快照（只读输入）。查证工具据此回答战况、
+    # 环境与自身状态类问题；缺省时这些工具按「无据可查」明确表示不确定。
+    # 可选字段，老请求不带它时行为与 v0.1 完全一致。
+    world_context: WorldContext | None = None
 
 
 class CompanionDialogueResponse(BaseModel):

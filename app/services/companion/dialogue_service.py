@@ -50,6 +50,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 memories=memories,
                 impressions=impressions,
                 relationship_stage=stage,
+                world_context=request.world_context,
             )
             topics = service.last_topics
             salient = service.last_salient
@@ -118,6 +119,7 @@ def _stream_llm_reply(
             memories=memories,
             impressions=impressions,
             relationship_stage=stage,
+            world_context=request.world_context,
         ):
             if event.kind == "delta":
                 emitted_delta = True
