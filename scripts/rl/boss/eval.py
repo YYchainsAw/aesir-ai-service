@@ -41,6 +41,10 @@ def main() -> None:
         f"timeout={report.timeout_rate:.3f} decisions={report.mean_decisions:.1f}"
     )
     print(
+        f"win_ci95=[{report.boss_win_rate_ci95_low:.3f}, "
+        f"{report.boss_win_rate_ci95_high:.3f}]"
+    )
+    print(
         f"reward={report.mean_reward:.3f} dealt={report.mean_damage_dealt:.3f} "
         f"received={report.mean_damage_received:.3f} "
         f"rejected={report.rejected_action_rate:.3f} "
@@ -48,7 +52,17 @@ def main() -> None:
         f"repeated={report.repeated_action_rate:.3f}"
     )
     print(f"actions={report.action_distribution}")
-    print(f"profiles={report.results_by_profile}")
+    for profile, metrics in report.metrics_by_profile.items():
+        print(
+            f"profile={profile} win={metrics.boss_win_rate:.3f} "
+            f"ci95=[{metrics.boss_win_rate_ci95_low:.3f}, "
+            f"{metrics.boss_win_rate_ci95_high:.3f}] "
+            f"defeat={metrics.boss_defeat_rate:.3f} "
+            f"reward={metrics.mean_reward:.3f} "
+            f"dealt={metrics.mean_damage_dealt:.3f} "
+            f"received={metrics.mean_damage_received:.3f}"
+        )
+        print(f"profile_actions[{profile}]={metrics.action_distribution}")
 
 
 if __name__ == "__main__":

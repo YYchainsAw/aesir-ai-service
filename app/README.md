@@ -10,5 +10,6 @@ This package is the production HTTP command service used by Unreal.
 - Boundary: `app` must never import `rl`. The service remains usable when
   Gymnasium, Stable-Baselines3, and Torch are not installed.
 
-RL inference will later enter through an explicit adapter at the Boss policy
-boundary. Training code does not belong in this package.
+RL inference enters through the separate `rl.boss.inference_app` service on
+port 8012. This command-service package does not import `rl`, Gymnasium,
+Stable-Baselines3, or Torch.

@@ -4,9 +4,10 @@ from collections import Counter
 from dataclasses import dataclass, field
 import statistics
 
+from rl.boss.contract import BossAction
 from rl.boss.policy import BossPolicy
 from rl.boss.rewards import REWARD_REVISION, compute_reward
-from rl.boss.sim import BossPolicySim, PLAYER_PROFILES
+from rl.boss.sim import SIMULATION_REVISION, BossPolicySim, PLAYER_PROFILES
 
 
 @dataclass(frozen=True)
@@ -22,16 +23,18 @@ class EpisodeMetrics:
     rejected_actions: int
     state_locked_decisions: int
     repeated_actions: int
+    successful_dodges: int
+    successful_defends: int
+    target_perfect_guards: int
     action_counts: dict[str, int]
 
 
 @dataclass(frozen=True)
-class EvaluationReport:
-    policy_name: str
-    schema_version: int
-    reward_revision: str
+class AggregateMetrics:
     episodes: int
     boss_win_rate: float
+    boss_win_rate_ci95_low: float
+    boss_win_rate_ci95_high: float
     boss_defeat_rate: float
     timeout_rate: float
     mean_decisions: float
@@ -41,8 +44,20 @@ class EvaluationReport:
     rejected_action_rate: float
     state_locked_rate: float
     repeated_action_rate: float
+    mean_successful_dodges: float
+    mean_successful_defends: float
+    mean_target_perfect_guards: float
     action_distribution: dict[str, float]
+
+
+@dataclass(frozen=True)
+class EvaluationReport(AggregateMetrics):
+    policy_name: str
+    schema_version: int
+    simulation_revision: str
+    reward_revision: str
     results_by_profile: dict[str, dict[str, int]] = field(default_factory=dict)
+    metrics_by_profile: dict[str, AggregateMetrics] = field(default_factory=dict)
 
 
 def run_episode(
@@ -60,6 +75,9 @@ def run_episode(
     rejected = 0
     state_locked = 0
     repeated = 0
+    successful_dodges = 0
+    successful_defends = 0
+    target_perfect_guards = 0
     terminal_reason: str | None = None
 
     while terminal_reason is None:
@@ -77,6 +95,9 @@ def run_episode(
             accepted += int(events.accepted)
             rejected += int(not events.accepted)
             repeated += int(events.repeat_count > 2)
+        successful_dodges += int(events.successful_dodge)
+        successful_defends += int(events.successful_defend)
+        target_perfect_guards += int(events.target_perfect_guarded)
 
     return EpisodeMetrics(
         seed=seed,
@@ -90,6 +111,9 @@ def run_episode(
         rejected_actions=rejected,
         state_locked_decisions=state_locked,
         repeated_actions=repeated,
+        successful_dodges=successful_dodges,
+        successful_defends=successful_defends,
+        target_perfect_guards=target_perfect_guards,
         action_counts=dict(action_counts),
     )
 
@@ -109,27 +133,55 @@ def evaluate_policy(
         for profile in PLAYER_PROFILES
         for index in range(episodes_per_profile)
     ]
-    result_counts = Counter(episode.result for episode in episodes)
-    action_counts: Counter[str] = Counter()
     results_by_profile: dict[str, dict[str, int]] = {}
     for episode in episodes:
-        action_counts.update(episode.action_counts)
         profile_results = results_by_profile.setdefault(episode.player_profile, {})
         profile_results[episode.result] = profile_results.get(episode.result, 0) + 1
+
+    aggregate = _aggregate_metrics(episodes)
+    metrics_by_profile = {
+        profile: _aggregate_metrics(
+            [episode for episode in episodes if episode.player_profile == profile]
+        )
+        for profile in PLAYER_PROFILES
+    }
+    from rl.boss.contract import SCHEMA_VERSION
+
+    return EvaluationReport(
+        **aggregate.__dict__,
+        policy_name=policy_name,
+        schema_version=SCHEMA_VERSION,
+        simulation_revision=SIMULATION_REVISION,
+        reward_revision=REWARD_REVISION,
+        results_by_profile=results_by_profile,
+        metrics_by_profile=metrics_by_profile,
+    )
+
+
+def _aggregate_metrics(episodes: list[EpisodeMetrics]) -> AggregateMetrics:
+    if not episodes:
+        raise ValueError("cannot aggregate an empty episode collection")
+
+    result_counts = Counter(episode.result for episode in episodes)
+    win_rate = result_counts["boss_victory"] / len(episodes)
+    ci_low, ci_high = _wilson_interval(
+        result_counts["boss_victory"],
+        len(episodes),
+    )
+    action_counts: Counter[str] = Counter()
+    for episode in episodes:
+        action_counts.update(episode.action_counts)
 
     decision_count = sum(episode.decisions for episode in episodes)
     total_actions = sum(action_counts.values())
     actionable_decisions = sum(
         episode.accepted_actions + episode.rejected_actions for episode in episodes
     )
-    from rl.boss.contract import SCHEMA_VERSION
-
-    return EvaluationReport(
-        policy_name=policy_name,
-        schema_version=SCHEMA_VERSION,
-        reward_revision=REWARD_REVISION,
+    return AggregateMetrics(
         episodes=len(episodes),
-        boss_win_rate=result_counts["boss_victory"] / len(episodes),
+        boss_win_rate=win_rate,
+        boss_win_rate_ci95_low=ci_low,
+        boss_win_rate_ci95_high=ci_high,
         boss_defeat_rate=result_counts["boss_defeat"] / len(episodes),
         timeout_rate=result_counts["timeout"] / len(episodes),
         mean_decisions=statistics.fmean(episode.decisions for episode in episodes),
@@ -139,16 +191,47 @@ def evaluate_policy(
             episode.damage_received for episode in episodes
         ),
         rejected_action_rate=(
-            sum(episode.rejected_actions for episode in episodes) / actionable_decisions
+            sum(episode.rejected_actions for episode in episodes)
+            / max(actionable_decisions, 1)
         ),
         state_locked_rate=(
-            sum(episode.state_locked_decisions for episode in episodes) / decision_count
+            sum(episode.state_locked_decisions for episode in episodes)
+            / max(decision_count, 1)
         ),
         repeated_action_rate=(
-            sum(episode.repeated_actions for episode in episodes) / actionable_decisions
+            sum(episode.repeated_actions for episode in episodes)
+            / max(actionable_decisions, 1)
+        ),
+        mean_successful_dodges=statistics.fmean(
+            episode.successful_dodges for episode in episodes
+        ),
+        mean_successful_defends=statistics.fmean(
+            episode.successful_defends for episode in episodes
+        ),
+        mean_target_perfect_guards=statistics.fmean(
+            episode.target_perfect_guards for episode in episodes
         ),
         action_distribution={
-            action: count / total_actions for action, count in sorted(action_counts.items())
+            action.name: action_counts[action.name] / max(total_actions, 1)
+            for action in BossAction
         },
-        results_by_profile=results_by_profile,
     )
+
+
+def _wilson_interval(successes: int, trials: int) -> tuple[float, float]:
+    if trials <= 0:
+        raise ValueError("trials must be positive")
+    z = 1.959963984540054
+    probability = successes / trials
+    denominator = 1.0 + z * z / trials
+    center = (probability + z * z / (2.0 * trials)) / denominator
+    margin = (
+        z
+        * (
+            probability * (1.0 - probability) / trials
+            + z * z / (4.0 * trials * trials)
+        )
+        ** 0.5
+        / denominator
+    )
+    return max(0.0, center - margin), min(1.0, center + margin)

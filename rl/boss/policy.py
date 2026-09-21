@@ -44,7 +44,19 @@ class RuleBossPolicy:
         ):
             return BossAction.USE_ABILITY
 
+        if (
+            state.target_blocking
+            and state.normalized_distance <= self.config.area_skill_range
+            and self._ready(state, BossAction.UNBLOCKABLE_AREA_SKILL)
+        ):
+            return BossAction.UNBLOCKABLE_AREA_SKILL
+
         if state.normalized_distance > self.config.light_range:
+            if (
+                state.normalized_distance <= self.config.gap_closer_range
+                and self._ready(state, BossAction.GAP_CLOSER_SKILL)
+            ):
+                return BossAction.GAP_CLOSER_SKILL
             return BossAction.PURSUE
 
         if state.target_blocking and self._ready(state, BossAction.HEAVY_ATTACK):

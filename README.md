@@ -55,7 +55,7 @@ aesir-ai-service/
 │       ├── agency/                # 自主行为（US3：场景判定/行为目录/仲裁/节流）
 │       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
 ├── rl/                            # Boss 强化学习研究（可选依赖）
-│   └── boss/                      # Boss-as-agent + UE schema v2
+│   └── boss/                      # Boss-as-agent + UE schema v4
 ├── scripts/
 │   ├── command_service/           # ASR 评估与假 UE 联调
 │   └── rl/
@@ -179,6 +179,15 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 .\.venv\Scripts\python scripts\rl\boss\train.py --timesteps 20000 # PPO 冒烟训练
 ```
 
+正式训练会额外生成 TensorBoard 日志、周期 Checkpoint、周期评估结果和最佳模型；
+最终 manifest 同时记录总体指标及每种玩家画像的胜率、伤害与动作分布。
+
+冻结后的 Boss 策略由独立服务提供推理，不与玩家指令服务混合：
+
+```powershell
+.\.venv\Scripts\python scripts\rl\boss\serve.py  # http://127.0.0.1:8012
+```
+
 目录边界与旧实验说明见 [`rl/README.md`](rl/README.md)。RL 尚未接入 HTTP 推理路径；后续会通过独立 Boss policy adapter 接入，而不是混进玩家指令解析器。
 
 ## 测试
@@ -211,7 +220,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
 - [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/command_service/mock_ue_flow.py` 全链路演示（2026-09-09）
 - [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
-- [x] Boss RL schema v2、训练模拟器、奖励和 Behavior Tree 规则基线
+- [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 
 ## 调试

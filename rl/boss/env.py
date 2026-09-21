@@ -12,9 +12,18 @@ from rl.boss.contract import (
     OBSERVATION_HIGH,
     OBSERVATION_LOW,
     SCHEMA_VERSION,
+    make_action_mask,
 )
 from rl.boss.rewards import REWARD_REVISION, compute_reward
-from rl.boss.sim import BossPolicySim, BossSimConfig, PLAYER_PROFILES
+from rl.boss.sim import (
+    SIMULATION_REVISION,
+    BossPolicySim,
+    BossSimConfig,
+    PLAYER_PROFILES,
+)
+
+EPISODE_SEED_STRATEGY = "gym_rng_per_episode_v1"
+_MAX_EPISODE_SEED = 2**31 - 1
 
 
 class AesirBossEnv(gym.Env):
@@ -33,6 +42,7 @@ class AesirBossEnv(gym.Env):
             raise ValueError(f"unknown player profile: {profile}")
         self._configured_profile = profile
         self._active_profile = "aggressive" if profile == "mixed" else profile
+        self._active_episode_seed = seed
         self._sim = BossPolicySim(
             seed=seed,
             profile=self._active_profile,
@@ -59,7 +69,15 @@ class AesirBossEnv(gym.Env):
         if requested_profile not in PLAYER_PROFILES:
             raise ValueError(f"unknown player profile: {requested_profile}")
         self._active_profile = requested_profile
-        self._sim.reset(seed=seed, profile=requested_profile)
+        # Explicit seeds reproduce a complete run. Automatic resets derive a
+        # fresh deterministic episode seed from Gym's seeded RNG.
+        episode_seed = (
+            int(seed)
+            if seed is not None
+            else int(self.np_random.integers(0, _MAX_EPISODE_SEED))
+        )
+        self._active_episode_seed = episode_seed
+        self._sim.reset(seed=episode_seed, profile=requested_profile)
         return self._observation(), self._base_info()
 
     def step(self, action: int):
@@ -77,6 +95,7 @@ class AesirBossEnv(gym.Env):
                 "action_result": events.result,
                 "damage_dealt": events.damage_dealt,
                 "damage_received": events.damage_received,
+                "target_perfect_guarded": events.target_perfect_guarded,
                 "repeat_count": events.repeat_count,
                 "reward_terms": terms,
             }
@@ -86,6 +105,13 @@ class AesirBossEnv(gym.Env):
     def render(self):  # pragma: no cover
         return None
 
+    def action_masks(self) -> np.ndarray:
+        """Action mask consumed directly by sb3-contrib MaskablePPO."""
+        return np.asarray(
+            make_action_mask(self._sim.state.observation()),
+            dtype=np.bool_,
+        )
+
     @property
     def unwrapped_sim(self) -> BossPolicySim:
         return self._sim
@@ -93,9 +119,12 @@ class AesirBossEnv(gym.Env):
     def _base_info(self) -> dict[str, Any]:
         return {
             "schema_version": SCHEMA_VERSION,
+            "simulation_revision": SIMULATION_REVISION,
             "feature_names": FEATURE_NAMES,
             "reward_revision": REWARD_REVISION,
             "player_profile": self._active_profile,
+            "episode_seed": self._active_episode_seed,
+            "episode_seed_strategy": EPISODE_SEED_STRATEGY,
         }
 
     def _observation(self) -> np.ndarray:
