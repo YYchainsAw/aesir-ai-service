@@ -19,6 +19,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
+from app.services.memory.facts import dedup_key
 from app.services.memory.summarizer import summarize_experiences
 from app.services.memory.topics import extract_topics as _extract_topics
 from app.services.memory.topics import impression_weight as _impression_weight
@@ -242,11 +243,23 @@ class MemoryStore:
             self._persist_locked()
 
     def record_experience(self, entries: list[MemoryEntry]) -> None:
-        """共同经历：落盘时聚合为摘要条目（T026：事件触发，非逐条写盘）。"""
+        """共同经历：落盘时聚合为摘要条目（T026：事件触发，非逐条写盘）。
+
+        按内容去重：同一事件重放（幂等缓存被清、进程重启后的补报）不重复
+        记一条经历——摘要层是追加语义，没有这道兜底会随重放膨胀。
+        """
         if not entries:
             return
         with self._lock:
-            self._snapshot.summaries.extend(summarize_experiences(entries))
+            existing = {entry.content for entry in self._snapshot.summaries}
+            fresh = [
+                summary
+                for summary in summarize_experiences(entries)
+                if summary.content not in existing
+            ]
+            if not fresh:
+                return
+            self._snapshot.summaries.extend(fresh)
             self._snapshot.summaries = self._evict(
                 self._snapshot.summaries, self._summary_limit
             )
@@ -254,12 +267,37 @@ class MemoryStore:
 
     def record_fact(self, entry: MemoryEntry) -> None:
         """长期档案：事实与承诺；承诺类（critical）不被淘汰（FR-008）。"""
+        self.record_facts([entry])
+
+    def record_facts(self, entries: list[MemoryEntry]) -> int:
+        """批量写档案（一轮对话抽出的多条事实一次落盘），返回新增条数。
+
+        按内容去重：同一件事再提一次不新增条目，只**刷新时间戳**——她记得
+        的还是同一件事，而「最近又提到过」应当让它更难被淘汰（``_evict``
+        同重要性下先淘汰最旧的）。重要性取两者中更高的一档，不因重述而降级。
+        """
+        if not entries:
+            return 0
         with self._lock:
-            self._snapshot.archive.append(entry)
+            index = {dedup_key(e.content): e for e in self._snapshot.archive}
+            added = 0
+            for entry in entries:
+                prior = index.get(dedup_key(entry.content))
+                if prior is not None:
+                    prior.real_time = entry.real_time
+                    if _IMPORTANCE_ORDER.get(entry.importance, 2) < _IMPORTANCE_ORDER.get(
+                        prior.importance, 2
+                    ):
+                        prior.importance = entry.importance
+                    continue
+                self._snapshot.archive.append(entry)
+                index[dedup_key(entry.content)] = entry
+                added += 1
             self._snapshot.archive = self._evict(
                 self._snapshot.archive, self._archive_limit, protect_promise=True
             )
             self._persist_locked()
+            return added
 
     def clear(self) -> None:
         """清空该角色全部记忆（记忆重置，FR-010 / T029）。"""

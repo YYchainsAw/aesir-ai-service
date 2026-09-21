@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from app.config import get_settings
 from app.schemas.companion_dialogue import (
@@ -23,6 +23,10 @@ from app.services.companion.session_memory import DialogueTurn
 from app.services.memory.retrieval import format_impression_block, format_memory_block
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.services.skills.tools import ToolResult, run_lookup, tool_menu
+
+
+# 事实条目长度上限：一句自足的中文陈述（超长说明模型在写小作文，丢弃）
+_MAX_FACT_CHARS = 60
 
 
 @dataclass(frozen=True)
@@ -108,7 +112,8 @@ class _DialoguePayload(BaseModel):
     """LLM 可输出的最小对话负载；封套字段由服务端生成。
 
     ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
-    由 LLM 顺带返回，零额外请求。
+    ``facts`` 为长期档案的事实提取（玩家陈述过的、跨会话仍然成立的事），
+    均由 LLM 顺带返回，零额外请求。
 
     ``action`` 默认 ``reply``，老模型输出（不带该键）行为不变；只有
     ``lookup`` 才走查证分支（见 ``_lookup_request``）。
@@ -123,7 +128,24 @@ class _DialoguePayload(BaseModel):
     facial_expression_id: str
     interruptible: bool = True
     topics: list[str] = Field(default_factory=list, max_length=3)
+    facts: list[str] = Field(default_factory=list, max_length=3)
     salient: bool = False
+
+    @field_validator("facts")
+    @classmethod
+    def _clean_facts(cls, values: list[str]) -> list[str]:
+        """清洗事实条目：去空白、丢空串与超长项。
+
+        事实是「锦上添花」的旁路字段，**不因它报废整轮对话**——格式不合的
+        条目直接丢弃，回复照常返回。写档案前的接地校验另在
+        ``memory.facts.is_grounded``（防编造）。
+        """
+        cleaned: list[str] = []
+        for value in values:
+            text = value.strip()
+            if text and len(text) <= _MAX_FACT_CHARS:
+                cleaned.append(text)
+        return cleaned
 
 
 class LLMCompanionDialogueService:
@@ -137,8 +159,9 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
-        # 最近一次成功生成提取的主题与显著性（实例按请求创建，见 dialogue_service）。
+        # 最近一次成功生成提取的主题/事实/显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
+        self.last_facts: list[str] = []
         self.last_salient: bool = False
 
     def reply(
@@ -173,6 +196,7 @@ class LLMCompanionDialogueService:
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
+        self.last_facts = response_payload.facts
         self.last_salient = response_payload.salient
 
         return CompanionDialogueResponse(
@@ -313,6 +337,7 @@ class LLMCompanionDialogueService:
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
+        self.last_facts = response_payload.facts
         self.last_salient = response_payload.salient
 
         yield StreamEvent(
@@ -484,10 +509,11 @@ def _build_system_prompt(
         "Memory honesty: everything you know about the past is ONLY the recent "
         "conversation, the long-term memories, and the fuzzy impressions shown "
         "above (fuzzy impressions are topic-level only — they contain no facts). "
-        "NEVER assert a specific past event (something was eaten, done, said, or "
-        "promised) unless it appears there; if the player asks about something "
-        "you have no record of, express uncertainty or ask them back — never "
-        "fill in details with a confident tone."
+        "State a long-term memory plainly when it is relevant — that is what it is "
+        "for — but NEVER add details beyond it. NEVER assert any other specific "
+        "past event (something was eaten, done, said, or promised) unless it appears "
+        "there; if the player asks about something you have no record of, express "
+        "uncertainty or ask them back — never fill in details with a confident tone."
     )
 
     examples = _format_dialogue_examples(profile)
@@ -504,11 +530,19 @@ def _build_system_prompt(
         lines.append(_format_lookup_menu())
 
     lines += [
-        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, salient.",
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
         '(things worth remembering about them, not your own reply); each keyword must be a '
         'concrete noun or topic word (2-6 chars), never connectives, fillers, or fragments '
         'like 不过/然后/意思; empty list if nothing salient.',
+        'facts: list of 0-3 durable facts about the PLAYER that you learned from what the '
+        'player actually said (in this message or in the recent conversation above): who they '
+        'are, their background, family, pets, home, work, strong likes and dislikes, plans, '
+        'or promises they made. Each fact must be a self-contained Chinese sentence in the '
+        'third person, at most 40 characters, e.g. "玩家养了一只叫小黑的猫" or "玩家最讨厌蘑菇". '
+        'Only include what the player stated — NEVER your own words, your guesses, or any '
+        'detail you invented; empty list if the player only made small talk. These facts are '
+        'stored and reused later, so a wrong one becomes a permanent false memory.',
         'salient: true only if the player solemnly declares something important about themselves '
         'and clearly wants it remembered (e.g. "记住：...", "有件重要的事情告诉你", promises, '
         'strong likes/dislikes); false for ordinary chat.',

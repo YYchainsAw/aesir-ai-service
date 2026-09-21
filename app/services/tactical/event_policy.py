@@ -30,6 +30,7 @@ from app.schemas.combat_event import (
 from app.schemas.tactical_decision import DecisionAction, Expires
 from app.schemas.world_event import WorldEventObservability, WorldEventReaction, WorldEventRequest, WorldEventResponse
 from app.services.companion.profile_repository import DialoguePresentation, get_profile
+from app.services.memory.experiences import record_world_event_experience
 from app.services.relationship.policy import get_policy as get_relationship_policy
 from app.services.relationship.state import RelationshipStoreError, get_relationship_store
 from app.services.tactical.policy import get_policy
@@ -384,6 +385,13 @@ def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
         request.event.event_id,
     )
     evaluation, duplicate = _resolve(key, lambda: _evaluate_combat(request))
+    if not duplicate:
+        # 与 v0.3 世界通道同一张幂等表：同一事件经两个通道上报也只记一次。
+        record_world_event_experience(
+            request.combat_context.companion.id,
+            request.event.event_type,
+            occurred_at=request.event.occurred_at,
+        )
     return _combat_response(request, evaluation, duplicate=duplicate)
 
 
@@ -521,4 +529,17 @@ def handle_world_event(request: WorldEventRequest) -> WorldEventResponse:
     else:
         key = (request.companion_id, "", request.event.event_id)
         evaluation, duplicate = _resolve(key, lambda: _evaluate_lifestyle(request))
+    if not duplicate:
+        # 共同经历入摘要层（记忆接线）：只在首次处理时写，重放不重复记。
+        record_world_event_experience(
+            request.companion_id,
+            request.event.event_type,
+            details=request.event.details,
+            occurred_at=request.event.occurred_at,
+            region_id=(
+                request.world_context.region.region_id
+                if request.world_context.region is not None
+                else ""
+            ),
+        )
     return _world_response(request, evaluation, duplicate=duplicate)

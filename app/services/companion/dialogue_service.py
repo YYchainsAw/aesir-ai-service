@@ -18,6 +18,7 @@ from app.services.companion.profile_repository import (
 from app.services.companion.dialogue_signals import record_turn_signal
 from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
+from app.services.memory.facts import is_grounded
 from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
 from app.services.memory.retrieval import retrieve, retrieve_impressions
 from app.services.memory.topics import extract_topics, looks_salient
@@ -54,14 +55,17 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 world_context=request.world_context,
             )
             topics = service.last_topics
+            facts = service.last_facts
             salient = service.last_salient
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
+            facts = None
             salient = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
+        facts = None
         salient = None
     response.relationship_stage = stage
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
@@ -69,6 +73,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         request,
         response,
         topics=topics,
+        facts=facts,
         salient=salient,
         injected_topics=[i.topic for i in impressions],
     )
@@ -140,6 +145,7 @@ def _stream_llm_reply(
                 request,
                 event.response,
                 topics=service.last_topics,
+                facts=service.last_facts,
                 salient=service.last_salient,
                 injected_topics=[i.topic for i in impressions],
             )
@@ -216,17 +222,20 @@ def _record_turn(
     response: CompanionDialogueResponse,
     *,
     topics: list[str] | None = None,
+    facts: list[str] | None = None,
     salient: bool | None = None,
     injected_topics: list[str] | None = None,
 ) -> None:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    双通道：``topics``/``salient`` 为 LLM 顺带返回；``None``（mock/回退
-    路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
-    复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；普通
-    发言只入印象层。艾莉自己的回复也提取主题入印象（非显著）——她记得
-    自己说过什么，反复谈起的话题同样形成印象。``injected_topics`` 为
-    本轮注入 prompt 的印象主题（埋点用，见 ``dialogue_signals``）。
+    三通道：``topics``/``facts``/``salient`` 为 LLM 顺带返回；``None``
+    （mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空——规则
+    切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案（玩家
+    期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
+    普通发言的主题只入印象层，陈述出的事实经接地校验后入档案。艾莉自己的
+    回复也提取主题入印象（非显著）——她记得自己说过什么，反复谈起的话题
+    同样形成印象。``injected_topics`` 为本轮注入 prompt 的印象主题（埋点用，
+    见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id) if request.session_id else ()
@@ -239,6 +248,13 @@ def _record_turn(
         salient = looks_salient(request.text)
     if salient:
         _remember_fact(request.companion_id, request.text)
+    _remember_facts(
+        request.companion_id,
+        facts or [],
+        # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
+        # 也能落地，但凭空捏造的仍会被拦下）。
+        sources=[request.text, *(t.user_text for t in prior_history)],
+    )
     salience_boost = _care_scaled_boost(request.companion_id) if salient else None
     _remember_turn(
         request.companion_id, topics, salient=salient, salience_boost=salience_boost
@@ -338,6 +354,33 @@ def _care_scaled_boost(companion_id: str) -> float | None:
         return None
     settings = get_settings()
     return settings.memory_impression_salience_boost * care_scale(value)
+
+
+def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str]) -> int:
+    """把本轮抽出的事实写进长期档案（过接地校验），返回落档条数。
+
+    接地校验（``memory.facts.is_grounded``）是这条通道的**安全阀**：档案里的
+    事实会被当作「她确定知道的事」长期注入，一旦编造就是永久错误记忆——
+    比当场幻视严重得多。对不上玩家原话的事实直接丢弃（印象层仍留痕）。
+    写失败静默降级（与其余记忆写入同语义）。
+    """
+    grounded = [fact for fact in facts if is_grounded(fact, sources)]
+    if not grounded:
+        return 0
+    try:
+        return get_memory_store(companion_id).record_facts(
+            [
+                MemoryEntry(
+                    content=fact,
+                    importance="normal",
+                    source="player_statement",
+                    tags=["dialogue", "fact"],
+                )
+                for fact in grounded
+            ]
+        )
+    except MemoryStoreError:
+        return 0
 
 
 def _remember_fact(companion_id: str, player_text: str) -> None:

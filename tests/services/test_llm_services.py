@@ -115,6 +115,66 @@ def test_companion_llm_prompt_injects_conversation_history() -> None:
     assert stub.user_prompt == "刚说到哪了？"
 
 
+def test_facts_are_exposed_and_prompt_asks_for_them() -> None:
+    """事实通道：prompt 要求顺带抽出玩家陈述的事实，服务暴露 last_facts。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "小黑啊，记住了。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.enthusiastic_nod",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            "facts": ["玩家养了一只叫小黑的猫"],
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="我养了只猫，它叫小黑。"))
+
+    assert service.last_facts == ["玩家养了一只叫小黑的猫"]
+    assert "facts: list of 0-3 durable facts" in stub.system_prompt
+    # 明确告知「写错会变成永久错误记忆」——这是模型唯一能自己把住的关口。
+    assert "permanent false memory" in stub.system_prompt
+
+
+def test_malformed_facts_are_dropped_without_failing_the_turn() -> None:
+    """事实是旁路字段：空白项与超长项直接丢弃，回复照常返回。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.enthusiastic_nod",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            "facts": ["  玩家怕高。  ", "", "长" * 80],
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    response = service.reply(CompanionDialogueRequest(text="我怕高。"))
+
+    assert response.reply_text == "嗯。"
+    assert service.last_facts == ["玩家怕高。"]
+
+
+def test_old_payloads_without_facts_key_still_work() -> None:
+    """向后兼容：不带 facts 键的老模型输出行为不变（空列表）。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "好。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.enthusiastic_nod",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="走吧。"))
+
+    assert service.last_facts == []
+
+
 def test_memory_honesty_rule_present_even_without_history_or_memories() -> None:
     """「不得编造过去」是常驻约束，不随历史/记忆有无开关（修首轮幻视）。
 
@@ -136,7 +196,7 @@ def test_memory_honesty_rule_present_even_without_history_or_memories() -> None:
 
     prompt = stub.system_prompt
     assert "Memory honesty" in prompt
-    assert "NEVER assert a specific past event" in prompt
+    assert "NEVER assert any other specific past event" in prompt
     assert "Recent conversation" not in prompt  # 无历史时不注入对话块
 
 
@@ -202,7 +262,8 @@ _FULL_STREAM_REPLY = (
     '"emotion_id": "emotion.bright", '
     '"gesture_id": "gesture.cheerful_idle", '
     '"facial_expression_id": "face.bright_smile", '
-    '"interruptible": true}'
+    '"interruptible": true, '
+    '"topics": ["高塔"], "facts": ["玩家怕高"]}'
 )
 
 
@@ -227,6 +288,9 @@ def test_stream_reply_emits_deltas_then_meta() -> None:
     assert metas[0].response.source == "llm"
     assert metas[0].response.session_id == "s1"
     assert all(e.kind != "error" for e in events)
+    # 流式路径与非流式一样暴露顺带抽出的主题/事实（供 dialogue_service 落档）。
+    assert service.last_facts == ["玩家怕高"]
+    assert service.last_topics == ["高塔"]
 
 
 def test_stream_reply_decodes_escapes_across_chunks() -> None:

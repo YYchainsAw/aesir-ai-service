@@ -50,7 +50,7 @@ aesir-ai-service/
 │       ├── tactical/              # resolver / event_policy / receipt_store / acknowledgement
 │       ├── companion/             # 对话服务 + 人设仓库
 │       ├── llm/                   # client + factory（共享 LLM Client）
-│       ├── memory/                # 记忆体系（US1：三级记忆/淘汰/检索/降级）
+│       ├── memory/                # 记忆体系（US1：四层记忆/淘汰/检索/降级/事实接地校验）
 │       ├── relationship/          # 关系体系（US2：数值/阶段/防刷/阶段化调制）
 │       ├── agency/                # 自主行为（US3：场景判定/行为目录/仲裁/节流）
 │       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
@@ -230,6 +230,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] US4 加固（2026-09-21）：意图白名单按域扩展 4 个非战斗意图；`/v1/agent/step` 文本路径与 `/v1/tactical/*` 共用同一决策层（战斗意图含关系调制，非战斗意图映射 agency 行为目录）；回归集加关系阶段维度
 - [x] US7 可解释性（2026-09-21）：响应统一携带 persona_revision / memory_layers 链路字段；调试台扩展场景/情绪/关系/近期记忆；mock_ue_flow 全链路可解释演示；`scripts.metrics_report` 验收指标采集
 - [x] 对话实测三修（2026-09-21）：prompt 常驻「不得凭空断言过去事件」（修首轮幻视）；`origin=companion` 的提及不再自我强化 + 近期已聊话题检索冷却（修印象正反馈回路与复读）；印象噪声/黑名单扩充 + 历史数据清洗脚本
+- [x] 记忆四层接线（2026-09-21）：LLM 顺带抽出玩家**事实**入档案（写档前过接地校验，编造的事实丢弃）、世界事件里的共同经历入摘要层；注入端按来源分口吻并许可「记得的可以直说」——她终于有据可说，不再靠脑补补全过去
 - [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 

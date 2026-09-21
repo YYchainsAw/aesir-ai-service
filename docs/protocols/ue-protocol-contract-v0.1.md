@@ -762,3 +762,22 @@ v0.1 完全一致，属附加式扩展、不升版本。
 - **指标采集（T079）**：`.venv/Scripts/python -m scripts.metrics_report`
   汇总执行回执分布、降级次数、复读轮数、负反馈与话题延续率
   （`--json` 输出机器可读格式）。
+
+### 附加扩展（2026-09-21）：记忆写入链路（对话事实 + 世界事件共同经历）
+
+**协议零变更**（请求/响应字段与上面完全一致），仅说明两个端点在处理成功后的
+记忆副作用——UE 侧无需任何改动，但调试时可据此预期「她为什么记得这件事」：
+
+- `POST /v1/companion/chat`（含 `/chat/voice` 与流式变体）：LLM 顺带抽出
+  玩家陈述过的**事实**（0~3 条第三人称陈述）写入长期档案层，经接地校验
+  （实词须大部分出自玩家真说过的话）后才落档——**编造的事实会被丢弃**。
+  下一轮起这些事实作为「她确定知道的事」注入，她可以直说，但不得加细节。
+- `POST /v1/world/events`（含 v0.2 `POST /v1/combat/events`）：有共同经历
+  语义的事件（`region_first_entered` / `gift_given` /
+  `player_protected_companion` / `promise_kept` / `companion_recovered` /
+  `boss_defeated`）写入经历摘要层；瞬时战斗状态（`player_hp_critical` /
+  `companion_mp_low` / `boss_stunned` 等）**不**入记忆。文案里的细节只取
+  请求 `details`（`item_id` / `promise_id` / `boss_id` / `region_id`）或快照
+  地区，取不到就写泛一点，服务端不推断任何未上报的名字。
+- **幂等**：同一 `event_id` 重放（`duplicate: true`）不重复记共同经历；
+  记忆文件损坏/不可写时静默降级，事件响应照常返回（FR-011）。

@@ -168,12 +168,32 @@ def _recency_phrase(days_ago: float) -> str:
     return "yesterday or the day before"
 
 
+# 来源 → 注入时的口吻：她得知道这条记忆是「玩家告诉她的」「两人一起经历的」
+# 还是「她自己答应过的」，措辞才不会张冠李戴（实测出现过把自己的话记成玩家的）。
+_SOURCE_PHRASES = {
+    "player_statement": "the player told you",
+    "shared_experience": "you two went through together",
+    "promise": "the player promised you",
+    "observation": "you noticed yourself",
+    "summary": "you two went through together",
+}
+
+
 def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -> str:
-    """把记忆条目格式化为注入 LLM prompt 的文本块（T028 使用）。"""
+    """把记忆条目格式化为注入 LLM prompt 的文本块（T028 使用）。
+
+    这些是**她确定知道的事实**（对话链路抽取并经接地校验后才落档案），
+    所以措辞要给她「可以直说」的许可——否则她会连记得的事也含糊其辞；
+    同时明确「不得在此之外加细节」，把发挥空间压在事实边界内。
+    """
     if not entries:
         return ""
-    lines = [f"Long-term memories about the player (facts {display_name} remembers; "
-             "reference them naturally when relevant, do not recite them):"]
+    lines = [
+        f"Long-term memories about the player ({display_name} is sure of these — "
+        "state them plainly when relevant, but never add details beyond what is "
+        "written here, and never recite the list):"
+    ]
     for entry in entries:
-        lines.append(f"- [{entry.source}] {entry.content}")
+        phrase = _SOURCE_PHRASES.get(entry.source, "you remember")
+        lines.append(f"- ({phrase}) {entry.content}")
     return "\n".join(lines)
