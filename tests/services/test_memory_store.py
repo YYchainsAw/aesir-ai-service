@@ -134,6 +134,78 @@ def test_salience_boost_takes_max_not_retreat(store: MemoryStore) -> None:
     assert impression.mention_count == 2
 
 
+def test_companion_mention_does_not_reinforce_existing_topic(store: MemoryStore) -> None:
+    """她自己反复提起的话题不加深、不刷新（防「注入 → 她提起 → 更必注入」回路）。
+
+    实测 2026-09-21：钓鱼被聊到 24 次，其中多数是她自己接话带出来的；
+    玩家只提一次时计数与 last_seen 照常强化。
+    """
+    store.record_mention(["钓鱼"], origin="player")
+    before = store.snapshot().impressions[0]
+    assert before.mention_count == 1
+
+    store.record_mention(["钓鱼"], origin="companion")
+    after = store.snapshot().impressions[0]
+    assert after.mention_count == 1
+    assert after.last_seen == before.last_seen
+
+    store.record_mention(["钓鱼"], origin="player")
+    assert store.snapshot().impressions[0].mention_count == 2
+
+
+def test_companion_mention_still_creates_first_impression(store: MemoryStore) -> None:
+    """首次由她提起的话题仍留痕：她记得自己说过什么（只是不再自强化）。"""
+    store.record_mention(["月见草"], origin="companion")
+    impression = store.snapshot().impressions[0]
+    assert impression.topic == "月见草"
+    assert impression.origin == "companion"
+    assert impression.mention_count == 1
+
+
+def test_player_mention_upgrades_companion_origin(store: MemoryStore) -> None:
+    """她先提、玩家后提：来源升级为 player（注入措辞不再说成「她自己提的」）。"""
+    store.record_mention(["月见草"], origin="companion")
+    store.record_mention(["月见草"], origin="player")
+    impression = store.snapshot().impressions[0]
+    assert impression.origin == "player"
+    assert impression.mention_count == 2
+
+
+def test_retrieve_impressions_cools_down_recently_discussed_topics(
+    store: MemoryStore,
+) -> None:
+    """近期会话里已聊过的话题本轮不注入（防复读同一话题）。"""
+    from app.services.memory.retrieval import retrieve_impressions
+
+    store.record_mention(["钓鱼"])
+    store.record_mention(["旅行者"])
+    assert {i.topic for i in retrieve_impressions(store)} == {"钓鱼", "旅行者"}
+
+    cooled = retrieve_impressions(store, recent_texts=["我们聊聊钓鱼吧"])
+    assert [i.topic for i in cooled] == ["旅行者"]
+
+
+def test_drop_impressions_removes_topics_and_persists(store: MemoryStore) -> None:
+    """旧数据清洗入口：按主题删除并落盘，未命中的主题不受影响。
+
+    噪声主题走合并入口会被直接过滤，因此这里直接注入快照——模拟过滤规则
+    升级**之前**已经落在盘上的历史数据。
+    """
+    from app.schemas.memory import TopicImpression
+
+    store.record_mention(["钓鱼"])
+    with store._lock:
+        store._snapshot.impressions.extend(
+            [TopicImpression(topic="不过"), TopicImpression(topic="人机味")]
+        )
+    assert store.drop_impressions({"不过", "人机味", "不存在的主题"}) == 2
+    assert [i.topic for i in store.snapshot().impressions] == ["钓鱼"]
+
+    reloaded = MemoryStore("companion.alice", root=str(store._dir.parent))
+    reloaded.load()
+    assert [i.topic for i in reloaded.snapshot().impressions] == ["钓鱼"]
+
+
 def test_concurrent_append_is_thread_safe(tmp_path) -> None:
     """并发写入不丢条目、不损坏文件（T020 并发安全）。"""
     store = MemoryStore("companion.alice", root=str(tmp_path))

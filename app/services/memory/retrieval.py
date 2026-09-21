@@ -50,11 +50,14 @@ def retrieve_impressions(
     store: _SnapshotProvider,
     *,
     share: int | None = None,
+    recent_texts: list[str] | None = None,
 ) -> list[TopicImpression]:
     """检索达到注入阈值的模糊印象，按现算权重降序、截固定份额。
 
-    权重随半衰期衰减：长期不再被提及的主题自然淡出注入。存储层故障
-    降级为空列表（FR-011 同语义）。
+    权重随半衰期衰减：长期不再被提及的主题自然淡出注入。``recent_texts``
+    为近期会话原文（玩家与她的都算）：**已经聊过的话题本轮不再注入**——
+    注入的目的是让印象自然浮出，而不是每轮复读同一话题（实测 2026-09-21
+    话题重复问题）。存储层故障降级为空列表（FR-011 同语义）。
     """
     if share is None:
         share = get_settings().memory_impression_injection_share
@@ -70,6 +73,8 @@ def retrieve_impressions(
     for impression in snapshot.impressions:
         if looks_like_noise(impression.topic):  # 旧数据里已落的噪声碎片不再注入
             continue
+        if recent_texts and any(impression.topic in text for text in recent_texts):
+            continue  # 近期已聊过：本轮冷却，不重复注入
         days_ago = _days_ago(impression.last_seen, now)
         if (
             tier_of(

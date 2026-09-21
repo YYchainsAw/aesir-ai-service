@@ -171,6 +171,11 @@ class MemoryStore:
         在意加深可以强化，淡化不回退（与 ``salient`` 旗标同一语义）。
         ``origin`` 记录谁先提的（player/companion）；companion 主题被
         玩家随后提及时升级为 player。
+
+        自我强化防护（实测 2026-09-21「钓鱼 24 次」回路）：**她自己反复
+        提起的话题不加深印象、不刷新时间**——否则「注入 → 她提起 → 计数
+        +1 → 更必注入」形成正反馈，长会话里话题越聊越窄。companion 来源
+        仅在首次出现时留痕（她记得自己说过什么），此后只有玩家提及才升级。
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
@@ -195,6 +200,8 @@ class MemoryStore:
                 self._snapshot.impressions.append(impression)
                 existing[topic] = impression
                 continue
+            if origin == "companion":
+                continue  # 她自己提过：不加深、不刷新（防自我强化循环）
             prior.mention_count += 1
             prior.last_seen = now
             if origin == "player":
@@ -259,6 +266,23 @@ class MemoryStore:
         with self._lock:
             self._snapshot = MemorySnapshot()
             self._persist_locked()
+
+    def drop_impressions(self, topics: set[str]) -> int:
+        """按主题名移除印象条目，返回移除数（旧数据清洗用）。
+
+        过滤规则升级（停用词/黑名单扩充）后，历史数据里已落的噪声碎片
+        不会自愈——检索端虽已跳过，但占用容量与调试视图；此入口供一次性
+        清洗脚本使用。
+        """
+        with self._lock:
+            before = len(self._snapshot.impressions)
+            self._snapshot.impressions = [
+                i for i in self._snapshot.impressions if i.topic not in topics
+            ]
+            removed = before - len(self._snapshot.impressions)
+            if removed:
+                self._persist_locked()
+            return removed
 
     # -- 内部 ---------------------------------------------------------------
     @staticmethod

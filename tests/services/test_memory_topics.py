@@ -56,6 +56,12 @@ class TestTopicBlacklist:
         for topic in ("钓鱼", "上海", "蘑菇"):
             assert is_blocked_topic(topic) is False
 
+    def test_meta_talk_about_being_an_ai_is_blocked(self):
+        # 实测 2026-09-21：「幻视」「人机味」被当成玩家印象存下来，注入后
+        # 只会让角色继续往「你是不是 AI」这条线上跑。
+        for topic in ("幻视", "幻觉", "人机", "人机味"):
+            assert is_blocked_topic(topic) is True
+
     def test_extract_topics_filters_blacklisted_fragments(self):
         # 迁移实测出现过的碎片：角色名 / 记忆元语言，不该成为印象主题。
         assert extract_topics("我叫艾莉，记得我的名字") == []
@@ -71,6 +77,11 @@ class TestNoiseTopics:
     def test_connective_fragments_are_noise(self):
         # 迁移实测出现过的碎片：LLM 顺带返回了「不过」「趁天」「意思呀」。
         for topic in ("不过", "趁天", "意思呀", "正好", "然后"):
+            assert looks_like_noise(topic) is True
+
+    def test_demonstrative_and_possessive_fragments_are_noise(self):
+        # 实测 2026-09-21 落进印象层的碎片：指代/领属词本身不是话题。
+        for topic in ("这话", "那话", "你的", "我的", "那你", "你说", "我说"):
             assert looks_like_noise(topic) is True
 
     def test_real_topics_are_not_noise(self):

@@ -39,7 +39,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id)
+    impressions = _recall_impressions(request.companion_id, history)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend == "llm":
@@ -93,7 +93,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id)
+    impressions = _recall_impressions(request.companion_id, history)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend != "llm":
@@ -275,10 +275,17 @@ def _recall(companion_id: str) -> list[MemoryEntry]:
         return []
 
 
-def _recall_impressions(companion_id: str) -> list:
-    """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。"""
+def _recall_impressions(companion_id: str, history: tuple = ()) -> list:
+    """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。
+
+    ``history`` 为近期会话原文：已经聊过的话题本轮冷却不注入（防话题
+    重复复读，实测 2026-09-21）。
+    """
     try:
-        return retrieve_impressions(get_memory_store(companion_id))
+        recent_texts = [t.user_text for t in history] + [t.reply_text for t in history]
+        return retrieve_impressions(
+            get_memory_store(companion_id), recent_texts=recent_texts or None
+        )
     except MemoryStoreError:
         return []
 

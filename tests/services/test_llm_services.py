@@ -115,6 +115,31 @@ def test_companion_llm_prompt_injects_conversation_history() -> None:
     assert stub.user_prompt == "刚说到哪了？"
 
 
+def test_memory_honesty_rule_present_even_without_history_or_memories() -> None:
+    """「不得编造过去」是常驻约束，不随历史/记忆有无开关（修首轮幻视）。
+
+    实测 2026-09-21：会话第一轮（无历史）她说出「上次的烤鱼」，凭空断言
+    过去事件——当时该约束被包在 ``if history:`` 里，首轮根本不生效。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯？",
+            "emotion_id": "emotion.thoughtful",
+            "gesture_id": "gesture.think",
+            "facial_expression_id": "face.thoughtful",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="在吗？", session_id="s1"))
+
+    prompt = stub.system_prompt
+    assert "Memory honesty" in prompt
+    assert "NEVER assert a specific past event" in prompt
+    assert "Recent conversation" not in prompt  # 无历史时不注入对话块
+
+
 def test_tactical_llm_parser_rejects_extra_fields() -> None:
     parser = LLMCommandParser(
         StubLLMClient(

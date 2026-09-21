@@ -58,6 +58,9 @@ aesir-ai-service/
 │   └── boss/                      # Boss-as-agent + UE schema v4
 ├── scripts/
 │   ├── command_service/           # ASR 评估与假 UE 联调
+│   ├── metrics_report.py          # 验收指标采集（US7 / T079）
+│   ├── migrate_memory_impressions.py   # 旧逐字记忆 → 主题印象（一次性）
+│   ├── prune_noise_impressions.py      # 清洗印象层历史噪声（一次性）
 │   └── rl/
 │       └── boss/                  # Boss 训练/评估入口
 ├── data/
@@ -210,6 +213,8 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 验收指标采集（US7 / T079）：`.\.venv\Scripts\python -m scripts.metrics_report` 汇总执行回执、降级次数、复读轮数与话题延续率（`--json` 为机器可读格式）。
 
+记忆维护（一次性脚本，均支持 `--dry-run` 预览）：`scripts.migrate_memory_impressions` 把旧的逐字玩家发言迁成主题印象；`scripts.prune_noise_impressions` 清洗印象层里已判为噪声/黑名单的历史主题（过滤规则升级后旧数据不会自愈）。
+
 ## 路线图
 
 - [x] 规则解析器：支持首批 5 条战术指令（契约 v0.1 判别联合）
@@ -224,6 +229,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
 - [x] US4 加固（2026-09-21）：意图白名单按域扩展 4 个非战斗意图；`/v1/agent/step` 文本路径与 `/v1/tactical/*` 共用同一决策层（战斗意图含关系调制，非战斗意图映射 agency 行为目录）；回归集加关系阶段维度
 - [x] US7 可解释性（2026-09-21）：响应统一携带 persona_revision / memory_layers 链路字段；调试台扩展场景/情绪/关系/近期记忆；mock_ue_flow 全链路可解释演示；`scripts.metrics_report` 验收指标采集
+- [x] 对话实测三修（2026-09-21）：prompt 常驻「不得凭空断言过去事件」（修首轮幻视）；`origin=companion` 的提及不再自我强化 + 近期已聊话题检索冷却（修印象正反馈回路与复读）；印象噪声/黑名单扩充 + 历史数据清洗脚本
 - [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 

@@ -476,11 +476,19 @@ def _build_system_prompt(
             "vary emotion_id / gesture_id / facial_expression_id choices instead "
             "of defaulting to the same ones."
         )
-        lines.append(
-            "Memory honesty: never claim the player said or agreed to something "
-            "not shown in the recent conversation or memories above. If unsure, "
-            "phrase it as a vague impression or simply ask the player."
-        )
+
+    # 事实诚实（实测 2026-09-21「烤鱼幻视」）：无论有没有会话历史都必须遵守——
+    # 首轮没有历史时模型最容易把假设当既定事实编圆。涉及具体过去事件，
+    # 没有记录就必须不确定或反问，绝不用确定语气补细节。
+    lines.append(
+        "Memory honesty: everything you know about the past is ONLY the recent "
+        "conversation, the long-term memories, and the fuzzy impressions shown "
+        "above (fuzzy impressions are topic-level only — they contain no facts). "
+        "NEVER assert a specific past event (something was eaten, done, said, or "
+        "promised) unless it appears there; if the player asks about something "
+        "you have no record of, express uncertainty or ask them back — never "
+        "fill in details with a confident tone."
+    )
 
     examples = _format_dialogue_examples(profile)
     if examples:
