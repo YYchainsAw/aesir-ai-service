@@ -59,3 +59,27 @@ def _isolate_memory_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     memory_store_module.reset_memory_stores()
     yield
     memory_store_module.reset_memory_stores()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_relationship_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """关系体系测试隔离：运行期关系状态一律落在临时目录，不污染 data/relationship/。
+
+    （与记忆同款约定；US5 事件联动会写关系数值，因此 API 测试也必须隔离。）
+    """
+    monkeypatch.setenv("AESIR_RELATIONSHIP_ROOT", str(tmp_path / "relationship"))
+    from app.services.relationship import state as relationship_state_module
+
+    relationship_state_module.reset_relationship_stores()
+    yield
+    relationship_state_module.reset_relationship_stores()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dialogue_signals_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """对话信号埋点隔离：测试的 JSONL 一律落临时目录，不污染真实信号数据。
+
+    信号数据是 RL 前置资产，混入测试 mock 回复会污染日后训练/分析。
+    """
+    monkeypatch.setenv("AESIR_DIALOGUE_SIGNALS_DIR", str(tmp_path / "signals"))
+    yield

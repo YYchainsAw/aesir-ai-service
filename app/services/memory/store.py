@@ -19,10 +19,12 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
+from app.services.memory.facts import dedup_key
 from app.services.memory.summarizer import summarize_experiences
 from app.services.memory.topics import extract_topics as _extract_topics
 from app.services.memory.topics import impression_weight as _impression_weight
 from app.services.memory.topics import is_blocked_topic as _is_blocked_topic
+from app.services.memory.topics import looks_like_noise as _looks_like_noise
 
 # 淘汰序：重要性越低越先淘汰；同级别按时间越旧越先淘汰（FR-008）
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
@@ -99,7 +101,12 @@ class MemoryStore:
 
     # -- 写入 ---------------------------------------------------------------
     def record_mention(
-        self, topics: list[str], *, salient: bool = False, salience_boost: float | None = None
+        self,
+        topics: list[str],
+        *,
+        salient: bool = False,
+        salience_boost: float | None = None,
+        origin: str = "player",
     ) -> None:
         """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
 
@@ -116,7 +123,8 @@ class MemoryStore:
         now = _utc_now_iso()
         with self._lock:
             self._merge_mentions_locked(
-                topics, now=now, salient=salient, salience_boost=salience_boost
+                topics, now=now, salient=salient,
+                salience_boost=salience_boost, origin=origin
             )
             self._evict_impressions_locked()
             self._persist_locked()
@@ -155,16 +163,24 @@ class MemoryStore:
         now: str,
         salient: bool = False,
         salience_boost: float | None = None,
+        origin: str = "player",
     ) -> None:
         """按主题合并计数并刷新权重（调用方须持锁）。
 
         黑名单主题统一在此过滤——LLM 顺带返回、规则提取、迁移脚本三条
         路径都汇到本入口。显著话题的 ``salience_boost`` 取历史最大值：
         在意加深可以强化，淡化不回退（与 ``salient`` 旗标同一语义）。
+        ``origin`` 记录谁先提的（player/companion）；companion 主题被
+        玩家随后提及时升级为 player。
+
+        自我强化防护（实测 2026-09-21「钓鱼 24 次」回路）：**她自己反复
+        提起的话题不加深印象、不刷新时间**——否则「注入 → 她提起 → 计数
+        +1 → 更必注入」形成正反馈，长会话里话题越聊越窄。companion 来源
+        仅在首次出现时留痕（她记得自己说过什么），此后只有玩家提及才升级。
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
-            if _is_blocked_topic(topic):
+            if _is_blocked_topic(topic) or _looks_like_noise(topic):
                 continue
             effective_boost = salience_boost if salient else None
             prior = existing.get(topic)
@@ -173,6 +189,7 @@ class MemoryStore:
                     topic=topic,
                     salient=salient,
                     salience_boost=effective_boost,
+                    origin=origin,
                     last_seen=now,
                 )
                 impression.weight = _impression_weight(
@@ -184,8 +201,12 @@ class MemoryStore:
                 self._snapshot.impressions.append(impression)
                 existing[topic] = impression
                 continue
+            if origin == "companion":
+                continue  # 她自己提过：不加深、不刷新（防自我强化循环）
             prior.mention_count += 1
             prior.last_seen = now
+            if origin == "player":
+                prior.origin = "player"
             if salient:
                 prior.salient = True
                 if effective_boost is not None:
@@ -222,11 +243,23 @@ class MemoryStore:
             self._persist_locked()
 
     def record_experience(self, entries: list[MemoryEntry]) -> None:
-        """共同经历：落盘时聚合为摘要条目（T026：事件触发，非逐条写盘）。"""
+        """共同经历：落盘时聚合为摘要条目（T026：事件触发，非逐条写盘）。
+
+        按内容去重：同一事件重放（幂等缓存被清、进程重启后的补报）不重复
+        记一条经历——摘要层是追加语义，没有这道兜底会随重放膨胀。
+        """
         if not entries:
             return
         with self._lock:
-            self._snapshot.summaries.extend(summarize_experiences(entries))
+            existing = {entry.content for entry in self._snapshot.summaries}
+            fresh = [
+                summary
+                for summary in summarize_experiences(entries)
+                if summary.content not in existing
+            ]
+            if not fresh:
+                return
+            self._snapshot.summaries.extend(fresh)
             self._snapshot.summaries = self._evict(
                 self._snapshot.summaries, self._summary_limit
             )
@@ -234,18 +267,60 @@ class MemoryStore:
 
     def record_fact(self, entry: MemoryEntry) -> None:
         """长期档案：事实与承诺；承诺类（critical）不被淘汰（FR-008）。"""
+        self.record_facts([entry])
+
+    def record_facts(self, entries: list[MemoryEntry]) -> int:
+        """批量写档案（一轮对话抽出的多条事实一次落盘），返回新增条数。
+
+        按内容去重：同一件事再提一次不新增条目，只**刷新时间戳**——她记得
+        的还是同一件事，而「最近又提到过」应当让它更难被淘汰（``_evict``
+        同重要性下先淘汰最旧的）。重要性取两者中更高的一档，不因重述而降级。
+        """
+        if not entries:
+            return 0
         with self._lock:
-            self._snapshot.archive.append(entry)
+            index = {dedup_key(e.content): e for e in self._snapshot.archive}
+            added = 0
+            for entry in entries:
+                prior = index.get(dedup_key(entry.content))
+                if prior is not None:
+                    prior.real_time = entry.real_time
+                    if _IMPORTANCE_ORDER.get(entry.importance, 2) < _IMPORTANCE_ORDER.get(
+                        prior.importance, 2
+                    ):
+                        prior.importance = entry.importance
+                    continue
+                self._snapshot.archive.append(entry)
+                index[dedup_key(entry.content)] = entry
+                added += 1
             self._snapshot.archive = self._evict(
                 self._snapshot.archive, self._archive_limit, protect_promise=True
             )
             self._persist_locked()
+            return added
 
     def clear(self) -> None:
         """清空该角色全部记忆（记忆重置，FR-010 / T029）。"""
         with self._lock:
             self._snapshot = MemorySnapshot()
             self._persist_locked()
+
+    def drop_impressions(self, topics: set[str]) -> int:
+        """按主题名移除印象条目，返回移除数（旧数据清洗用）。
+
+        过滤规则升级（停用词/黑名单扩充）后，历史数据里已落的噪声碎片
+        不会自愈——检索端虽已跳过，但占用容量与调试视图；此入口供一次性
+        清洗脚本使用。
+        """
+        with self._lock:
+            before = len(self._snapshot.impressions)
+            self._snapshot.impressions = [
+                i for i in self._snapshot.impressions if i.topic not in topics
+            ]
+            removed = before - len(self._snapshot.impressions)
+            if removed:
+                self._persist_locked()
+            return removed
 
     # -- 内部 ---------------------------------------------------------------
     @staticmethod

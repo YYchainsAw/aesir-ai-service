@@ -46,11 +46,22 @@ class Priorities:
 
 
 @dataclass(frozen=True)
+class AbilitySpec:
+    """能力目录中的一个战斗能力（FR-035：能力注册表的数据来源）。"""
+
+    name: str          # 短名，与 priorities 的键同域（如 major_heal）
+    id: str            # 稳定 ID，UE 侧能力标识（如 ability.alice.major_heal）
+    display_name: str
+    description: str
+
+
+@dataclass(frozen=True)
 class TacticalPolicy:
     revision: str
     event_revision: str
     thresholds: Thresholds
     priorities: Priorities
+    abilities: dict[str, AbilitySpec]
 
 
 def _require(mapping: dict[str, Any], key: str, parent: str) -> Any:
@@ -99,6 +110,23 @@ def _build(path: Path) -> TacticalPolicy:
         if not 0 <= value <= 100:
             raise TacticalPolicyError(f"priorities.{name} 必须在 [0,100]，收到 {value}")
 
+    abilities_raw = _require(raw, "abilities", "顶层")
+    if not isinstance(abilities_raw, dict) or not abilities_raw:
+        raise TacticalPolicyError("abilities 必须是非空映射")
+    abilities: dict[str, AbilitySpec] = {}
+    for name, spec_raw in abilities_raw.items():
+        if not isinstance(spec_raw, dict):
+            raise TacticalPolicyError(f"abilities.{name} 必须是映射")
+        ability_id = str(_require(spec_raw, "id", f"abilities.{name}"))
+        if ability_id in {spec.id for spec in abilities.values()}:
+            raise TacticalPolicyError(f"能力 ID 重复：{ability_id}")
+        abilities[str(name)] = AbilitySpec(
+            name=str(name),
+            id=ability_id,
+            display_name=str(_require(spec_raw, "display_name", f"abilities.{name}")),
+            description=str(spec_raw.get("description", "")),
+        )
+
     revision = str(_require(raw, "revision", "顶层"))
     event_revision = str(_require(raw, "event_revision", "顶层"))
     return TacticalPolicy(
@@ -106,6 +134,7 @@ def _build(path: Path) -> TacticalPolicy:
         event_revision=event_revision,
         thresholds=thresholds,
         priorities=priorities,
+        abilities=abilities,
     )
 
 

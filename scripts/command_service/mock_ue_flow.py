@@ -269,6 +269,65 @@ def main(url: str) -> int:
     #     —— 限流仍会先 429，此处直接展示服务端 THROTTLED 路径见 API 测试。
 
     print("\nUS3 演示完成：非战斗场景产出合理且不重复的自主行为。")
+
+    # 10. US7 全链路可解释演示（T078）：输入 → 理解 → 关系阶段 → 决策 → 依据 → 结果。
+    #    用主入口文本指令路径（T075：与 /v1/tactical 同一决策层）逐段打印。
+    print("\n=== US7 可解释链路演示（输入 → 理解 → 关系 → 决策 → 依据 → 结果）===")
+
+    def _explain_step(title: str, text: str, world_context: dict) -> None:
+        _time.sleep(2.2)  # 心跳限流
+        payload = {
+            "protocol_version": "0.3",
+            "request_id": _rid(),
+            "companion_id": "companion.alice",
+            "text": text,
+            "world_context": world_context,
+        }
+        response = client.post("/v1/agent/step", json=payload)
+        body = response.json()
+        obs = body.get("observability", {})
+        directive = body.get("directive")
+        reasons = obs.get("reason_codes", [])
+        # 抽出意图/关系码单独展示
+        intent_codes = [c for c in reasons if c.startswith("INTENT:")]
+        rel_codes = [c for c in reasons if c.startswith("RELATIONSHIP_")]
+        other_codes = [c for c in reasons if not c.startswith(("INTENT:", "RELATIONSHIP_"))]
+        print(
+            f"\n--- {title}"
+            f"\n  [输入]   \"{text}\""
+            f"\n  [理解]   {intent_codes or '（未识别意图）'}"
+            f"\n  [关系]   stage={obs.get('relationship_stage')!r} {rel_codes}"
+            f"\n  [决策]   action={body.get('action')}"
+            f"  behavior={directive['action_type'] if directive else None}"
+            f"\n  [依据]   {other_codes}"
+            f"  （策略 {obs.get('policy_revision')}，人设 {obs.get('persona_revision')}）"
+            f"\n  [结果]   reply_text={body.get('reply_text')!r}"
+            f"\n  [快照]   used_snapshot_id={obs.get('used_snapshot_id')}"
+        )
+
+    # 10a. 战斗指令：濒危快照 A + 治疗意图 → 强效治疗
+    critical_combat = json.loads((GOLDEN_DIR / "snapshot_a_critical.json").read_text(encoding="utf-8"))
+    combat_world = {
+        "snapshot_id": "77777777-7777-4777-8777-777777777777",
+        "captured_at": "2026-09-21T12:00:00Z",
+        "scene": "combat",
+        "player": {"id": "party.player", "hp_percent": critical_combat["player"]["hp_percent"]},
+        "companion": {"id": "companion.alice", "hp_percent": 90, "mp_percent": 70},
+        "combat": critical_combat,
+    }
+    _explain_step("战斗指令（濒危快照）", "艾莉，快奶我一口", combat_world)
+
+    # 10b. 非战斗指令：探索快照 + 查看意图 → inspect 指令（快照内目标）
+    explore_world = json.loads(
+        (GOLDEN_DIR / "world_snapshot_exploration.json").read_text(encoding="utf-8")
+    )
+    _explain_step("非战斗指令（探索快照）", "艾莉，看看那个路标", explore_world)
+
+    # 10c. 调试台（T077）：场景 / 情绪 / 关系 / 近期记忆 / 版本一览
+    state = client.get("/v1/console/state", params={"companion_id": "companion.alice"})
+    _show("GET /v1/console/state（US7 调试台）", state.status_code, state.json())
+
+    print("\nUS7 演示完成：每一次决策都可逐段解释。")
     return 0
 
 

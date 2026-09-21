@@ -605,6 +605,43 @@ combat_event_reactions:
     gesture_id: gesture.enthusiastic_nod
     facial_expression_id: face.excited
 
+# v0.3 /v1/world/events 的生活事件反应（US5 首版六类）。结构与
+# combat_event_reactions 一致，服务端按 event_type 读取；ID 越界或缺失时
+# 同样回退到安全默认反应。其中 gift_given / companion_recovered /
+# player_protected_companion / promise_kept 同时驱动关系数值
+# （幅度见 data/policy/relationship_policy.yaml）。
+world_event_reactions:
+  region_first_entered:
+    reply_text: "这地方我还没来过……别走太快，我先看看周围。"
+    emotion_id: emotion.thoughtful
+    gesture_id: gesture.think
+    facial_expression_id: face.thoughtful
+  weather_changed:
+    reply_text: "天色不太对，等下要是下起来，我们找个地方躲一躲。"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.concerned
+  gift_given:
+    reply_text: "给我的？……那我就收下了，谢谢你。"
+    emotion_id: emotion.shy
+    gesture_id: gesture.look_away
+    facial_expression_id: face.shy
+  companion_recovered:
+    reply_text: "呼——总算缓过来了。你也没事吧？"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.cheerful_idle
+    facial_expression_id: face.gentle_smile
+  player_protected_companion:
+    reply_text: "你——你干嘛替我挡啊！让我看看伤到哪儿了！"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.concerned
+  promise_kept:
+    reply_text: "你真的做到了……我一直都记着呢，谢谢你。"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.gentle_smile
+
 allowed_emotion_ids:
   - id: emotion.bright
     description: "默认的开朗、积极状态。"

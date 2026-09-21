@@ -15,8 +15,10 @@ from app.services.companion.profile_repository import (
     UnknownCompanionError,
     get_profile,
 )
+from app.services.companion.dialogue_signals import record_turn_signal
 from app.services.companion.session_memory import get_session_memory
 from app.services.llm.client import LLMClientError
+from app.services.memory.facts import is_grounded
 from app.services.memory.store import MemoryStore, MemoryStoreError, get_memory_store
 from app.services.memory.retrieval import retrieve, retrieve_impressions
 from app.services.memory.topics import extract_topics, looks_salient
@@ -38,7 +40,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id)
+    impressions = _recall_impressions(request.companion_id, history)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend == "llm":
@@ -50,19 +52,31 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 memories=memories,
                 impressions=impressions,
                 relationship_stage=stage,
+                world_context=request.world_context,
             )
             topics = service.last_topics
+            facts = service.last_facts
             salient = service.last_salient
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
+            facts = None
             salient = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
+        facts = None
         salient = None
     response.relationship_stage = stage
-    _record_turn(request, response, topics=topics, salient=salient)
+    _annotate_observability(response, profile, memories=memories, impressions=impressions)
+    _record_turn(
+        request,
+        response,
+        topics=topics,
+        facts=facts,
+        salient=salient,
+        injected_topics=[i.topic for i in impressions],
+    )
     return response
 
 
@@ -84,11 +98,14 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     history = memory.history(request.session_id) if request.session_id else ()
 
     memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id)
+    impressions = _recall_impressions(request.companion_id, history)
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend != "llm":
-        return _stream_mock_reply(request, profile=profile, source="mock", stage=stage)
+        return _stream_mock_reply(
+            request, profile=profile, source="mock", stage=stage,
+            memories=memories, impressions=impressions,
+        )
 
     return _stream_llm_reply(
         request,
@@ -118,6 +135,7 @@ def _stream_llm_reply(
             memories=memories,
             impressions=impressions,
             relationship_stage=stage,
+            world_context=request.world_context,
         ):
             if event.kind == "delta":
                 emitted_delta = True
@@ -127,7 +145,12 @@ def _stream_llm_reply(
                 request,
                 event.response,
                 topics=service.last_topics,
+                facts=service.last_facts,
                 salient=service.last_salient,
+                injected_topics=[i.topic for i in impressions],
+            )
+            _annotate_observability(
+                event.response, profile, memories=memories, impressions=impressions
             )
             yield _with_stage(event, stage)
             return
@@ -135,7 +158,10 @@ def _stream_llm_reply(
         if emitted_delta:
             yield StreamEvent(kind="error", text="LLM stream interrupted; this turn is incomplete.")
             return
-        yield from _stream_mock_reply(request, profile=profile, source="fallback", stage=stage)
+        yield from _stream_mock_reply(
+            request, profile=profile, source="fallback", stage=stage,
+            memories=memories, impressions=impressions,
+        )
 
 
 def _stream_mock_reply(
@@ -144,10 +170,13 @@ def _stream_mock_reply(
     profile: CompanionProfile,
     source: str,
     stage: str,
+    memories: list[MemoryEntry],
+    impressions: list,
 ) -> Iterator[StreamEvent]:
     """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
     response = _create_mock_dialogue_reply(request, profile=profile, source=source)
     _record_turn(request, response)
+    _annotate_observability(response, profile, memories=memories, impressions=impressions)
     if response.reply_text:
         yield StreamEvent(kind="delta", text=response.reply_text)
     yield _with_stage(StreamEvent(kind="meta", response=response), stage)
@@ -159,22 +188,58 @@ def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
     return event
 
 
+def _note_runtime(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:
+    """US7（T077）：记录最近情绪，供调试台查询；任何故障静默。"""
+    try:
+        from app.services.console.runtime_state import record_observation
+
+        record_observation(request.companion_id, emotion_id=response.emotion_id)
+    except Exception:
+        pass
+
+
+def _annotate_observability(
+    response: CompanionDialogueResponse,
+    profile: CompanionProfile,
+    *,
+    memories: list[MemoryEntry],
+    impressions: list,
+) -> None:
+    """US7（T076）链路信息：人设版本 + 本轮实际注入的记忆条数（按通道）。
+
+    只报事实：mock/回退路径同样注入了记忆（供埋点口径统一），但回退回复
+    未必使用——仍如实记录注入量。
+    """
+    response.persona_revision = str(profile.raw.get("profile_version", ""))
+    response.memory_layers = {
+        "long_term": len(memories),
+        "impressions": len(impressions),
+    }
+
+
 def _record_turn(
     request: CompanionDialogueRequest,
     response: CompanionDialogueResponse,
     *,
     topics: list[str] | None = None,
+    facts: list[str] | None = None,
     salient: bool | None = None,
+    injected_topics: list[str] | None = None,
 ) -> None:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    双通道：``topics``/``salient`` 为 LLM 顺带返回；``None``（mock/回退
-    路径）退化为规则提取。郑重声明（salient）逐字入档案（玩家期待精确
-    复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；普通
-    发言只入印象层。艾莉自己的回复也提取主题入印象（非显著）——她记得
-    自己说过什么，反复谈起的话题同样形成印象。
+    三通道：``topics``/``facts``/``salient`` 为 LLM 顺带返回；``None``
+    （mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空——规则
+    切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案（玩家
+    期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
+    普通发言的主题只入印象层，陈述出的事实经接地校验后入档案。艾莉自己的
+    回复也提取主题入印象（非显著）——她记得自己说过什么，反复谈起的话题
+    同样形成印象。``injected_topics`` 为本轮注入 prompt 的印象主题（埋点用，
+    见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
+    prior_history = memory.history(request.session_id) if request.session_id else ()
+    _note_runtime(request, response)
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
     if topics is None:
@@ -183,13 +248,39 @@ def _record_turn(
         salient = looks_salient(request.text)
     if salient:
         _remember_fact(request.companion_id, request.text)
+    _remember_facts(
+        request.companion_id,
+        facts or [],
+        # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
+        # 也能落地，但凭空捏造的仍会被拦下）。
+        sources=[request.text, *(t.user_text for t in prior_history)],
+    )
     salience_boost = _care_scaled_boost(request.companion_id) if salient else None
     _remember_turn(
         request.companion_id, topics, salient=salient, salience_boost=salience_boost
     )
     reply_topics = extract_topics(response.reply_text)
     if reply_topics:
-        _remember_turn(request.companion_id, reply_topics)
+        # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
+        # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
+        _remember_turn(request.companion_id, reply_topics, origin="companion")
+
+    # 信号埋点（RL 前置）：先用记录前的会话历史算复读度/话题延续，再落 JSONL；
+    # 任何故障静默（绝不阻塞对话）。
+    record_turn_signal(
+        request.companion_id,
+        request.session_id,
+        player_text=request.text,
+        reply_text=response.reply_text,
+        source=response.source or "mock",
+        emotion_id=response.emotion_id,
+        gesture_id=response.gesture_id,
+        facial_expression_id=response.facial_expression_id,
+        game_state=request.game_state,
+        injected_topics=injected_topics,
+        previous_player_texts=[t.user_text for t in prior_history],
+        previous_reply_texts=[t.reply_text for t in prior_history],
+    )
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:
@@ -200,10 +291,17 @@ def _recall(companion_id: str) -> list[MemoryEntry]:
         return []
 
 
-def _recall_impressions(companion_id: str) -> list:
-    """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。"""
+def _recall_impressions(companion_id: str, history: tuple = ()) -> list:
+    """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。
+
+    ``history`` 为近期会话原文：已经聊过的话题本轮冷却不注入（防话题
+    重复复读，实测 2026-09-21）。
+    """
     try:
-        return retrieve_impressions(get_memory_store(companion_id))
+        recent_texts = [t.user_text for t in history] + [t.reply_text for t in history]
+        return retrieve_impressions(
+            get_memory_store(companion_id), recent_texts=recent_texts or None
+        )
     except MemoryStoreError:
         return []
 
@@ -227,11 +325,12 @@ def _remember_turn(
     *,
     salient: bool = False,
     salience_boost: float | None = None,
+    origin: str = "player",
 ) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
         get_memory_store(companion_id).record_mention(
-            topics, salient=salient, salience_boost=salience_boost
+            topics, salient=salient, salience_boost=salience_boost, origin=origin
         )
     except MemoryStoreError:
         pass
@@ -255,6 +354,33 @@ def _care_scaled_boost(companion_id: str) -> float | None:
         return None
     settings = get_settings()
     return settings.memory_impression_salience_boost * care_scale(value)
+
+
+def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str]) -> int:
+    """把本轮抽出的事实写进长期档案（过接地校验），返回落档条数。
+
+    接地校验（``memory.facts.is_grounded``）是这条通道的**安全阀**：档案里的
+    事实会被当作「她确定知道的事」长期注入，一旦编造就是永久错误记忆——
+    比当场幻视严重得多。对不上玩家原话的事实直接丢弃（印象层仍留痕）。
+    写失败静默降级（与其余记忆写入同语义）。
+    """
+    grounded = [fact for fact in facts if is_grounded(fact, sources)]
+    if not grounded:
+        return 0
+    try:
+        return get_memory_store(companion_id).record_facts(
+            [
+                MemoryEntry(
+                    content=fact,
+                    importance="normal",
+                    source="player_statement",
+                    tags=["dialogue", "fact"],
+                )
+                for fact in grounded
+            ]
+        )
+    except MemoryStoreError:
+        return 0
 
 
 def _remember_fact(companion_id: str, player_text: str) -> None:

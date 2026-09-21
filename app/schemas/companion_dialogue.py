@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.world_context import WorldContext
+
 
 class CompanionDialogueRequest(BaseModel):
     """玩家发送给非战斗队友的文字消息。"""
@@ -31,6 +33,10 @@ class CompanionDialogueRequest(BaseModel):
             "N 轮滚动记忆并注入 LLM；缺省时本请求完全无状态（v0.1 行为不变）。"
         ),
     )
+    # US6（T069）：随本轮对话携带的世界快照（只读输入）。查证工具据此回答战况、
+    # 环境与自身状态类问题；缺省时这些工具按「无据可查」明确表示不确定。
+    # 可选字段，老请求不带它时行为与 v0.1 完全一致。
+    world_context: WorldContext | None = None
 
 
 class CompanionDialogueResponse(BaseModel):
@@ -50,3 +56,7 @@ class CompanionDialogueResponse(BaseModel):
     # US2（T042）：当前关系阶段（distant/neutral/friendly/close）；关系体系
     # 故障降级时为空字符串——UE 不应依赖该字段做表现逻辑。
     relationship_stage: str = ""
+    # US7（T076）链路信息：人设 YAML 的 profile_version 与本轮实际注入的
+    # 记忆条数（按通道：长期记忆 / 模糊印象）。缺省空——UE 不应依赖。
+    persona_revision: str = ""
+    memory_layers: dict[str, int] = Field(default_factory=dict)

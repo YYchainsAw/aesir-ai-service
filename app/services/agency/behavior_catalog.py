@@ -39,6 +39,7 @@ class BehaviorSpec:
     priority: int
     allowed_kinds: frozenset[str] | None  # None = 无目标行为（如 rest/self_talk）
     max_distance_m: float
+    description: str = ""  # 能力注册表（FR-035）登记本行为时的说明文案
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,7 @@ def _build(path: Path) -> AgencyPolicy:
             priority=priority,
             allowed_kinds=allowed_kinds,
             max_distance_m=float(spec_raw.get("max_distance_m", 0.0)),
+            description=str(spec_raw.get("description", "")),
         )
 
     arbiter_raw = _require(raw, "arbiter", "顶层")

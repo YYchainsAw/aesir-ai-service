@@ -33,6 +33,10 @@ def test_companion_chat_returns_mock_ue_friendly_response() -> None:
     assert body["facial_expression_id"] == "face.thoughtful"
     assert body["interruptible"] is True
     assert body["source"] == "mock"
+    # US7（T076）链路信息：人设版本 + 本轮注入的记忆条数（按通道）
+    assert body["persona_revision"] != ""
+    assert isinstance(body["memory_layers"], dict)
+    assert set(body["memory_layers"]) == {"long_term", "impressions"}
 
 
 def test_companion_chat_mock_fallback_is_deterministic_per_text() -> None:

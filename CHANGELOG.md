@@ -2,7 +2,59 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-16，**388 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-17，**491 通过 + 2 跳过**）。
+
+## 2026-09-17 — 语音陪伴对话端点（音频 → ASR → 对话）
+
+- **`POST /v1/companion/chat/voice`**（`app/api/v1/companion.py`）：multipart 音频 → 转写 → **既有**对话链路——记忆/关系/信号埋点全部生效，与 `/v1/voice/command`（音频→战术指令）同款模式但尾部接陪伴对话。请求带可选 `session_id` / `world_context_json`；响应 = `CompanionDialogueResponse` + `transcribed_text`（UE 展示「你说了什么」/ 调试转写质量）。契约记入 v0.1 附录 A（附加式扩展，不升版本）。
+- **错误语义**：转写故障 502、空转写 422——对话里「听错还硬答」比「明确听不清」更糟，不回退 mock 文本。
+- **测试**：新增 6 例（全链路含记忆/埋点生效、空转写、转写故障、未登记角色、非法 game_state/world_context），485 → **491 通过 + 2 跳过**。转写桩注入不加载真实模型；真实 faster_whisper 质量验证留待有真人录音时（历史决策不变）。
+
+## 2026-09-17 — 对话信号埋点（RL 路线的第 2 步：奖励的前提是数据）
+
+- **决策**：对话生成不用 RL 替代 LLM（动作空间 10^100+ / 奖励不可自动判定 / API 模型无法做策略梯度 / 8GB 显存跑不动 RLHF 流水线）；RL 的正确位置是「导演层」——记忆调度、表现选择。先埋点攒数据，攒够几百轮真实对话后复用 `rl/boss/` 脚手架（bandit 起步）。
+- **信号模块**（`services/companion/dialogue_signals.py`）：每轮对话向 `data/runtime/dialogue_signals/<companion_id>.jsonl` 追加一条记录——玩家否定反馈（实测日志出现过的「幻视/记岔/没说过/没答应/又模糊/返回相同」模式）、复读度（回复 vs 会话近期回复的字符二元组 Jaccard）、话题延续（主题重叠/包含关系，engagement 粗代理）、当轮注入的印象主题、情绪/手势/表情选择。
+- **挂点**：`_record_turn`（流式/非流式汇合点），记录会话历史**之前**采集上轮文本供比较；埋点任何故障静默（同 FR-011 纪律，绝不阻塞对话）。
+- **测试隔离**：`conftest` 新增 autouse 把 `AESIR_DIALOGUE_SIGNALS_DIR` 指到临时目录——信号是 RL 前置资产，测试 mock 回复混入会污染日后训练数据。
+- **配置**：`AESIR_DIALOGUE_SIGNALS_DIR`（默认 `data/runtime/dialogue_signals`，`data/runtime/` 已在 .gitignore）。
+- **测试**：新增 12 例（否定检测 2 + 复读度 4 + 话题延续 3 + 落盘/容错/跨轮 3），473 → **485 通过 + 2 跳过**。
+
+## 2026-09-17 — 实测反馈二修：印象防张冠李戴 + 防编造 + 防复读
+
+- **问题 1（张冠李戴）**：实测中艾莉说「你还说钓上来的鱼归我烤」——这话是她自己说的。上次改动让她自己的回复也入印象，但注入文案统一写成「玩家提过 X」，她把自己的话记成了玩家的话。**修复**：`TopicImpression` 新增 `origin`（player/companion，旧数据默认 player）；玩家后提及时 companion 主题升级为 player；注入文案区分——她的主题明确标注 "her own words, NOT the player's"。对话链路 `reply_topics` 落盘时标 `origin="companion"`。
+- **问题 2（编造细节）**：「刚才不是还嘴硬说不怕吗」（玩家从没说过）——模糊印象注入后模型自己脑补出「具体原话」。**修复**：注入块与 system prompt 双处加 Memory honesty 指令：绝不能声称玩家说过/答应过上下文与记忆里没有的话，不确定就模糊表述或反问。
+- **问题 3（复读机）**：句式「……不过……吧」反复出现，emotion/gesture 长时间锁同一个。**修复**：有会话历史时注入 Anti-repetition 指令：禁止复用近期轮次的句式/口头禅/开场（点名「……不过」模式），每轮变换句法、长度、节奏，情绪/手势/表情也要轮换。
+- **控制台 `/memory` 现在展示印象**：按权重前 10 条，标注谁提的（玩家/她自己）+ 次数 + 权重；`TopicImpressionView` 增加 `origin` 字段。
+- **测试**：3 个既有测试扩展断言（origin 持久化/升级、注入文案区分、控制台视图带 origin），**473 通过 + 2 跳过**（数量不变）。
+
+## 2026-09-17 — 记忆注入改为「近期必记 + 权重衰减」（实测反馈修复）
+
+- **问题**（真人实测反馈）：注入门槛是提及次数 ≥3 的硬门槛，而真实对话 55 条印象里 51 条只提过 1 次——昨天的闲聊 96% 被丢弃，「没有印象」；且门槛完全不看时间，与真人「时间不过太久就记得」相悖。
+- **注入判定改为权重阈值**（`topics.tier_of` 重写）：不看次数、看现算权重 `log2(1+次数) × 0.5^(距上次提及天数/半衰期)`。新配置 `AESIR_MEMORY_IMPRESSION_INJECT_WEIGHT`（默认 0.75）/ `AESIR_MEMORY_IMPRESSION_DEEP_WEIGHT`（默认 2.5），取代并删除 `MIN_MENTIONS`。默认语义：昨天聊过 1 次的闲聊也记得（权重 0.91），约 3 天淡出；提 2~3 次存活约 7~10 天；郑重声明 + 在意值缩放照旧拉长存活（28 天半衰期）。**近期必记 → 随时间衰减 → 因频率和重视程度增强**。
+- **注入份额 3→5**（`AESIR_MEMORY_IMPRESSION_INJECTION_SHARE` 默认值），近期话题在 prompt 文案中标注「刚聊过」，并指示模型可主动拉回近期话题（提升活人感）。
+- **口语噪声碎片过滤**（`topics.looks_like_noise`）：LLM 顺带返回的主题里实测出现「不过」「趁天」「意思呀」这类连接词/语气词碎片——不成话题，注入只会让角色说怪话。合并入口（LLM 返回/规则提取/迁移）与检索侧（兜住存量旧数据）双重过滤；提取 prompt 同步要求主题必须是 2~6 字具体名词。
+- **测试**：改写 8 个旧门槛语义断言，新增 11 例（近期单提/3 天淡出/频率强化存活/显著存活更久/噪声碎片 4 + store 检索 3），462 → **473 通过 + 2 跳过**。用真实 `memory.json`（昨日 55 条印象）验证：注入 5 条且噪声已拦。
+
+## 2026-09-17 — SDD Phase 7（US6）：能力注册表 + 只读查证 + 两轮调用
+
+- **能力注册表**（`services/skills/registry.py`，T067）：统一登记战斗行为 / 生活行为 / 信息工具三类（FR-035），且是既有配置源的**投影**而非第二份真相——测试守住「注册表与策略不漂移」。为此把战斗能力目录沉到 `tactical_policy.yaml` 新增 `abilities:` 段（ID / 展示名 / 描述），`resolver.py` 的 `ABIL_*` 常量改为从策略**派生**：能力 ID 从此只写一次，不在代码里另留一份字面量。
+- **只读查证工具**（`services/skills/tools.py`，T068）：`tool.lore.query`（世界观）、`tool.world.snapshot`（战况）、`tool.world.interactables`（环境）、`tool.self.status`（自身）、`tool.memory.recall`（记忆）五个工具全部只读，输出按 `AESIR_TOOLS_OUTPUT_MAX_CHARS` 裁剪（默认 400）。未命中一律 `found=False` + `TOOL_NO_RESULT` +「没有记载」文案——**编造在工具层就是不可能的**，不是「不鼓励」（FR-037）。模型给的查证请求先过 `run_lookup` 的结构校验（类型 / 白名单）才执行。
+- **两轮调用**（T069）：`llm_dialogue_service` 第一轮 prompt 附工具清单，模型可返回 `{"action":"lookup",...}` 索取查证；服务端执行只读查证后把结果回填第二轮 prompt。上限 2 轮 + 时间预算（`AESIR_TOOLS_LOOKUP_TIMEOUT_SECONDS`，超限降级为直接回应，FR-038）。流式路径复用同一逻辑：查证轮负载不含 `reply_text`，玩家不会看到半截话。`CompanionDialogueRequest` 新增**可选** `world_context` 字段（v0.1 向后兼容）——战况/环境/自身状态类查证以请求内快照为准，不用过期缓存。
+- **知识库**（T070，`data/world/lore.yaml`）：首版 4 条目（艾莉 / 能力目录 / 战斗分工 / Boss 眩晕），全部登记来源（FR-012）；加载器强制「没出处不进库」。收录纪律：**只收设计文档已确立的事实**——「这个遗迹是谁建的」刻意留空，正是「明确不确定」验收路径的用例。
+- **战斗链路禁用查证**（T071）：工具场景白名单不含 combat，注册表层面 `for_scene("combat", kind="info_tool")` 恒为空；查证只存在于非战斗对话链路。
+- **配置**：新增 `AESIR_TOOLS_{OUTPUT_MAX_CHARS,LOOKUP_TIMEOUT_SECONDS,MAX_ROUNDS}`。
+- **测试**：新增 54 例（注册表 17 + 工具命中/未命中 17 + 降级 14 + 两轮调用 6），408 → **462 通过 + 2 跳过**。
+
+## 2026-09-16 — SDD Phase 6（US5）：世界事件统一处理 + 幂等 + 关系联动
+
+- **统一决策层**（`services/tactical/event_policy.py`）：抽出与响应 schema 无关的 `EventEvaluation`，v0.2 `/v1/combat/events` 与 v0.3 `/v1/world/events` 共享同一张幂等表——缓存的是评估结果而非响应对象，两个通道各自组装自己的响应格式。同一 `event_id` 无论经哪个通道上报，都只评估一次、只产生一次副作用。
+- **幂等键含遭遇维度**：`companion_id + encounter_id + event_id`（生活类以空串占位）。评估在锁内进行——关系计分是副作用，若挪到锁外，并发重试可能在两次查表之间都未命中而重复计分（SC-007）。
+- **关系数值有了 HTTP 上报入口**（T062）：生活事件按 `data/policy/relationship_policy.yaml` 调 `relationship` 计分，`observability` 新增 `relationship_stage` / `relationship_delta` 留痕；事件不在策略表内时**跳过而非谎报「未变化」**（不加载不写盘），存储故障按 FR-041 降级不中断事件处理。原因码区分 `RELATIONSHIP_UPDATED` / `RELATIONSHIP_UNCHANGED` / `RELATIONSHIP_UNAVAILABLE`。
+- **生活事件六类**（T060）：`region_first_entered`、`weather_changed`、`gift_given`、`companion_recovered`、`player_protected_companion`、`promise_kept`；人设反应新增 `world_event_reactions` 段（结构同 `combat_event_reactions`，共用白名单校验路径）。
+- **战斗类经世界通道**（T061）：内嵌 `combat` 快照折成 v0.2 请求复用既有决策表，不重写策略；快照缺失时只给反应 + 保守建议，`companion_action` 恒为 `null`（FR-025 不虚构）。
+- **路由瘦身**（T063）：`app/api/v1/world.py` 从 83 行降到 35 行，只留 HTTP 边界（未登记角色 404），策略全部下沉到 `event_policy`。
+- **golden 样例 +2**：`world_event_gift_given.json`（关系 +3 留痕）、`world_event_boss_stunned.json`（战斗事件内嵌快照 → 爆发动作），由 `tests/api/test_world_events.py` 直接回放校验，保证 fixture 与真实端点不脱节。
+- **测试**：新增 `tests/api/test_world_events.py`、`tests/api/test_world_events_idempotency.py`、`tests/services/test_event_no_fabrication.py`，净增 20 例（388 → **408 通过 + 2 跳过**）。
 
 ## 2026-09-16 — 记忆三补：主题黑名单 + 自述入印象 + 在意值缩放
 

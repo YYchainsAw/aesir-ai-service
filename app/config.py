@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # -- 回执与 LLM Provider -------------------------------------------------
     receipts_dir: str = "data/runtime/command_service/executions"
+    dialogue_signals_dir: str = "data/runtime/dialogue_signals"  # 对话信号埋点（RL 前置数据，JSONL 按角色分文件）
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
     llm_model: str = Field(default="", alias="LLM_MODEL")
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
@@ -55,11 +56,17 @@ class Settings(BaseSettings):
     # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
     memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
     memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）
-    memory_impression_min_mentions: int = 3     # 达到该提及次数才注入 prompt
-    memory_impression_injection_share: int = 3  # 单次注入的印象条数份额（不挤占记忆预算）
+    memory_impression_inject_weight: float = 0.75  # 注入权重阈值：近期哪怕只提过 1 次也记得，随时间衰减后淡出
+    memory_impression_deep_weight: float = 2.5    # 印象很深的权重阈值（多次提及/郑重声明 + 近期）
+    memory_impression_injection_share: int = 5  # 单次注入的印象条数份额（不挤占记忆预算）
     memory_impression_salience_boost: float = 2.0  # 郑重声明的等效提及加成（首提即达注入阈值）
     memory_impression_salient_half_life_days: float = 28.0  # 显著话题半衰期（重要的事遗忘更慢）
     memory_impression_care_neutral: float = 50.0  # 在意值中性锚点：显著性加成按「偏离该值的程度」缩放（极爱与极厌都最在意）
+
+    # -- 查证工具（SDD US6 / T067~T071）---------------------------------------
+    tools_output_max_chars: int = 400            # 单次查证结果回填 prompt 的字符上限（FR-009 同纪律）
+    tools_lookup_timeout_seconds: float = 2.0    # 查证总预算；超限降级为直接回应（FR-038）
+    tools_max_rounds: int = 2                    # 模型侧轮次上限：1 轮查证 + 1 轮正式回复
 
     # -- 心跳（SDD US3 / T002）------------------------------------------------
     # 注：自主行为节流参数在 data/policy/agency_policy.yaml（不在此处）

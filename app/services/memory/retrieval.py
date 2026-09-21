@@ -15,7 +15,7 @@ from typing import Protocol
 
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.config import get_settings
-from app.services.memory.topics import impression_weight, tier_of
+from app.services.memory.topics import impression_weight, looks_like_noise, tier_of
 
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
 
@@ -50,11 +50,14 @@ def retrieve_impressions(
     store: _SnapshotProvider,
     *,
     share: int | None = None,
+    recent_texts: list[str] | None = None,
 ) -> list[TopicImpression]:
     """检索达到注入阈值的模糊印象，按现算权重降序、截固定份额。
 
-    权重随半衰期衰减：长期不再被提及的主题自然淡出注入。存储层故障
-    降级为空列表（FR-011 同语义）。
+    权重随半衰期衰减：长期不再被提及的主题自然淡出注入。``recent_texts``
+    为近期会话原文（玩家与她的都算）：**已经聊过的话题本轮不再注入**——
+    注入的目的是让印象自然浮出，而不是每轮复读同一话题（实测 2026-09-21
+    话题重复问题）。存储层故障降级为空列表（FR-011 同语义）。
     """
     if share is None:
         share = get_settings().memory_impression_injection_share
@@ -68,9 +71,15 @@ def retrieve_impressions(
     now = datetime.now(timezone.utc)
     ranked: list[tuple[float, TopicImpression]] = []
     for impression in snapshot.impressions:
+        if looks_like_noise(impression.topic):  # 旧数据里已落的噪声碎片不再注入
+            continue
+        if recent_texts and any(impression.topic in text for text in recent_texts):
+            continue  # 近期已聊过：本轮冷却，不重复注入
+        days_ago = _days_ago(impression.last_seen, now)
         if (
             tier_of(
                 impression.mention_count,
+                last_seen_days_ago=days_ago,
                 salient=impression.salient,
                 salience_boost=impression.salience_boost,
             )
@@ -79,7 +88,7 @@ def retrieve_impressions(
             continue
         weight = impression_weight(
             mention_count=impression.mention_count,
-            last_seen_days_ago=_days_ago(impression.last_seen, now),
+            last_seen_days_ago=days_ago,
             salient=impression.salient,
             salience_boost=impression.salience_boost,
         )
@@ -102,26 +111,48 @@ def _days_ago(iso_timestamp: str, now: datetime) -> float:
 def format_impression_block(
     impressions: list[TopicImpression], display_name: str = "她"
 ) -> str:
-    """把模糊印象格式化为注入 LLM prompt 的文本块（档位化口吻）。"""
+    """把模糊印象格式化为注入 LLM prompt 的文本块（档位化口吻）。
+
+    口吻按档位与近期程度区分：deep（印象很深）> 近期刚聊过（哪怕只提过
+    一次）> 久远的模糊印象。指令要求自然带出（近期话题可主动提及拉回），
+    绝不逐字背诵、不复述次数。
+    """
     if not impressions:
         return ""
+    now = datetime.now(timezone.utc)
     lines = [
-        f"Fuzzy impressions of the player's recurring topics ({display_name} "
-        "does not recall them word for word; weave them in naturally only when "
-        "relevant, never recite counts):"
+        f"Fuzzy impressions of topics ({display_name} "
+        "does not recall them word for word; weave them in naturally when "
+        "relevant, never recite counts; topics talked about recently may be "
+        "brought up first as a natural callback; NEVER claim the player said "
+        "any specific sentence you were not shown — these are topic-level "
+        "memories only, so phrase them vaguely or ask instead of inventing "
+        "details):"
     ]
     for impression in impressions:
-        if (
-            tier_of(
-                impression.mention_count,
-                salient=impression.salient,
-                salience_boost=impression.salience_boost,
+        days_ago = _days_ago(impression.last_seen, now)
+        tier = tier_of(
+            impression.mention_count,
+            last_seen_days_ago=days_ago,
+            salient=impression.salient,
+            salience_boost=impression.salience_boost,
+        )
+        if impression.origin == "companion":
+            # 她自己说过的话：措辞必须是「她提过」，绝不能记成玩家说的。
+            lines.append(
+                f"- {impression.topic} is something {display_name} herself "
+                f"brought up recently — her own words, NOT the player's."
             )
-            == "deep"
-        ):
+            continue
+        if tier == "deep":
             lines.append(
                 f"- {impression.topic} is something the player often brings up; "
                 f"{display_name} has a deep impression of it."
+            )
+        elif days_ago <= 1.0:
+            lines.append(
+                f"- {display_name} was talking with the player about "
+                f"{impression.topic} recently ({_recency_phrase(days_ago)})."
             )
         else:
             lines.append(
@@ -131,12 +162,38 @@ def format_impression_block(
     return "\n".join(lines)
 
 
+def _recency_phrase(days_ago: float) -> str:
+    if days_ago < 0.5:
+        return "today"
+    return "yesterday or the day before"
+
+
+# 来源 → 注入时的口吻：她得知道这条记忆是「玩家告诉她的」「两人一起经历的」
+# 还是「她自己答应过的」，措辞才不会张冠李戴（实测出现过把自己的话记成玩家的）。
+_SOURCE_PHRASES = {
+    "player_statement": "the player told you",
+    "shared_experience": "you two went through together",
+    "promise": "the player promised you",
+    "observation": "you noticed yourself",
+    "summary": "you two went through together",
+}
+
+
 def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -> str:
-    """把记忆条目格式化为注入 LLM prompt 的文本块（T028 使用）。"""
+    """把记忆条目格式化为注入 LLM prompt 的文本块（T028 使用）。
+
+    这些是**她确定知道的事实**（对话链路抽取并经接地校验后才落档案），
+    所以措辞要给她「可以直说」的许可——否则她会连记得的事也含糊其辞；
+    同时明确「不得在此之外加细节」，把发挥空间压在事实边界内。
+    """
     if not entries:
         return ""
-    lines = [f"Long-term memories about the player (facts {display_name} remembers; "
-             "reference them naturally when relevant, do not recite them):"]
+    lines = [
+        f"Long-term memories about the player ({display_name} is sure of these — "
+        "state them plainly when relevant, but never add details beyond what is "
+        "written here, and never recite the list):"
+    ]
     for entry in entries:
-        lines.append(f"- [{entry.source}] {entry.content}")
+        phrase = _SOURCE_PHRASES.get(entry.source, "you remember")
+        lines.append(f"- ({phrase}) {entry.content}")
     return "\n".join(lines)

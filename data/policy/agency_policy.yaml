@@ -19,18 +19,19 @@ domains:
 # - priority：默认优先级（0~100，同级仲裁用）
 # - allowed_kinds：可作目标的 interactable 类型；null 表示无目标行为
 # - max_distance_m：目标距离上限（米），超出视为不可达不产出（FR-025）
+# - description：能力注册表（FR-035）登记本行为时的说明文案
 behaviors:
-  follow:       { domains: [exploration, camp, idle], priority: 20, allowed_kinds: null, max_distance_m: 50 }
-  move_to:      { domains: [exploration, camp, idle], priority: 30, allowed_kinds: [item, npc, prop, poi], max_distance_m: 30 }
-  observe:      { domains: [exploration, idle], priority: 25, allowed_kinds: [item, npc, prop, poi], max_distance_m: 25 }
-  inspect:      { domains: [exploration, camp], priority: 25, allowed_kinds: [prop, poi, npc], max_distance_m: 10 }
-  interact:    { domains: [exploration, camp], priority: 35, allowed_kinds: [item, prop, npc], max_distance_m: 5 }
-  pickup:       { domains: [exploration, camp], priority: 30, allowed_kinds: [item], max_distance_m: 5 }
-  rest:         { domains: [camp, idle], priority: 40, allowed_kinds: null, max_distance_m: 0 }
-  wait:         { domains: [exploration, camp, idle], priority: 15, allowed_kinds: null, max_distance_m: 0 }
-  express:      { domains: [exploration, camp, conversation, idle], priority: 10, allowed_kinds: null, max_distance_m: 0 }
-  self_talk:    { domains: [exploration, camp, idle], priority: 10, allowed_kinds: null, max_distance_m: 0 }
-  alert_player: { domains: [exploration, camp, idle], priority: 70, allowed_kinds: null, max_distance_m: 0 }
+  follow:       { domains: [exploration, camp, idle], priority: 20, allowed_kinds: null, max_distance_m: 50, description: "跟上玩家的位置。" }
+  move_to:      { domains: [exploration, camp, idle], priority: 30, allowed_kinds: [item, npc, prop, poi], max_distance_m: 30, description: "移动到某个目标附近。" }
+  observe:      { domains: [exploration, idle], priority: 25, allowed_kinds: [item, npc, prop, poi], max_distance_m: 25, description: "留意远处的东西。" }
+  inspect:      { domains: [exploration, camp], priority: 25, allowed_kinds: [prop, poi, npc], max_distance_m: 10, description: "走近查看某个物件。" }
+  interact:    { domains: [exploration, camp], priority: 35, allowed_kinds: [item, prop, npc], max_distance_m: 5, description: "与近处目标互动。" }
+  pickup:       { domains: [exploration, camp], priority: 30, allowed_kinds: [item], max_distance_m: 5, description: "拾取地上的物品。" }
+  rest:         { domains: [camp, idle], priority: 40, allowed_kinds: null, max_distance_m: 0, description: "原地休整恢复。" }
+  wait:         { domains: [exploration, camp, idle], priority: 15, allowed_kinds: null, max_distance_m: 0, description: "原地等待玩家。" }
+  express:      { domains: [exploration, camp, conversation, idle], priority: 10, allowed_kinds: null, max_distance_m: 0, description: "做个小表情或动作。" }
+  self_talk:    { domains: [exploration, camp, idle], priority: 10, allowed_kinds: null, max_distance_m: 0, description: "自言自语。" }
+  alert_player: { domains: [exploration, camp, idle], priority: 70, allowed_kinds: null, max_distance_m: 0, description: "提醒玩家注意危险。" }
 
 # 跨域优先级仲裁（FR-024：高 → 低）
 arbiter:

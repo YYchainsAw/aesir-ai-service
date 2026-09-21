@@ -4,8 +4,10 @@ UE 以固定间隔携带世界快照调用 ``/v1/agent/step``：
 - 纯心跳（无 ``text``）：受最小间隔限流，超频返回 429；随后走自主行为
   编排——禁打断判定 → 候选生成 → 目录校验 → 跨域仲裁 → 节流 → 指令输出
   （T054，全部规则驱动、不虚构行为 FR-028）。
-- 玩家指令（有 ``text``）：骨架阶段如实返回「待接入」原因码，对话链路
-  （T028）与指令域（T049+）接线后升级。
+- 玩家指令（有 ``text``）：与 ``/v1/tactical/command`` 共用同一决策层
+  （T075：``parse_intent_with_source`` → 按域路由）。战斗意图走
+  ``resolve_intent`` 战术决策（含 US2 关系调制），非战斗意图映射到 agency
+  行为目录并按当前场景做目录/距离校验；不可识别时回复澄清，不猜测执行。
 
 系统 MUST NOT 主动向客户端推送：一切产出经本响应返回。
 """
@@ -92,6 +94,15 @@ def _relationship_stage_or_empty(companion_id: str) -> str:
         return ""
 
 
+def _persona_revision_or_empty(companion_id: str) -> str:
+    """人设 YAML 的 profile_version（US7 / T076）；读取失败降级为空字符串。"""
+    try:
+        profile = get_registered_profile(companion_id)
+    except CompanionProfileError:
+        return ""
+    return str(profile.raw.get("profile_version", ""))
+
+
 def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> AgentStepResponse:
     """空动作轻量返回（FR-025：不虚构行为；FR-021 判定无产出时快速返回）。"""
     return AgentStepResponse(
@@ -105,6 +116,7 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             policy_revision=_policy_revision(),
             used_snapshot_id=request.world_context.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(request.companion_id),
+            persona_revision=_persona_revision_or_empty(request.companion_id),
         ),
     )
 
@@ -198,6 +210,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
             policy_revision=_policy_revision(),
             used_snapshot_id=ctx.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(companion_id),
+            persona_revision=_persona_revision_or_empty(companion_id),
         ),
     )
 
@@ -210,6 +223,24 @@ def agent_step(request: AgentStepRequest) -> AgentStepResponse:
         # FR-044：未登记角色明确拒绝，不回退默认角色人格。
         raise HTTPException(status_code=404, detail=str(error)) from error
 
+    # US7（T077）：记录最近观测（场景 + 快照时间），调试台数据源
+    from app.services.console.runtime_state import record_observation
+
+    record_observation(
+        request.companion_id,
+        scene=request.world_context.scene,
+        last_seen=request.world_context.captured_at,
+    )
+    response = _dispatch_step(request)
+    if response.directive and response.directive.presentation:
+        record_observation(
+            request.companion_id, emotion_id=response.directive.presentation.emotion_id
+        )
+    return response
+
+
+def _dispatch_step(request: AgentStepRequest) -> AgentStepResponse:
+    """心跳与文本指令的分发（限流只约束心跳）。"""
     if request.text is None:
         # 纯心跳：限流 + 自主行为编排（T054）
         settings = get_settings()
@@ -223,5 +254,208 @@ def agent_step(request: AgentStepRequest) -> AgentStepResponse:
             )
         return _autonomous_step(request)
 
-    # 玩家指令：尚未接线（T028 对话 / 指令域判别），如实说明，不猜测执行。
-    return _empty_response(request, ["TEXT_PIPELINE_PENDING"])
+    return _command_step(request)
+
+
+# ---------------------------------------------------------------------------
+# 玩家文本指令（T075）：与 /v1/tactical/command 共用同一意图解析与决策层
+# ---------------------------------------------------------------------------
+# 战斗意图 → 战术决策动作 → 指令 action_type（combat.py 白名单）
+_COMBAT_ACTION_TYPE = {
+    "major_heal": "major_heal",
+    "quick_heal": "quick_heal",
+    "shield": "shield",
+    "explosion": "burst",
+}
+
+# 非战斗意图 → agency 行为目录行为名
+_NON_COMBAT_BEHAVIOR = {
+    "follow_player": "follow",
+    "inspect_interactable": "inspect",
+    "pickup_item": "pickup",
+    "rest_here": "rest",
+    "wait_here": "wait",
+}
+
+
+def _intent_observability(
+    request: AgentStepRequest, source: str, reason_codes: list[str], snapshot_id: str
+) -> AgentStepObservability:
+    return AgentStepObservability(
+        source=source,
+        reason_codes=reason_codes,
+        policy_revision=_policy_revision(),
+        used_snapshot_id=snapshot_id,
+        relationship_stage=_relationship_stage_or_empty(request.companion_id),
+        persona_revision=_persona_revision_or_empty(request.companion_id),
+    )
+
+
+def _command_step(request: AgentStepRequest) -> AgentStepResponse:
+    """文本指令：意图解析（规则/LLM 门面）→ 按域路由 → 统一信封输出。
+
+    与 ``/v1/tactical/command`` 的前半段完全同源（``parse_intent_with_source``），
+    决策层不分叉：战斗意图复用 ``resolve_intent``（含关系调制），非战斗意图
+    复用 agency 行为目录的场景/距离校验（FR-025/FR-040：只引用快照中的目标）。
+    """
+    from app.services.tactical.llm_intent import parse_intent_with_source
+
+    intent, source = parse_intent_with_source(request.text)
+    ctx = request.world_context
+
+    if intent is None:
+        # 不可识别：按策划书 §5.2 回复澄清，不猜测执行（FR-028）
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text="我没听清你想让我做什么，能再说一遍吗？",
+            observability=_intent_observability(
+                request, source, ["INTENT_UNRECOGNIZED"], ctx.snapshot_id
+            ),
+        )
+
+    from app.schemas.tactical_intent import COMBAT_INTENT_IDS
+
+    if intent.intent_id in COMBAT_INTENT_IDS:
+        return _combat_command_step(request, intent, source)
+
+    return _non_combat_command_step(request, intent, source)
+
+
+def _combat_command_step(request: AgentStepRequest, intent, source: str) -> AgentStepResponse:
+    """战斗意图：resolve_intent 战术决策 + US2 关系调制（与 /v1/tactical 同层）。"""
+    from app.services.tactical.resolver import resolve_intent
+
+    ctx = request.world_context
+    if ctx.combat is None:
+        # 快照未携带战斗上下文：如实说明，不虚构战况执行（FR-028）
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text="现在不在战斗中，我先待命。",
+            observability=_intent_observability(
+                request, source, ["COMBAT_CONTEXT_MISSING"], ctx.snapshot_id
+            ),
+        )
+
+    decision = resolve_intent(intent, ctx.combat, _relationship_stage_or_empty(request.companion_id))
+    if decision.status != "actionable" or decision.action is None:
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text=decision.explanation,
+            observability=_intent_observability(
+                request, source, decision.reason_codes, ctx.snapshot_id
+            ),
+        )
+
+    action = decision.action
+    if action.type == "retreat":
+        action_type = "retreat"
+    elif action.type == "follow":
+        action_type = "follow"
+    else:
+        suffix = (action.ability_id or "").rsplit(".", 1)[-1]
+        action_type = _COMBAT_ACTION_TYPE.get(suffix, action.type)
+    presentation, _ = _presentation_for(request.companion_id, action.target_id)
+    directive = DirectiveEnvelope(
+        agent_id=request.companion_id,
+        domain="combat",
+        action_type=action_type,
+        priority=action.priority,
+        source="player_command",
+        reason_codes=decision.reason_codes,
+        policy_revision=_policy_revision(),
+        payload={"target_id": action.target_id or ""},
+        presentation=presentation,
+    )
+    return AgentStepResponse(
+        protocol_version=PROTOCOL_VERSION,
+        request_id=request.request_id,
+        companion_id=request.companion_id,
+        action="directive",
+        directive=directive,
+        observability=_intent_observability(
+            request, source, decision.reason_codes, ctx.snapshot_id
+        ),
+    )
+
+
+def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> AgentStepResponse:
+    """非战斗意图：映射 agency 行为目录，按场景与距离校验（不虚构目标）。"""
+    ctx = request.world_context
+    behavior = _NON_COMBAT_BEHAVIOR[intent.intent_id]
+
+    spec = next(
+        (s for s in behaviors_allowed(ctx.scene) if s.name == behavior), None
+    )
+    if spec is None:
+        # 当前场景不允许该行为（如战斗中「休息」）：如实说明（FR-019）
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text="现在不方便做这个。",
+            observability=_intent_observability(
+                request,
+                source,
+                ["BEHAVIOR_NOT_IN_SCENE", f"INTENT:{intent.intent_id}", f"SCENE:{ctx.scene}"],
+                ctx.snapshot_id,
+            ),
+        )
+
+    # 目标选择：有目标行为取快照中最近的可交互物（类型/距离按目录校验）
+    payload: dict[str, str] = {}
+    reasons = [f"INTENT:{intent.intent_id}", f"BEHAVIOR:{behavior}"]
+    if spec.allowed_kinds:
+        candidates = [
+            obj
+            for obj in ctx.interactables
+            if obj.kind in spec.allowed_kinds and obj.distance_m <= spec.max_distance_m
+        ]
+        if not candidates:
+            # 附近没有合适目标：不虚构（FR-040），回复澄清
+            return AgentStepResponse(
+                protocol_version=PROTOCOL_VERSION,
+                request_id=request.request_id,
+                companion_id=request.companion_id,
+                action="none",
+                reply_text="附近没有合适的目标。",
+                observability=_intent_observability(
+                    request,
+                    source,
+                    [*reasons, "NO_VALID_TARGET"],
+                    ctx.snapshot_id,
+                ),
+            )
+        target = min(candidates, key=lambda o: o.distance_m)
+        payload["target_id"] = target.object_id
+        reasons.append(f"TARGET:{target.object_id}")
+
+    presentation, _ = _presentation_for(request.companion_id, payload.get("target_id"))
+    directive = DirectiveEnvelope(
+        agent_id=request.companion_id,
+        domain=domain_for(ctx.scene),
+        action_type=behavior,
+        priority=spec.priority,
+        source="player_command",
+        reason_codes=reasons,
+        policy_revision=_policy_revision(),
+        payload=payload,
+        presentation=presentation,
+    )
+    return AgentStepResponse(
+        protocol_version=PROTOCOL_VERSION,
+        request_id=request.request_id,
+        companion_id=request.companion_id,
+        action="directive",
+        directive=directive,
+        observability=_intent_observability(request, source, reasons, ctx.snapshot_id),
+    )

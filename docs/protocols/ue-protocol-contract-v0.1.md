@@ -693,3 +693,91 @@ data: {"detail":"LLM stream interrupted; this turn is incomplete."}
 - HTTP 状态恒为 200；流开始前的错误照常返回 404（未登记角色）/ 422（参数
   校验）。
 - 建议代理层禁用缓冲（服务端已带 `Cache-Control: no-cache`、`X-Accel-Buffering: no`）。
+
+### 附加扩展（2026-09-17，SDD US6）：可选 `world_context` 请求字段
+
+`CompanionDialogueRequest` 新增**可选**字段 `world_context`（`WorldContext` 结构，
+与 `/v1/agent/step`、`/v1/world/events` 使用的世界快照同构）。缺省不传时行为与
+v0.1 完全一致，属附加式扩展、不升版本。
+
+- 用途：艾莉回答「现在战况如何 / 周围有什么 / 你状态怎样」这类问题时，先经
+  只读查证工具**查证本轮快照**再作答，不用过期状态（US6 验收场景 3）。
+- 建议传法：UE 发起对话时附带当前快照（与心跳同一份即可）；不传时上述三类
+  问题她将明确表示「说不清」，而不是凭印象编。
+
+### 附加扩展（2026-09-17）：语音陪伴对话 `POST /v1/companion/chat/voice`
+
+`/v1/companion/chat` 的**语音入口**：multipart 音频 → ASR 转写 → 既有对话
+链路（记忆 / 关系 / 信号埋点全部生效）。与 `POST /v1/voice/command` 同款
+模式，尾部接陪伴对话而非战术指令解析。
+
+- **请求**（multipart/form-data）：`audio`（WAV 16kHz / 单声道 / 16bit，同
+  `/v1/speech/transcribe` 约定）+ `companion_id`（默认 `companion.alice`）+
+  `game_state`（`exploration|conversation`，默认前者）+ 可选 `session_id` +
+  可选 `world_context_json`（`WorldContext` 的 JSON 字符串，同上）。
+- **响应**：`CompanionDialogueResponse` 全部字段 + `transcribed_text`（ASR
+  转写文本，供 UE 展示「你说了什么」与调试转写质量）。
+- **错误语义**：转写后端故障 → 502；未识别出语音内容 → 422（对话里「听错
+  还硬答」比「明确听不清」更糟，**不**回退 mock 文本）；参数非法 → 422；
+  未登记角色 → 404。
+- `AESIR_ASR_BACKEND` 与转写端点共用：`mock` 返回 `AESIR_ASR_MOCK_TEXT`，
+  `faster_whisper` 走真实本机 Whisper。
+
+### 附加扩展（2026-09-21，SDD US4 加固 T074/T075）：主入口文本指令
+
+`POST /v1/agent/step` 携带可选 `text` 字段时，与 `/v1/tactical/command`
+共用同一意图解析与决策层（规则/LLM 门面，按域路由），不再返回
+`TEXT_PIPELINE_PENDING` 骨架原因码：
+
+- **战斗意图**（治疗/护盾/爆发/等眩晕集火/撤退，6 类）：复用
+  `resolve_intent` 战术决策（含 US2 关系阶段调制），快照 `world_context.combat`
+  存在时产出统一信封 `DirectiveEnvelope`（`domain="combat"`，
+  `source="player_command"`，action_type 取 combat 白名单
+  major_heal/quick_heal/shield/burst/retreat）；未携带战斗快照 →
+  `action="none"` + `COMBAT_CONTEXT_MISSING`；决策不可执行 → 原因码 +
+  `reply_text` 说明。
+- **非战斗意图**（T074 新增白名单）：`follow_player` / `inspect_interactable`
+  / `pickup_item` / `rest_here` / `wait_here`，映射到 agency 行为目录
+  （follow/inspect/pickup/rest/wait），并按当前 `scene` 做目录域校验
+  （不匹配 → `BEHAVIOR_NOT_IN_SCENE`）、目标类型/距离校验（有目标行为取快照内
+  最近可交互物，无合适目标 → `NO_VALID_TARGET`，不虚构目标）。
+- **不可识别文本**：`action="none"` + `INTENT_UNRECOGNIZED` + 澄清
+  `reply_text`，不猜测执行（FR-028）。
+- 意图解析来源进 `observability.source`（`rule`/`llm`/`rule_fallback`），
+  关系阶段进 `observability.relationship_stage`，原因码完整可解释（US7 前置）。
+
+### 附加扩展（2026-09-21，SDD US7 T076/T077）：链路信息字段与调试台
+
+- **链路字段补全（T076）**：`AgentStepObservability` 新增 `persona_revision`
+  （人设 YAML 的 `profile_version`）与 `memory_layers`（本轮注入记忆条数；
+  心跳路径为空字典）；`CompanionDialogueResponse` 同样新增 `persona_revision`
+  与 `memory_layers`（`{"long_term": n, "impressions": m}`）；tactical
+  `Observability` 新增 `persona_revision`。全部为可选字段，缺省空——UE
+  不应依赖其做表现逻辑，仅供调试与归因。
+- **调试台（T077）**：`GET /v1/console/state` 返回扩展为完整调试视图：
+  `relationship_stage` / `relationship_value`（关系）、`last_scene` /
+  `last_emotion_id`（运行期最近观测，服务重启后为空）、`recent_memory`
+  （按重要性前 5 条）、`persona_revision` / `agency_policy_revision` /
+  `tactical_policy_revision`（三个策略版本）。
+- **指标采集（T079）**：`.venv/Scripts/python -m scripts.metrics_report`
+  汇总执行回执分布、降级次数、复读轮数、负反馈与话题延续率
+  （`--json` 输出机器可读格式）。
+
+### 附加扩展（2026-09-21）：记忆写入链路（对话事实 + 世界事件共同经历）
+
+**协议零变更**（请求/响应字段与上面完全一致），仅说明两个端点在处理成功后的
+记忆副作用——UE 侧无需任何改动，但调试时可据此预期「她为什么记得这件事」：
+
+- `POST /v1/companion/chat`（含 `/chat/voice` 与流式变体）：LLM 顺带抽出
+  玩家陈述过的**事实**（0~3 条第三人称陈述）写入长期档案层，经接地校验
+  （实词须大部分出自玩家真说过的话）后才落档——**编造的事实会被丢弃**。
+  下一轮起这些事实作为「她确定知道的事」注入，她可以直说，但不得加细节。
+- `POST /v1/world/events`（含 v0.2 `POST /v1/combat/events`）：有共同经历
+  语义的事件（`region_first_entered` / `gift_given` /
+  `player_protected_companion` / `promise_kept` / `companion_recovered` /
+  `boss_defeated`）写入经历摘要层；瞬时战斗状态（`player_hp_critical` /
+  `companion_mp_low` / `boss_stunned` 等）**不**入记忆。文案里的细节只取
+  请求 `details`（`item_id` / `promise_id` / `boss_id` / `region_id`）或快照
+  地区，取不到就写泛一点，服务端不推断任何未上报的名字。
+- **幂等**：同一 `event_id` 重放（`duplicate: true`）不重复记共同经历；
+  记忆文件损坏/不可写时静默降级，事件响应照常返回（FR-011）。

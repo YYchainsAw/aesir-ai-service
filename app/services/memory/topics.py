@@ -1,10 +1,11 @@
 """模糊印象层：主题 × 提及频率（方案：LLM 顺带返回主题，规则提取兜底）。
 
-真人不会逐字记住所有对话，但对反复出现的主题形成强印象：
+真人不会逐字记住所有对话，但近期聊过的都记得、随时间衰减：
 - 每次提及 ``mention_count += 1``；
 - 权重 = ``log2(1 + 次数) × 0.5 ** (距上次提及天数 / 半衰期)``——
   提得越多印象越深，长期不提自然淡忘；
-- 次数不足阈值不注入（只提过一两次的闲聊不留印象）。
+- 注入按权重阈值：近期哪怕只提过 1 次也记得，约 3 天淡出；提及频率与
+  显著性（郑重声明/在意值）把存活期拉长。
 
 规则提取（``extract_topics``）只是 mock / LLM 失败时的降级路径：
 按停用词与标点切段，保留 ≥2 字的片段，去重后截前 3 个——
@@ -38,11 +39,39 @@ _SPLIT_PATTERN = re.compile(
 _TOPIC_BLACKLIST = frozenset(
     """
     艾莉 爱莉 alice 名字 记得 记住 忘了 忘记 告诉 答应 说话 对话 回复 聊天
-    重要 事情 感觉 时候 现在
+    重要 事情 感觉 时候 现在 幻视 幻觉 人机 人机味
     """.split()
 )
 
 MAX_TOPICS = 3
+
+# 口语噪声主题：连接词 / 应付词 / 带语气词的短碎片。LLM 顺带返回的主题
+# 里实测出现过「不过」「趁天」「意思呀」这类碎片——不成话题，注入只会
+# 让角色说出怪话。按全等匹配（黑名单才是包含匹配）。
+_NOISE_TOPICS = frozenset(
+    """
+    不过 但是 然后 所以 就是 还是 还是 正好 趁 趁天 意思 确实 其实 当然
+    可能 应该 大概 反正 另外 而且 以及 这样 那样 怎么 为什么 真的 好的
+    可以 不用 没事 没问题 还行 挺好 差不多 反馈 表示 感觉 觉得
+    这话 那话 你的 我的 没有 有点 比较 有点儿 那你 你说 我说
+    """.split()
+)
+# 句尾语气词：带语气词结尾的短碎片（意思呀 / 挺好吧）不是话题。
+_MODAL_TAILS = "呀哦啦嘛呗咯哈嘿吧呢啊"
+
+
+def looks_like_noise(topic: str) -> bool:
+    """主题是否为口语噪声碎片（连接词 / 应付词 / 语气词尾巴）。
+
+    与黑名单（角色自指 / 元语言）互补：黑名单按包含匹配，这里按全等 +
+    形态判定，避免误伤包含这些字眼的正常话题。规则提取与 LLM 返回共用。
+    """
+    stripped = topic.strip()
+    if len(stripped) <= 1:
+        return True
+    if stripped[-1] in _MODAL_TAILS and len(stripped) <= 3:
+        return True
+    return stripped in _NOISE_TOPICS
 
 
 def is_blocked_topic(topic: str) -> bool:
@@ -56,11 +85,16 @@ def is_blocked_topic(topic: str) -> bool:
 
 
 def extract_topics(text: str, *, max_topics: int = MAX_TOPICS) -> list[str]:
-    """规则降级提取：切段 → 去停用词 → 保留 ≥2 字 → 去黑名单 → 去重截断。"""
+    """规则降级提取：切段 → 去停用词 → 保留 ≥2 字 → 去黑名单/噪声 → 去重截断。"""
     topics: list[str] = []
     for segment in _SPLIT_PATTERN.split(text):
         for run in _remove_stopwords(segment):
-            if len(run) >= 2 and run not in topics and not is_blocked_topic(run):
+            if (
+                len(run) >= 2
+                and run not in topics
+                and not is_blocked_topic(run)
+                and not looks_like_noise(run)
+            ):
                 topics.append(run)
     return topics[:max_topics]
 
@@ -120,25 +154,34 @@ def impression_weight(
 def tier_of(
     mention_count: int,
     *,
+    last_seen_days_ago: float = 0.0,
     salient: bool = False,
-    faint_threshold: int | None = None,
-    deep_threshold: int = 5,
+    inject_weight: float | None = None,
+    deep_weight: float | None = None,
     salience_boost: float | None = None,
 ) -> str | None:
     """注入档位：None（不注入）| faint（有点印象）| deep（印象很深）。
 
-    显著性计入等效提及；``salience_boost`` 为该条印象声明时按在意值缩放后
-    持久化的加成（None 用全局默认，兼容旧数据）。
+    判定不看提及次数的硬门槛，而看现算权重（log 增长 × 半衰期衰减）：
+    近期哪怕只提过一次的闲聊也有印象（真人语义：时间不过太久就记得），
+    随时间自然淡出；提及越频繁、越被郑重对待（显著性/在意值），权重越高、
+    存活越久。``salience_boost`` 为该条印象声明时按在意值缩放后持久化的
+    加成（None 用全局默认，兼容旧数据）。
     """
-    if faint_threshold is None:
-        faint_threshold = get_settings().memory_impression_min_mentions
-    if salient:
-        if salience_boost is None:
-            salience_boost = get_settings().memory_impression_salience_boost
-        mention_count = mention_count + salience_boost
-    if mention_count < faint_threshold:
+    settings = get_settings()
+    if inject_weight is None:
+        inject_weight = settings.memory_impression_inject_weight
+    if deep_weight is None:
+        deep_weight = settings.memory_impression_deep_weight
+    weight = impression_weight(
+        mention_count=mention_count,
+        last_seen_days_ago=last_seen_days_ago,
+        salient=salient,
+        salience_boost=salience_boost,
+    )
+    if weight < inject_weight:
         return None
-    if mention_count >= deep_threshold:
+    if weight >= deep_weight:
         return "deep"
     return "faint"
 

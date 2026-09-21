@@ -108,6 +108,18 @@ def _show_memory(client: httpx.Client, companion_id: str) -> None:
             print(f"  [{label}/{entry['importance']}] {entry['content']}")
     if not any(data[tier] for tier in ("archive", "summaries", "short_term")):
         print("  （空）")
+    # 模糊印象：按权重取前 10，标注谁提的（玩家 / 她自己）。
+    impressions = sorted(
+        data.get("impressions", []), key=lambda i: i["weight"], reverse=True
+    )[:10]
+    if impressions:
+        print("  --- 模糊印象（按权重前 10）---")
+        for i in impressions:
+            origin = "玩家" if i.get("origin", "player") == "player" else "她自己"
+            print(
+                f"  [印象] {i['topic']}（{origin}提过 {i['mention_count']} 次，"
+                f"权重 {i['weight']:.2f}）"
+            )
 
 
 def _reset(client: httpx.Client, companion_id: str) -> None:

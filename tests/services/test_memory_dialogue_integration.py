@@ -119,6 +119,24 @@ def test_companion_own_reply_topics_recorded(_fresh_memory) -> None:
     assert "钓鱼" in [i.topic for i in impressions]
     assert all(not i.salient for i in impressions)  # 她自己的话不显著
 
+    # 她自己说的主题标 origin=companion——注入文案按「她说过」而非「玩家提过」。
+    from app.services.memory.retrieval import format_impression_block
+
+    reply_impression = next(i for i in impressions if i.topic == "钓鱼")
+    assert reply_impression.origin == "companion"
+    line = format_impression_block([reply_impression], "艾莉").splitlines()[-1]
+    assert "her own words" in line
+    assert "player often brings up" not in line
+
+    # 玩家随后也提及时升级为 player（双方便都算数）。
+    from app.services.memory.store import get_memory_store as _get_store
+
+    _get_store("companion.alice").record_mention(["钓鱼"], origin="player")
+    upgraded = next(
+        i for i in _get_store("companion.alice").snapshot().impressions if i.topic == "钓鱼"
+    )
+    assert upgraded.origin == "player"
+
 
 def test_plain_chat_is_not_archived(_fresh_memory) -> None:
     """普通闲聊只入印象层，不进档案（档案留给郑重声明/承诺/经历）。"""
@@ -145,6 +163,62 @@ def test_verbatim_migration_converts_statements_to_impressions(_fresh_memory) ->
     assert migrated == 2
     assert snapshot.short_term == []
     assert any(i.topic == "钓鱼" for i in snapshot.impressions)
+
+
+class _StubFactsLLM:
+    """返回固定负载的 LLM 替身：用于验证 facts 通道的落档与拦截。"""
+
+    def __init__(self, facts: list[str]) -> None:
+        self.facts = facts
+
+    def generate_json(self, *, system_prompt: str, user_prompt: str, temperature: float = 0.2):
+        return {
+            "action": "reply",
+            "reply_text": "记下了。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.enthusiastic_nod",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            "topics": [],
+            "facts": self.facts,
+            "salient": False,
+        }
+
+
+def _chat_with_facts(monkeypatch, facts: list[str], text: str, session_id: str = "s6"):
+    """走 LLM 后端发一轮对话，LLM 顺带返回指定 facts。"""
+    from app.services.companion import llm_dialogue_service as llm_module
+
+    monkeypatch.setenv("AESIR_COMPANION_BACKEND", "llm")
+    monkeypatch.setattr(llm_module, "create_llm_client", lambda: _StubFactsLLM(facts))
+    return _chat(text, session_id=session_id)
+
+
+def test_grounded_fact_is_archived(_fresh_memory, monkeypatch) -> None:
+    """LLM 抽出的事实（玩家真说过）写进档案——她从此有据可说。"""
+    response = _chat_with_facts(monkeypatch, ["玩家养了一只叫小黑的猫"], "我养了只猫，它叫小黑。")
+    assert response.status_code == 200
+
+    archive = get_memory_store("companion.alice").snapshot().archive
+    assert [entry.content for entry in archive] == ["玩家养了一只叫小黑的猫"]
+
+
+def test_invented_fact_is_rejected(_fresh_memory, monkeypatch) -> None:
+    """编造的事实被接地校验拦下：档案里不留永久错误记忆。"""
+    _chat_with_facts(monkeypatch, ["玩家上次给艾莉烤了鱼"], "今天天气不错。")
+
+    assert get_memory_store("companion.alice").snapshot().archive == []
+
+
+def test_archived_fact_is_injected_next_turn(_fresh_memory, monkeypatch) -> None:
+    """落档的事实下一轮进入注入块，且措辞标明「她确定知道」。"""
+    from app.services.memory.retrieval import format_memory_block, retrieve
+
+    _chat_with_facts(monkeypatch, ["玩家养了一只叫小黑的猫"], "我养了只猫，它叫小黑。")
+
+    block = format_memory_block(retrieve(get_memory_store("companion.alice")), "艾莉")
+    assert "玩家养了一只叫小黑的猫" in block
+    assert "sure of these" in block  # 给她「可以直说」的许可，而非含糊其辞
 
 
 def test_console_reset_clears_long_term_memory(_fresh_memory) -> None:

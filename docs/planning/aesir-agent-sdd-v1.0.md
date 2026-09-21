@@ -207,6 +207,23 @@
 4. **Given** 记忆内容已达到配置容量上限，**When** 产生新的重要经历，**Then** 系统按重要性优先保留重要内容，淘汰低价值旧内容，且最核心的记忆（承诺、重大事件）不被淘汰。
 5. **Given** 玩家希望重新开始，**When** 执行记忆重置，**Then** NPC 回到初始人格状态，不残留任何旧记忆。
 6. **Given** 记忆存储暂时不可用，**When** 玩家继续对话，**Then** NPC 仍能正常回应（仅表现为不记得长期信息），游戏流程不中断。
+7. **Given** 玩家多次提及某话题但从未成为具体事件（如反复聊起"妹妹"），**When** 后续对话中该话题再次出现，**Then** NPC 表现出模糊印象（"你好像提起过……"级别的态度，而非引用具体事实），印象不张冠李戴、不编造细节；注入按权重阈值（近期必记 + 提及次数衰减 + 在意值缩放）而非硬次数门槛。
+
+> **实现补记（2026-09-21）**：记忆体系实际落地为**四级存储**——短期窗口 / 经历摘要 / 长期档案 / **模糊印象层**（`app/services/memory/topics.py`，双通道注入 + 权重衰减，e6cb948/fed9cf8 迭代）。印象防张冠李戴与对话防复读已由 `tests/services/test_memory_topics.py` 覆盖。
+>
+> **实测三修（2026-09-21，真实对话复盘）**：拿真实会话记录（45 轮）对照后发现三个问题并修复——
+> 1. **幻视/编造过去**：prompt 里「不得凭空断言过去事件」的约束原先被包在 `if history:` 里，**会话第一轮根本不生效**，于是首轮就出现「上次的烤鱼」这类无据断言。已移到常驻约束并加强（模糊印象只有话题、不含事实），由 `test_memory_honesty_rule_present_even_without_history_or_memories` 钉住。
+> 2. **印象自我强化回路**：她自己的回复也提取主题入印象（设计如此），但走的是**与玩家同一条强化路径**——「注入 → 她提起 → 计数 +1 → 更必注入」形成正反馈，实测「钓鱼」被计到 24 次、印象层塞满 200 条。现在 `origin=companion` 的提及**不加深、不刷新时间**（仅首次留痕，表示"她记得自己说过"），玩家提及仍可升级来源并正常强化；检索端对近期会话已聊过的话题**本轮冷却不注入**。
+> 3. **停用词噪声入印象**：实测落进印象层的「不过 / 这话 / 人机味 / 幻视」等碎片会被当成"对玩家的印象"注入，让角色说怪话。黑名单扩充（幻视/幻觉/人机/人机味）+ 噪声表扩充（指代/领属词）。历史数据不会自愈，新增一次性清洗脚本 `scripts/prune_noise_impressions.py`（支持 `--dry-run`，已清洗现有 14 条）。
+>
+> **残留待办**：① 规则提取仍会产出「以为 / 前面 / 这么定」这类无法穷举的碎片（正式路径走 LLM 顺带返回，规则仅为降级）；② 旧数据里被正反馈抬高的话题（钓鱼 n=24）靠半衰期自然淡出，可另用清洗脚本重置。
+>
+> **四补：让「有据可说」成为默认路径（2026-09-21）**。三修之后复盘根因：`short_term / summaries / archive` 三层在真实运行中**恒为空**（`record_experience` 只有测试和 demo 在调），长期信息全靠印象层承载——而印象只有话题、没有事实。她手里没有任何可引用的事实，遇到「上次的烤鱼」这种问法只能脑补，这正是幻视的土壤。本轮把另两层接上：
+> - **事实通道**：LLM 顺带返回 `facts`（0~3 条关于玩家本人的、跨会话仍成立的第三人称陈述），落**档案层**（`MemoryStore.record_facts`，按内容去重、重复提及只刷新时效不新增、不降级重要性）。注入端 `format_memory_block` 按来源分口吻（"the player told you" / "you two went through together" / "the player promised you"），并明确许可「这些可以直说，但不得加细节」——否则她连记得的事也会含糊其辞。
+> - **接地校验**（`app/services/memory/facts.py`）：档案里的事实会以「她确定知道」长期注入，**编造一条就是永久错误记忆，比当场幻视严重得多**。因此写档前做轻量接地校验——事实的实词（剥离「玩家」前缀与高频功能字后的字符集）至少一半要能在玩家真说过的话（本轮 + 近期会话）里找到，对不上直接丢弃（印象层仍留痕）。宁可漏掉一条真事实，也不让编造进档案。
+> - **共同经历通道**：`/v1/world/events`（含 v0.2 战斗通道）处理成功后，把有共同经历语义的事件（第一次踏进某地 / 收到礼物 / 玩家替她挡刀 / 承诺兑现 / 击败强敌）写进**摘要层**；瞬时战斗状态（血量告急、蓝量过低）不入记忆——那是当下要处理的情况，不是回忆。细节只取上报方给过的 `details` / 快照字段，取不到就写泛一点，绝不推断；重放事件不重复记（幂等检查之后才写 + 摘要层按内容去重兜底）。
+>
+> 测试 605 通过（新增 22：接地校验、档案去重、事实落档/拦截/注入、共同经历模板与幂等重放）。
 
 ---
 
@@ -468,6 +485,19 @@ NPC 与玩家的关系是一段会成长的关系。玩家保护她、认真对�
 - 本项目为课程项目，交付范围以"可演示、可解释、可验收"为准，不追求生产级并发与运维能力。
 - 角色属于虚构游戏角色，不存在真实人物映射；内容表达遵守通用合规要求（无不当与侵害性内容）。
 
+### 演进路线补记（未入原 8 个用户故事的规格）
+
+**模糊记忆层**已并入 US1（见其实现补记）。
+
+**对话 RL「导演层」路线**（2026-09-21 登记，目标：让自主行为/对话节奏随玩家反馈自适应，**不**替代 LLM 文本生成）：
+
+1. 对话信号埋点已落地（`app/services/dialogue_signals`，d15be4d）：轮次时长、话题切换、玩家主动性、情绪词等 → `data/signals/` JSONL 攒数据；
+2. 起步用 bandit（LinUCB / Thompson Sampling）在「主动搭话 vs 沉默」「话题选择」等离散决策位做在线学习；
+3. 奖励 = 玩家留存信号（继续聊、追问、主动分享）与负信号（冷场、转话题）的组合；
+4. 安全边界：RL 只做导演层决策，人格文本仍由 LLM + 人设约束生成；学习率与探索率保守，防人格漂移（章程原则 VII）。
+
+**Boss 战 RL**（yjx 侧，独立于对话 RL）：`rl/boss/` 训练 3 种子 × 100 万步已完成（2026-09-10，2/3 达标），独立推理服务 `scripts/rl/boss/serve.py` 已并入 main。
+
 ---
 
 # 第三部分　实施计划（Implementation Plan）
@@ -676,11 +706,11 @@ scripts/
 
 **Purpose**: 为新增能力准备配置入口与目录约定，不改动既有对外契约。
 
-- [ ] T001 按 plan.md 建立新增子包骨架：`app/services/memory/`、`app/services/relationship/`、`app/services/agency/`、`app/services/skills/`、`app/schemas/directives/`，各含 `__init__.py`
-- [ ] T002 [P] 扩展运行时配置：`app/config.py` 增加记忆根目录、心跳最小间隔、关系数值范围与初值、记忆容量上限、工具轮次上限等配置项（全部带安全默认值）
-- [ ] T003 [P] 建立运行期数据目录约定与忽略规则：`data/memory/`（不入版本库）与 `data/world/`；确认 `.gitignore` 覆盖
-- [ ] T004 [P] 扩展配置文件骨架：`data/policy/relationship_policy.yaml`（关系事件与增减）、`data/policy/agency_policy.yaml`（活动域、行为目录、节流）、`data/world/lore.yaml`（世界观知识库占位）
-- [ ] T005 [P] 更新 `docs/README.md` 文档索引，登记本次新增文档与规格目录
+- [x] T001 按 plan.md 建立新增子包骨架：`app/services/memory/`、`app/services/relationship/`、`app/services/agency/`、`app/services/skills/`、`app/schemas/directives/`，各含 `__init__.py`
+- [x] T002 [P] 扩展运行时配置：`app/config.py` 增加记忆根目录、心跳最小间隔、关系数值范围与初值、记忆容量上限、工具轮次上限等配置项（全部带安全默认值）
+- [x] T003 [P] 建立运行期数据目录约定与忽略规则：`data/memory/`（不入版本库）与 `data/world/`；确认 `.gitignore` 覆盖
+- [x] T004 [P] 扩展配置文件骨架：`data/policy/relationship_policy.yaml`（关系事件与增减）、`data/policy/agency_policy.yaml`（活动域、行为目录、节流）、`data/world/lore.yaml`（世界观知识库占位）
+- [x] T005 [P] 更新 `docs/README.md` 文档索引，登记本次新增文档与规格目录
 
 **Checkpoint**: 骨架与配置就绪，可进入基础阶段
 
@@ -692,20 +722,20 @@ scripts/
 
 **⚠️ CRITICAL**: 本阶段完成前，任何用户故事都不得开始
 
-- [ ] T006 定义单一指令体系共享字段：`app/schemas/directives/common.py`（信封、标识、优先级、有效期、来源、表现块）
-- [ ] T007 [P] 定义世界状态快照：`app/schemas/world_context.py`（活动场景、世界时间与天气、区域、玩家/NPC 状态、可交互对象；保留既有战斗字段）
-- [ ] T008 [P] 定义主入口请求/响应：`app/schemas/agent_step.py`
-- [ ] T009 [P] 定义世界事件模型：`app/schemas/world_event.py`（事件标识、类型白名单、幂等标记）
-- [ ] T010 实现多角色注册表：改造 `app/services/companion/profile_repository.py`（按角色标识解析与缓存，移除单例假设，未登记返回 404）
-- [ ] T011 [P] 消除进程级单例：改造 `app/services/companion/session_memory.py`，按角色标识分区
-- [ ] T012 [P] 事件幂等缓存按角色分区：改造 `app/services/tactical/event_policy.py` 的幂等键
-- [ ] T013 新增主入口路由：`app/api/v1/agent.py`（心跳与指令统一处理，空动作轻量返回）
-- [ ] T014 [P] 新增世界事件路由：`app/api/v1/world.py`（并入既有战斗事件分支）
-- [ ] T015 [P] 新增调试与控制路由：`app/api/v1/console.py`（状态查询、记忆重置）
-- [ ] T016 注册新路由：更新 `app/api/routes.py`（仅此一处 include）
-- [ ] T017 [P] 建立 golden 样例：`data/golden/` 增加非战斗场景快照（探索含可交互物、营地、待机、非战斗危险）与主入口请求/响应样例
-- [ ] T018 全链路预演脚本骨架：`scripts/mock_ue_flow.py` 扩展出心跳与自主行为分支（先跑通空动作路径）
-- [ ] T019 契约测试：`tests/api/test_agent_step.py` 建立主入口骨架用例（正常、缺字段 422、未登记角色 404、限流 429）
+- [x] T006 定义单一指令体系共享字段：`app/schemas/directives/common.py`（信封、标识、优先级、有效期、来源、表现块）
+- [x] T007 [P] 定义世界状态快照：`app/schemas/world_context.py`（活动场景、世界时间与天气、区域、玩家/NPC 状态、可交互对象；保留既有战斗字段）
+- [x] T008 [P] 定义主入口请求/响应：`app/schemas/agent_step.py`
+- [x] T009 [P] 定义世界事件模型：`app/schemas/world_event.py`（事件标识、类型白名单、幂等标记）
+- [x] T010 实现多角色注册表：改造 `app/services/companion/profile_repository.py`（按角色标识解析与缓存，移除单例假设，未登记返回 404）
+- [x] T011 [P] 消除进程级单例：改造 `app/services/companion/session_memory.py`，按角色标识分区
+- [x] T012 [P] 事件幂等缓存按角色分区：改造 `app/services/tactical/event_policy.py` 的幂等键
+- [x] T013 新增主入口路由：`app/api/v1/agent.py`（心跳与指令统一处理，空动作轻量返回）
+- [x] T014 [P] 新增世界事件路由：`app/api/v1/world.py`（并入既有战斗事件分支）
+- [x] T015 [P] 新增调试与控制路由：`app/api/v1/console.py`（状态查询、记忆重置）
+- [x] T016 注册新路由：更新 `app/api/routes.py`（仅此一处 include）
+- [x] T017 [P] 建立 golden 样例：`data/golden/` 增加非战斗场景快照（探索含可交互物、营地、待机、非战斗危险）与主入口请求/响应样例
+- [x] T018 全链路预演脚本骨架：`scripts/mock_ue_flow.py` 扩展出心跳与自主行为分支（先跑通空动作路径）
+- [x] T019 契约测试：`tests/api/test_agent_step.py` 建立主入口骨架用例（正常、缺字段 422、未登记角色 404、限流 429）
 
 **Checkpoint**: 基础设施就绪，各用户故事可并行开发
 
@@ -721,21 +751,21 @@ scripts/
 
 > **先写测试，确认失败后再实现**
 
-- [ ] T020 [P] [US1] 记忆读写与分区测试：`tests/services/test_memory_store.py`（按角色隔离、并发安全）
-- [ ] T021 [P] [US1] 容量与淘汰测试：`tests/services/test_memory_eviction.py`（达上限按重要性与时间淘汰，承诺类不被淘汰）
-- [ ] T022 [P] [US1] 重启回读测试：`tests/services/test_memory_persistence.py`（写入后重新加载，回读正确率 100%）
-- [ ] T023 [P] [US1] 降级测试：`tests/services/test_memory_degradation.py`（目录不可写、文件损坏、检索超时三种路径）
+- [x] T020 [P] [US1] 记忆读写与分区测试：`tests/services/test_memory_store.py`（按角色隔离、并发安全）
+- [x] T021 [P] [US1] 容量与淘汰测试：`tests/services/test_memory_eviction.py`（达上限按重要性与时间淘汰，承诺类不被淘汰）
+- [x] T022 [P] [US1] 重启回读测试：`tests/services/test_memory_persistence.py`（写入后重新加载，回读正确率 100%）
+- [x] T023 [P] [US1] 降级测试：`tests/services/test_memory_degradation.py`（目录不可写、文件损坏、检索超时三种路径）
 
 #### Implementation for User Story 1
 
-- [ ] T024 [P] [US1] 记忆条目与档案模型：`app/schemas/memory.py`（条目、重要性、来源、双时间戳；长期档案结构）
-- [ ] T025 [P] [US1] 分级存储实现：`app/services/memory/store.py`（短期窗口、经历摘要、长期档案；上限与淘汰；原子写入 + 单版本备份）
-- [ ] T026 [US1] 经历摘要在数据落盘时生成：`app/services/memory/summarizer.py`（事件触发写入，非逐条写盘）
-- [ ] T027 [US1] 记忆检索与预算注入：`app/services/memory/retrieval.py`（按重要性排序，超预算截断）
-- [ ] T028 [US1] 对话服务接入记忆：改造 `app/services/companion/dialogue_service.py` 与 `llm_dialogue_service.py`（注入记忆块，写入时机接入）
-- [ ] T029 [US1] 记忆重置能力：在 `app/services/memory/store.py` 提供清空入口并在 `app/api/v1/console.py` 暴露
-- [ ] T030 [US1] 降级接线：记忆异常时以短期窗口继续服务，响应标记降级来源
-- [ ] T031 [US1] 回读演示脚本：`scripts/demo_memory_persistence.py`（写入 → 重启 → 回读）
+- [x] T024 [P] [US1] 记忆条目与档案模型：`app/schemas/memory.py`（条目、重要性、来源、双时间戳；长期档案结构）
+- [x] T025 [P] [US1] 分级存储实现：`app/services/memory/store.py`（短期窗口、经历摘要、长期档案；上限与淘汰；原子写入 + 单版本备份）
+- [x] T026 [US1] 经历摘要在数据落盘时生成：`app/services/memory/summarizer.py`（事件触发写入，非逐条写盘）
+- [x] T027 [US1] 记忆检索与预算注入：`app/services/memory/retrieval.py`（按重要性排序，超预算截断）
+- [x] T028 [US1] 对话服务接入记忆：改造 `app/services/companion/dialogue_service.py` 与 `llm_dialogue_service.py`（注入记忆块，写入时机接入）
+- [x] T029 [US1] 记忆重置能力：在 `app/services/memory/store.py` 提供清空入口并在 `app/api/v1/console.py` 暴露
+- [x] T030 [US1] 降级接线：记忆异常时以短期窗口继续服务，响应标记降级来源（注：对话链路降级已完成；`/v1/agent/step` 心跳路径暂不消费记忆，其 `observability.degraded` 字段保留待 T076+ 链路补全时统一设置）
+- [x] T031 [US1] 回读演示脚本：`scripts/demo_memory_persistence.py`（写入 → 重启 → 回读）
 
 **Checkpoint**: US1 可独立验证——"她记得我"成立
 
@@ -806,18 +836,19 @@ scripts/
 
 #### Tests for User Story 5 ⚠️
 
-- [ ] T057 [P] [US5] 事件白名单与校验测试：`tests/api/test_world_events.py`（未知类型 422、时间非法 422）
-- [ ] T058 [P] [US5] 幂等测试：`tests/api/test_world_events_idempotency.py`（重复上报回放首次、跨遭遇同标识独立）
-- [ ] T059 [P] [US5] 不虚构动作测试：`tests/services/test_event_no_fabrication.py`（能力不可用时动作为空但仍返回反应与建议）
+- [x] T057 [P] [US5] 事件白名单与校验测试：`tests/api/test_world_events.py`（未知类型 422、时间非法 422）
+- [x] T058 [P] [US5] 幂等测试：`tests/api/test_world_events_idempotency.py`（重复上报回放首次、跨遭遇同标识独立）
+- [x] T059 [P] [US5] 不虚构动作测试：`tests/services/test_event_no_fabrication.py`（能力不可用时动作为空但仍返回反应与建议）
 
 #### Implementation for User Story 5
 
-- [ ] T060 [P] [US5] 非战斗事件类型扩展：`app/schemas/world_event.py` 与 `data/companions/` 事件反应配置（首版 6 类）
-- [ ] T061 [US5] 事件处理统一：改造 `app/services/tactical/event_policy.py` 支持两类事件并复用幂等键（含角色维度）
-- [ ] T062 [US5] 关系事件联动：事件处理链路调用 `app/services/relationship/rules.py`
-- [ ] T063 [US5] 路由并入：`app/api/v1/world.py` 与既有战斗事件入口保持兼容
+- [x] T060 [P] [US5] 非战斗事件类型扩展：`app/schemas/world_event.py` 与 `data/companions/` 事件反应配置（首版 6 类）
+- [x] T061 [US5] 事件处理统一：改造 `app/services/tactical/event_policy.py` 支持两类事件并复用幂等键（含角色维度）
+- [x] T062 [US5] 关系事件联动：事件处理链路调用 `app/services/relationship/rules.py`
+- [x] T063 [US5] 路由并入：`app/api/v1/world.py` 与既有战斗事件入口保持兼容
 
-**Checkpoint**: US5 独立可验
+**Checkpoint**: US5 独立可验（2026-09-16 完成，408 用例全绿；关系数值自此有了 HTTP 上报入口，
+重复上报不重复计分由 `test_world_events_idempotency.py` 守住）
 
 ---
 
@@ -829,19 +860,24 @@ scripts/
 
 #### Tests for User Story 6 ⚠️
 
-- [ ] T064 [P] [US6] 能力注册表测试：`tests/services/test_skill_registry.py`（登记、查询、按场景过滤）
-- [ ] T065 [P] [US6] 工具命中与未命中测试：`tests/services/test_tools_lore.py`（命中一致、未命中明确不确定）
-- [ ] T066 [P] [US6] 工具降级测试：`tests/services/test_tools_degradation.py`（超时、轮次上限、未注册工具、非法调用 JSON）
+- [x] T064 [P] [US6] 能力注册表测试：`tests/services/test_skill_registry.py`（登记、查询、按场景过滤）
+- [x] T065 [P] [US6] 工具命中与未命中测试：`tests/services/test_tools_lore.py`（命中一致、未命中明确不确定）
+- [x] T066 [P] [US6] 工具降级测试：`tests/services/test_tools_degradation.py`（超时、轮次上限、未注册工具、非法调用 JSON）
 
 #### Implementation for User Story 6
 
-- [ ] T067 [P] [US6] 能力注册表：`app/services/skills/registry.py`（统一登记战斗行为、生活行为、信息工具）
-- [ ] T068 [US6] 只读查证工具：`app/services/skills/tools.py`（世界观知识库、战况快照、环境可交互物、自身状态、记忆检索；全部只读 + 输出裁剪）
-- [ ] T069 [US6] 模型侧两轮调用：改造 `app/services/companion/llm_dialogue_service.py`（发出查证请求 → 回填 → 再生成；上限 2 轮）
-- [ ] T070 [US6] 知识库资产：填充 `data/world/lore.yaml` 首版条目并登记来源
-- [ ] T071 [US6] 战斗链路禁用查证（保延迟），仅在非战斗对话链路启用
+- [x] T067 [P] [US6] 能力注册表：`app/services/skills/registry.py`（统一登记战斗行为、生活行为、信息工具）
+- [x] T068 [US6] 只读查证工具：`app/services/skills/tools.py`（世界观知识库、战况快照、环境可交互物、自身状态、记忆检索；全部只读 + 输出裁剪）
+- [x] T069 [US6] 模型侧两轮调用：改造 `app/services/companion/llm_dialogue_service.py`（发出查证请求 → 回填 → 再生成；上限 2 轮）
+- [x] T070 [US6] 知识库资产：填充 `data/world/lore.yaml` 首版条目并登记来源
+- [x] T071 [US6] 战斗链路禁用查证（保延迟），仅在非战斗对话链路启用
 
-**Checkpoint**: US6 独立可验
+**Checkpoint**: US6 独立可验（2026-09-17 完成，462 用例全绿）。注册表是既有配置源的
+投影而非第二份真相：战斗能力 ID 从此只在 `tactical_policy.yaml` 写一次（resolver 常量
+改为派生），生活行为沿用 `agency_policy.yaml`，工具清单在 `tools.py`。「查不到就明确
+查不到」由 `test_tools_lore.py` 成对守住；轮次上限（1 轮查证 + 1 轮作答）由
+`test_tools_degradation.py` 守住。知识库收录纪律：只收设计文档已确立的事实，
+「遗迹是谁建的」刻意留空作为「明确不确定」的验收用例。
 
 ---
 
@@ -851,12 +887,17 @@ scripts/
 
 **Goal**: 确保关系与人格状态接入后，战斗指挥链路仍正确、可解释、可降级。
 
-- [ ] T072 [P] [US4] 回归集扩展：`tests/services/test_tactical_regression.py`（原 20 意图 × 4 战况基础上，新增"关系阶段"维度抽样）
-- [ ] T073 [P] [US4] 关系参与决策的回归：验证同一意图在不同关系阶段产出的动作与原因码可解释且不违反安全约束
-- [ ] T074 [US4] 意图白名单扩展至非战斗意图：改造 `app/services/tactical/intent_parser.py` 与 `llm_intent.py`（按域维护白名单，保持既有 7 意图不变）
-- [ ] T075 [US4] 主入口兼容既有指挥路径：`app/api/v1/agent.py` 与既有 `/v1/tactical/*` 共用同一决策层，避免逻辑分叉
+- [x] T072 [P] [US4] 回归集扩展：`tests/services/test_tactical_regression.py`（原 20 意图 × 4 战况基础上，新增"关系阶段"维度抽样）
+- [x] T073 [P] [US4] 关系参与决策的回归：验证同一意图在不同关系阶段产出的动作与原因码可解释且不违反安全约束
+- [x] T074 [US4] 意图白名单扩展至非战斗意图：改造 `app/services/tactical/intent_parser.py` 与 `llm_intent.py`（按域维护白名单，保持既有 7 意图不变）
+- [x] T075 [US4] 主入口兼容既有指挥路径：`app/api/v1/agent.py` 与既有 `/v1/tactical/*` 共用同一决策层，避免逻辑分叉
 
 **Checkpoint**: 战斗链路在升级后仍全绿
+
+> **实现补记（2026-09-21）**：
+> - T074 白名单新增 4 个非战斗意图（`inspect_interactable` / `pickup_item` / `rest_here` / `wait_here`），按域分组常量 `COMBAT_INTENT_IDS` / `NON_COMBAT_INTENT_IDS` 维护（`app/schemas/tactical_intent.py`），LLM 提示同步按域分组。
+> - T075 主入口文本路径接入：`/v1/agent/step` 携带 `text` 时与 `/v1/tactical/command` 同源走 `parse_intent_with_source`——战斗意图复用 `resolve_intent`（含 US2 关系调制）后映射为统一信封 `DirectiveEnvelope`；非战斗意图映射 agency 行为目录并做场景域/目标类型/距离校验（只引用快照内目标，FR-040）。不可识别回复澄清；战斗意图无战斗快照返回 `COMBAT_CONTEXT_MISSING`；场景不匹配返回 `BEHAVIOR_NOT_IN_SCENE`。
+> - T072/T073 回归集扩展：`RELATIONSHIP_STAGES` 四阶段 × 4 意图 × 4 战况抽样，另加 devoted 护盾重建前置校验、抗议只加原因码不改动作、任意阶段不虚构 CD 能力三条安全断言。全量 574 测试通过。
 
 ---
 
@@ -864,12 +905,18 @@ scripts/
 
 **Goal**: 全链路可解释信息与调试面板数据。
 
-- [ ] T076 [P] [US7] 链路信息字段补全：所有响应统一携带来源标记、原因说明、策略版本、人格版本、使用快照标识、记忆层级
-- [ ] T077 [US7] 调试状态查询：`app/api/v1/console.py` 返回当前场景、情绪、关系阶段、近期记忆摘要、策略版本
-- [ ] T078 [US7] 演示脚本汇总：`scripts/mock_ue_flow.py` 覆盖"输入 → 理解 → 关系阶段 → 决策 → 依据 → 结果"全链路打印
-- [ ] T079 [US7] 指标采集脚本：统计越界下发、重复响应、风格违规、降级次数等验收指标
+- [x] T076 [P] [US7] 链路信息字段补全：所有响应统一携带来源标记、原因说明、策略版本、人格版本、使用快照标识、记忆层级
+- [x] T077 [US7] 调试状态查询：`app/api/v1/console.py` 返回当前场景、情绪、关系阶段、近期记忆摘要、策略版本
+- [x] T078 [US7] 演示脚本汇总：`scripts/mock_ue_flow.py` 覆盖"输入 → 理解 → 关系阶段 → 决策 → 依据 → 结果"全链路打印
+- [x] T079 [US7] 指标采集脚本：统计越界下发、重复响应、风格违规、降级次数等验收指标
 
 **Checkpoint**: 答辩可逐条解释每次决策
+
+> **实现补记（2026-09-21）**：
+> - T076：`AgentStepObservability` / `CompanionDialogueResponse` / tactical `Observability` 统一新增 `persona_revision`（人设 YAML 的 `profile_version`，读取失败降级空串）；对话响应另带 `memory_layers`（本轮实际注入的长期记忆/印象条数）；心跳路径不消费记忆，`memory_layers` 为空字典（如实而非虚构）。
+> - T077：`/v1/console/state` 扩展为完整调试视图——关系阶段/数值、运行期最近场景与情绪（`app/services/console/runtime_state.py`，由 `/v1/agent/step` 与对话链路记录）、近期记忆摘要（前 5 条）、人设/自主行为/战术策略版本。
+> - T078：`scripts/command_service/mock_ue_flow.py` 新增第 10 节「US7 可解释链路演示」，按 输入 → 理解 → 关系 → 决策 → 依据 → 结果 逐段打印（主入口文本指令路径 + 调试台）。
+> - T079：`scripts/metrics_report.py` 统计执行回执分布、可疑指令数、对话后端分布、降级次数（fallback）、复读轮数、负反馈与话题延续率；风格违规指标待 T083 style_guard 落地后接入数据源。
 
 ---
 

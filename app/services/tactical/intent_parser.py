@@ -93,4 +93,21 @@ def parse_text_to_intent(text: str) -> TacticalIntent | None:
     if _has_any(t, "跟随", "跟着", "跟上", "跟我", "follow"):
         return _intent("follow_player", "party.player")
 
+    # --- 非战斗意图（T074：按域扩展白名单，交由主入口映射 agency 行为）---
+    # 8. 拾取。
+    if _has_any(t, "捡起", "捡一下", "拾取", "拿起来", "拿一下", "pickup"):
+        return _intent("pickup_item", "")
+
+    # 9. 查看物件。
+    if _has_any(t, "看看", "看一下", "查看", "检查", "瞅瞅", "inspect"):
+        return _intent("inspect_interactable", "")
+
+    # 10. 休整。
+    if _has_any(t, "休息", "歇会", "歇一会儿", "休整", "扎营", "rest"):
+        return _intent("rest_here", "")
+
+    # 11. 原地等待。
+    if _has_any(t, "等我", "等一下我", "原地等", "停下等", "wait"):
+        return _intent("wait_here", "party.player")
+
     return None

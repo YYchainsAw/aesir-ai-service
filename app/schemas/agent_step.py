@@ -40,6 +40,10 @@ class AgentStepObservability(BaseModel):
     degraded: bool = False  # 任一子系统降级时为 true（章程原则 V）
     # US2（T042）：本次决策所依据的关系阶段；关系体系故障降级时为空字符串
     relationship_stage: str = ""
+    # US7（T076）链路信息：人设 YAML 的 profile_version；本轮决策注入的
+    # 记忆条数（心跳路径不消费记忆，为空字典——如实而非虚构）。
+    persona_revision: str = ""
+    memory_layers: dict[str, int] = Field(default_factory=dict)
 
 
 class AgentStepResponse(BaseModel):

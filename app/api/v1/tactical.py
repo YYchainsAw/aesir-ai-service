@@ -26,6 +26,19 @@ from app.services.tactical.resolver import resolve_intent
 router = APIRouter(prefix="/v1/tactical", tags=["tactical"])
 
 
+def _persona_revision_or_empty(companion_id: str) -> str:
+    """人设 YAML 的 profile_version（US7 / T076）；读取失败降级为空字符串。"""
+    from app.services.companion.profile_repository import (
+        CompanionProfileError,
+        get_registered_profile,
+    )
+
+    try:
+        return str(get_registered_profile(companion_id).raw.get("profile_version", ""))
+    except CompanionProfileError:
+        return ""
+
+
 def _resolve_response(
     request_id: str, intent, combat_context, source: str = "rule"
 ) -> ResolveResponse:
@@ -56,6 +69,8 @@ def _resolve_response(
         },
         observability=Observability(
             normalized_text=intent.normalized_text,
+            # US7（T076）：人设版本（读取失败降级为空字符串）
+            persona_revision=_persona_revision_or_empty(combat_context.companion.id),
             # rl 后端请求但未接入时保留标记，便于在回执数据中区分；
             # 规则路径的版本号来自 data/policy/tactical_policy.yaml
             policy_revision=(
