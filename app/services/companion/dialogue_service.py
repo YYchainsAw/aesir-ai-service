@@ -64,6 +64,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         topics = None
         salient = None
     response.relationship_stage = stage
+    _annotate_observability(response, profile, memories=memories, impressions=impressions)
     _record_turn(
         request,
         response,
@@ -96,7 +97,10 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     stage = _relationship_stage(request.companion_id)
 
     if get_settings().companion_backend != "llm":
-        return _stream_mock_reply(request, profile=profile, source="mock", stage=stage)
+        return _stream_mock_reply(
+            request, profile=profile, source="mock", stage=stage,
+            memories=memories, impressions=impressions,
+        )
 
     return _stream_llm_reply(
         request,
@@ -139,13 +143,19 @@ def _stream_llm_reply(
                 salient=service.last_salient,
                 injected_topics=[i.topic for i in impressions],
             )
+            _annotate_observability(
+                event.response, profile, memories=memories, impressions=impressions
+            )
             yield _with_stage(event, stage)
             return
     except LLMClientError:
         if emitted_delta:
             yield StreamEvent(kind="error", text="LLM stream interrupted; this turn is incomplete.")
             return
-        yield from _stream_mock_reply(request, profile=profile, source="fallback", stage=stage)
+        yield from _stream_mock_reply(
+            request, profile=profile, source="fallback", stage=stage,
+            memories=memories, impressions=impressions,
+        )
 
 
 def _stream_mock_reply(
@@ -154,10 +164,13 @@ def _stream_mock_reply(
     profile: CompanionProfile,
     source: str,
     stage: str,
+    memories: list[MemoryEntry],
+    impressions: list,
 ) -> Iterator[StreamEvent]:
     """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
     response = _create_mock_dialogue_reply(request, profile=profile, source=source)
     _record_turn(request, response)
+    _annotate_observability(response, profile, memories=memories, impressions=impressions)
     if response.reply_text:
         yield StreamEvent(kind="delta", text=response.reply_text)
     yield _with_stage(StreamEvent(kind="meta", response=response), stage)
@@ -167,6 +180,35 @@ def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
     if event.response is not None:
         event.response.relationship_stage = stage
     return event
+
+
+def _note_runtime(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:
+    """US7（T077）：记录最近情绪，供调试台查询；任何故障静默。"""
+    try:
+        from app.services.console.runtime_state import record_observation
+
+        record_observation(request.companion_id, emotion_id=response.emotion_id)
+    except Exception:
+        pass
+
+
+def _annotate_observability(
+    response: CompanionDialogueResponse,
+    profile: CompanionProfile,
+    *,
+    memories: list[MemoryEntry],
+    impressions: list,
+) -> None:
+    """US7（T076）链路信息：人设版本 + 本轮实际注入的记忆条数（按通道）。
+
+    只报事实：mock/回退路径同样注入了记忆（供埋点口径统一），但回退回复
+    未必使用——仍如实记录注入量。
+    """
+    response.persona_revision = str(profile.raw.get("profile_version", ""))
+    response.memory_layers = {
+        "long_term": len(memories),
+        "impressions": len(impressions),
+    }
 
 
 def _record_turn(
@@ -188,6 +230,7 @@ def _record_turn(
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id) if request.session_id else ()
+    _note_runtime(request, response)
     if request.session_id:
         memory.record(request.session_id, request.text, response.reply_text)
     if topics is None:

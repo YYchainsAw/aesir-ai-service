@@ -52,6 +52,31 @@ def test_console_state_returns_registered_summary() -> None:
     assert body["tactical_policy_revision"]
 
 
+def test_console_state_exposes_us7_debug_fields() -> None:
+    """T077：调试台返回场景/情绪/关系/近期记忆/版本（如实，不虚构）。"""
+    from app.services.console.runtime_state import reset_runtime_observations
+
+    reset_runtime_observations()
+    # 先跑一次对话，观测记录应有情绪
+    chat = client.post(
+        "/v1/companion/chat",
+        json={"text": "艾莉，今天心情怎么样？", "companion_id": "companion.alice"},
+    )
+    assert chat.status_code == 200
+    response = client.get("/v1/console/state", params={"companion_id": "companion.alice"})
+    assert response.status_code == 200
+    body = response.json()
+    # 版本字段（US7 链路信息）
+    assert body["persona_revision"]
+    assert body["agency_policy_revision"]
+    # 关系字段（体系故障降级为空，但不缺字段）
+    assert "relationship_stage" in body
+    assert "relationship_value" in body
+    # 运行观测：对话路径只记录情绪；场景来自 /v1/agent/step（此处未调用，可为空）
+    assert body["last_emotion_id"]
+    assert isinstance(body["recent_memory"], list)
+
+
 def test_console_state_unknown_companion_returns_404() -> None:
     response = client.get("/v1/console/state", params={"companion_id": "companion.unknown"})
     assert response.status_code == 404

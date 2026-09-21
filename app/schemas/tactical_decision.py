@@ -55,6 +55,7 @@ class Observability(BaseModel):
     normalized_text: str = ""
     policy_revision: str = ""
     used_snapshot_id: str = ""
+    persona_revision: str = ""  # US7（T076）：人设 YAML 的 profile_version
 
 
 class ResolveRequest(BaseModel):

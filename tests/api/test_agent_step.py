@@ -61,6 +61,9 @@ def test_heartbeat_emits_autonomous_directive() -> None:
     assert body["request_id"] == _REQUEST_ID
     assert body["companion_id"] == "companion.alice"
     assert body["action"] == "directive"
+    # US7（T076）链路信息：人设版本；心跳路径不消费记忆（memory_layers 为空字典）
+    assert body["observability"]["persona_revision"] != ""
+    assert body["observability"]["memory_layers"] == {}
     directive = body["directive"]
     assert directive["agent_id"] == "companion.alice"
     assert directive["domain"] == "exploration"

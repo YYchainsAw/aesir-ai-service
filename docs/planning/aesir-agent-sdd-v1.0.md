@@ -891,12 +891,18 @@ scripts/
 
 **Goal**: 全链路可解释信息与调试面板数据。
 
-- [ ] T076 [P] [US7] 链路信息字段补全：所有响应统一携带来源标记、原因说明、策略版本、人格版本、使用快照标识、记忆层级
-- [ ] T077 [US7] 调试状态查询：`app/api/v1/console.py` 返回当前场景、情绪、关系阶段、近期记忆摘要、策略版本
-- [ ] T078 [US7] 演示脚本汇总：`scripts/mock_ue_flow.py` 覆盖"输入 → 理解 → 关系阶段 → 决策 → 依据 → 结果"全链路打印
-- [ ] T079 [US7] 指标采集脚本：统计越界下发、重复响应、风格违规、降级次数等验收指标
+- [x] T076 [P] [US7] 链路信息字段补全：所有响应统一携带来源标记、原因说明、策略版本、人格版本、使用快照标识、记忆层级
+- [x] T077 [US7] 调试状态查询：`app/api/v1/console.py` 返回当前场景、情绪、关系阶段、近期记忆摘要、策略版本
+- [x] T078 [US7] 演示脚本汇总：`scripts/mock_ue_flow.py` 覆盖"输入 → 理解 → 关系阶段 → 决策 → 依据 → 结果"全链路打印
+- [x] T079 [US7] 指标采集脚本：统计越界下发、重复响应、风格违规、降级次数等验收指标
 
 **Checkpoint**: 答辩可逐条解释每次决策
+
+> **实现补记（2026-09-21）**：
+> - T076：`AgentStepObservability` / `CompanionDialogueResponse` / tactical `Observability` 统一新增 `persona_revision`（人设 YAML 的 `profile_version`，读取失败降级空串）；对话响应另带 `memory_layers`（本轮实际注入的长期记忆/印象条数）；心跳路径不消费记忆，`memory_layers` 为空字典（如实而非虚构）。
+> - T077：`/v1/console/state` 扩展为完整调试视图——关系阶段/数值、运行期最近场景与情绪（`app/services/console/runtime_state.py`，由 `/v1/agent/step` 与对话链路记录）、近期记忆摘要（前 5 条）、人设/自主行为/战术策略版本。
+> - T078：`scripts/command_service/mock_ue_flow.py` 新增第 10 节「US7 可解释链路演示」，按 输入 → 理解 → 关系 → 决策 → 依据 → 结果 逐段打印（主入口文本指令路径 + 调试台）。
+> - T079：`scripts/metrics_report.py` 统计执行回执分布、可疑指令数、对话后端分布、降级次数（fallback）、复读轮数、负反馈与话题延续率；风格违规指标待 T083 style_guard 落地后接入数据源。
 
 ---
 

@@ -24,6 +24,16 @@ from app.services.tactical.policy import get_policy
 router = APIRouter(prefix="/v1/console", tags=["console"])
 
 
+class MemoryEntryView(BaseModel):
+    """调试视图：单条长期记忆的精简字段。"""
+
+    model_config = ConfigDict(extra="forbid")
+    content: str
+    importance: str
+    source: str
+    real_time: str
+
+
 class ConsoleStateResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
@@ -33,6 +43,14 @@ class ConsoleStateResponse(BaseModel):
     memory_backend: str          # 当前记忆后端说明（长期记忆 T025 落地后更新）
     session_memory_turns: int    # 会话记忆窗口配置
     tactical_policy_revision: str
+    # ---- US7（T077）调试视图：场景 / 情绪 / 关系 / 记忆 / 版本 ----
+    persona_revision: str                 # 人设 YAML 的 profile_version
+    agency_policy_revision: str           # 自主行为策略版本
+    relationship_stage: str               # 关系阶段（体系故障为空字符串）
+    relationship_value: float | None      # 关系数值（同上为 None）
+    last_scene: str                      # 最近一次快照的活动场景（重启后为空）
+    last_emotion_id: str                  # 最近一次输出表现的表情 ID（同上）
+    recent_memory: list[MemoryEntryView]  # 近期记忆摘要（按重要性取前 5）
 
 
 class MemoryResetRequest(BaseModel):
@@ -56,24 +74,52 @@ def console_state(companion_id: str) -> ConsoleStateResponse:
     except UnknownCompanionError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
+    # US7（T077）：关系（故障降级为空阶段/None，不阻塞调试台）
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        rel = get_relationship_store(companion_id).state()
+        relationship_stage, relationship_value = rel.stage, rel.value
+    except RelationshipStoreError:
+        relationship_stage, relationship_value = "", None
+
+    # 近期记忆摘要（检索预算内的条目按重要性取前 5；故障为空列表）
+    try:
+        from app.services.memory.retrieval import retrieve
+
+        recent = retrieve(get_memory_store(companion_id))[:5]
+    except MemoryStoreError:
+        recent = []
+
+    from app.services.agency.behavior_catalog import get_agency_policy
+    from app.services.console.runtime_state import get_observation
+
+    observation = get_observation(companion_id)
+
     return ConsoleStateResponse(
         registered_companions=list_registered_companions(),
         companion_id=profile.companion_id,
         display_name=profile.display_name,
-        memory_backend="session-memory（进程内滚动窗口；长期记忆见 SDD T025）",
+        memory_backend="四级存储：短期窗口 / 经历摘要 / 长期档案 / 模糊印象",
         session_memory_turns=get_settings().dialogue_history_turns,
         tactical_policy_revision=get_policy().revision,
+        persona_revision=str(profile.raw.get("profile_version", "")),
+        agency_policy_revision=get_agency_policy().revision,
+        relationship_stage=relationship_stage,
+        relationship_value=relationship_value,
+        last_scene=observation.scene,
+        last_emotion_id=observation.emotion_id,
+        recent_memory=[
+            MemoryEntryView(
+                content=e.content, importance=e.importance,
+                source=e.source, real_time=e.real_time,
+            )
+            for e in recent
+        ],
     )
-
-
-class MemoryEntryView(BaseModel):
-    """调试视图：单条长期记忆的精简字段。"""
-
-    model_config = ConfigDict(extra="forbid")
-    content: str
-    importance: str
-    source: str
-    real_time: str
 
 
 class TopicImpressionView(BaseModel):

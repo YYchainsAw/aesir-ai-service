@@ -117,7 +117,7 @@ aesir-ai-service/
 | `POST` | `/v1/companion/chat/stream` | 陪伴对话流式变体（SSE：delta 增量 + meta 权威帧，契约附录 A） |
 | `POST` | `/v1/agent/step` | v0.3 主入口：心跳/世界快照 → 禁打断判定 → 候选生成 → 仲裁 → 节流 → 自主行为指令（US3）；携带 `text` 时与 `/v1/tactical/command` 同源处理玩家指令（战斗/非战斗意图按域路由，US4） |
 | `POST` | `/v1/world/events` | v0.3 世界事件（含幂等回放） |
-| `GET` | `/v1/console/state` · `/memory`，`POST /memory/reset` | v0.3 调试台（状态查询/记忆重置） |
+| `GET` | `/v1/console/state` · `/memory`，`POST /memory/reset` | v0.3 调试台（状态查询含场景/情绪/关系/近期记忆，US7） |
 | `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
 
 支持的 5 条战术指令（`intent`）：
@@ -206,7 +206,9 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 .\.venv\Scripts\python -m scripts.command_service.mock_ue_flow    # 终端 2：假 UE 全链路
 ```
 
-脚本按策划书 §9 的 UE 伪流程依次调用 chat → parse → resolve（同一句治疗指令 × A/B/C/D 四类战况，见 `data/golden/`）→ combat/events（含同一 `event_id` 重试的幂等回放）→ executions 回执，全部打印响应 JSON，可直接作为 UE 侧开发与答辩演示素材。
+脚本按策划书 §9 的 UE 伪流程依次调用 chat → parse → resolve（同一句治疗指令 × A/B/C/D 四类战况，见 `data/golden/`）→ combat/events（含同一 `event_id` 重试的幂等回放）→ executions 回执，全部打印响应 JSON，可直接作为 UE 侧开发与答辩演示素材。末段含 v0.3 主入口心跳/文本指令（US4）与「输入 → 理解 → 关系 → 决策 → 依据 → 结果」逐段可解释演示（US7）。
+
+验收指标采集（US7 / T079）：`.\.venv\Scripts\python -m scripts.metrics_report` 汇总执行回执、降级次数、复读轮数与话题延续率（`--json` 为机器可读格式）。
 
 ## 路线图
 
@@ -221,6 +223,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/command_service/mock_ue_flow.py` 全链路演示（2026-09-09）
 - [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
 - [x] US4 加固（2026-09-21）：意图白名单按域扩展 4 个非战斗意图；`/v1/agent/step` 文本路径与 `/v1/tactical/*` 共用同一决策层（战斗意图含关系调制，非战斗意图映射 agency 行为目录）；回归集加关系阶段维度
+- [x] US7 可解释性（2026-09-21）：响应统一携带 persona_revision / memory_layers 链路字段；调试台扩展场景/情绪/关系/近期记忆；mock_ue_flow 全链路可解释演示；`scripts.metrics_report` 验收指标采集
 - [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 

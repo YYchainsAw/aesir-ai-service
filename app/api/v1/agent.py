@@ -94,6 +94,15 @@ def _relationship_stage_or_empty(companion_id: str) -> str:
         return ""
 
 
+def _persona_revision_or_empty(companion_id: str) -> str:
+    """人设 YAML 的 profile_version（US7 / T076）；读取失败降级为空字符串。"""
+    try:
+        profile = get_registered_profile(companion_id)
+    except CompanionProfileError:
+        return ""
+    return str(profile.raw.get("profile_version", ""))
+
+
 def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> AgentStepResponse:
     """空动作轻量返回（FR-025：不虚构行为；FR-021 判定无产出时快速返回）。"""
     return AgentStepResponse(
@@ -107,6 +116,7 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             policy_revision=_policy_revision(),
             used_snapshot_id=request.world_context.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(request.companion_id),
+            persona_revision=_persona_revision_or_empty(request.companion_id),
         ),
     )
 
@@ -200,6 +210,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
             policy_revision=_policy_revision(),
             used_snapshot_id=ctx.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(companion_id),
+            persona_revision=_persona_revision_or_empty(companion_id),
         ),
     )
 
@@ -212,6 +223,24 @@ def agent_step(request: AgentStepRequest) -> AgentStepResponse:
         # FR-044：未登记角色明确拒绝，不回退默认角色人格。
         raise HTTPException(status_code=404, detail=str(error)) from error
 
+    # US7（T077）：记录最近观测（场景 + 快照时间），调试台数据源
+    from app.services.console.runtime_state import record_observation
+
+    record_observation(
+        request.companion_id,
+        scene=request.world_context.scene,
+        last_seen=request.world_context.captured_at,
+    )
+    response = _dispatch_step(request)
+    if response.directive and response.directive.presentation:
+        record_observation(
+            request.companion_id, emotion_id=response.directive.presentation.emotion_id
+        )
+    return response
+
+
+def _dispatch_step(request: AgentStepRequest) -> AgentStepResponse:
+    """心跳与文本指令的分发（限流只约束心跳）。"""
     if request.text is None:
         # 纯心跳：限流 + 自主行为编排（T054）
         settings = get_settings()
@@ -258,6 +287,7 @@ def _intent_observability(
         policy_revision=_policy_revision(),
         used_snapshot_id=snapshot_id,
         relationship_stage=_relationship_stage_or_empty(request.companion_id),
+        persona_revision=_persona_revision_or_empty(request.companion_id),
     )
 
 

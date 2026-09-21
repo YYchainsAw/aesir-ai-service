@@ -56,3 +56,7 @@ class CompanionDialogueResponse(BaseModel):
     # US2（T042）：当前关系阶段（distant/neutral/friendly/close）；关系体系
     # 故障降级时为空字符串——UE 不应依赖该字段做表现逻辑。
     relationship_stage: str = ""
+    # US7（T076）链路信息：人设 YAML 的 profile_version 与本轮实际注入的
+    # 记忆条数（按通道：长期记忆 / 模糊印象）。缺省空——UE 不应依赖。
+    persona_revision: str = ""
+    memory_layers: dict[str, int] = Field(default_factory=dict)

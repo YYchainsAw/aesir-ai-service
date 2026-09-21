@@ -745,3 +745,20 @@ v0.1 完全一致，属附加式扩展、不升版本。
   `reply_text`，不猜测执行（FR-028）。
 - 意图解析来源进 `observability.source`（`rule`/`llm`/`rule_fallback`），
   关系阶段进 `observability.relationship_stage`，原因码完整可解释（US7 前置）。
+
+### 附加扩展（2026-09-21，SDD US7 T076/T077）：链路信息字段与调试台
+
+- **链路字段补全（T076）**：`AgentStepObservability` 新增 `persona_revision`
+  （人设 YAML 的 `profile_version`）与 `memory_layers`（本轮注入记忆条数；
+  心跳路径为空字典）；`CompanionDialogueResponse` 同样新增 `persona_revision`
+  与 `memory_layers`（`{"long_term": n, "impressions": m}`）；tactical
+  `Observability` 新增 `persona_revision`。全部为可选字段，缺省空——UE
+  不应依赖其做表现逻辑，仅供调试与归因。
+- **调试台（T077）**：`GET /v1/console/state` 返回扩展为完整调试视图：
+  `relationship_stage` / `relationship_value`（关系）、`last_scene` /
+  `last_emotion_id`（运行期最近观测，服务重启后为空）、`recent_memory`
+  （按重要性前 5 条）、`persona_revision` / `agency_policy_revision` /
+  `tactical_policy_revision`（三个策略版本）。
+- **指标采集（T079）**：`.venv/Scripts/python -m scripts.metrics_report`
+  汇总执行回执分布、降级次数、复读轮数、负反馈与话题延续率
+  （`--json` 输出机器可读格式）。
