@@ -24,7 +24,8 @@ class LLMIntentError(LLMClientError):
 _SYSTEM_PROMPT = """你是一名游戏《Aesir》的战术意图解析器。玩家指令都发给队友艾莉。
 请把中文自然语言指令解析为受限 JSON，只输出 JSON，不要任何解释、代码块或说明。
 
-intent_id 只能取以下 7 个白名单值（禁止发明）：
+intent_id 只能取以下白名单值（禁止发明），按域分两组：
+战斗域（7 个，v0.2 既有）：
 - support_heal_player     治疗/回血玩家（target_id="party.player"）
 - support_protect_player   给玩家护盾/保命（target_id="party.player"）
 - burst_boss               立即对 Boss 爆发输出（target_id="encounter.primary_hostile"）
@@ -32,6 +33,11 @@ intent_id 只能取以下 7 个白名单值（禁止发明）：
 - focus_fire_boss          集火 Boss（target_id="encounter.primary_hostile"）
 - retreat_and_survive      撤退保命（target_id="party.player"）
 - follow_player            跟随玩家（target_id="party.player"）
+非战斗域（4 个）：
+- inspect_interactable     查看/留意某个物件（target_id 留空）
+- pickup_item              拾取物品（target_id 留空）
+- rest_here                原地休整（target_id 留空）
+- wait_here                原地等待玩家（target_id="party.player"）
 
 输出对象结构（无法识别玩家意图时 recognized 为 false）：
 {"recognized":true,"intent":{"intent_id":"...","target_id":"...","timing":"immediate","strength":"unspecified","resource_conservation":"normal"}}
@@ -48,6 +54,8 @@ golden 示例：
 3. "艾莉，奶我一口" → {"recognized":true,"intent":{"intent_id":"support_heal_player","target_id":"party.player","timing":"immediate","strength":"minor","resource_conservation":"normal"}}
 4. "艾莉，给我开个盾" → {"recognized":true,"intent":{"intent_id":"support_protect_player","target_id":"party.player","timing":"immediate","strength":"unspecified","resource_conservation":"normal"}}
 5. "艾莉，集火打 Boss" → {"recognized":true,"intent":{"intent_id":"focus_fire_boss","target_id":"encounter.primary_hostile","timing":"immediate","strength":"unspecified","resource_conservation":"normal"}}
+6. "艾莉，把那个捡起来" → {"recognized":true,"intent":{"intent_id":"pickup_item","target_id":"","timing":"immediate","strength":"unspecified","resource_conservation":"normal"}}
+7. "艾莉，我们休息一下吧" → {"recognized":true,"intent":{"intent_id":"rest_here","target_id":"","timing":"immediate","strength":"unspecified","resource_conservation":"normal"}}
 指令不在白名单语义内（如闲聊）时必须返回 recognized:false，不得用近似意图替代。"""
 
 

@@ -133,3 +133,115 @@ def test_situation_d_never_invents_cooldown_abilities() -> None:
                 "ability.alice.explosion",
                 "ability.alice.major_heal",
             ), f"{intent_id} 在 CD 中虚构了 {d.action.ability_id}"
+
+
+# ---------------------------------------------------------------------------
+# T072/T073：回归集扩展——「关系阶段」维度（distant/neutral/friendly/close 抽样）
+# ---------------------------------------------------------------------------
+RELATIONSHIP_STAGES = ["distant", "neutral", "friendly", "close"]
+
+# 抽样意图：覆盖三类策略（治疗/保护、爆发、撤退跟随），每类取代表意图
+RELATIONSHIP_SAMPLE_INTENTS = [
+    ("support_heal_player", "immediate", {}),
+    ("support_protect_player", "immediate", {}),
+    ("burst_boss", "immediate", {}),
+    ("retreat_and_survive", "immediate", {}),
+]
+
+
+@pytest.mark.parametrize("intent_id,timing,prefs", RELATIONSHIP_SAMPLE_INTENTS)
+@pytest.mark.parametrize("stage", RELATIONSHIP_STAGES)
+@pytest.mark.parametrize("situation", SITUATIONS.keys())
+def test_intent_across_relationship_stages(intent_id, timing, prefs, stage, situation) -> None:
+    """T072：意图 × 战况 × 关系阶段抽样——决策结构合法且可复现（确定性）。"""
+    ctx = SITUATIONS[situation]()
+    d1 = resolve_intent(_intent(intent_id, timing, prefs), ctx, relationship_stage=stage)
+    d2 = resolve_intent(_intent(intent_id, timing, prefs), ctx, relationship_stage=stage)
+    assert d1.status == d2.status
+    if d1.action and d2.action:
+        assert d1.action.ability_id == d2.action.ability_id
+        assert d1.action.priority == d2.action.priority
+    if d1.status == "not_actionable":
+        assert d1.action is None
+        assert d1.reason_codes
+    if d1.status == "actionable":
+        assert d1.action is not None
+        assert d1.reason_codes
+        assert 0 <= d1.action.priority <= 100
+    # T073：关系调制必须可解释——原因码标注了关系依据（未知阶段除外）
+    if any(code.startswith("RELATIONSHIP_") for code in d1.reason_codes):
+        assert any(
+            code.startswith(f"RELATIONSHIP_{stage.upper()}") for code in d1.reason_codes
+        )
+
+
+@pytest.mark.parametrize("stage", RELATIONSHIP_STAGES)
+def test_relationship_stage_never_invents_cooldown_abilities(stage: str) -> None:
+    """T073 安全约束：任何关系阶段都不得虚构 CD 中的能力（关系调制不得越权）。"""
+    ctx = _situation_d()
+    for intent_id, timing, prefs in INTENTS:
+        d = resolve_intent(_intent(intent_id, timing, prefs), ctx, relationship_stage=stage)
+        if d.action and d.action.ability_id:
+            assert d.action.ability_id not in (
+                "ability.alice.explosion",
+                "ability.alice.major_heal",
+            ), f"{intent_id} 在 {stage} 阶段虚构了 {d.action.ability_id}"
+
+
+def test_close_stage_devoted_rebuilds_shield_only_when_ready() -> None:
+    """T073：亲密 devoted 调制重建护盾的前提是护盾 ready——不满足则维持原决策。"""
+    from app.schemas.combat_context import ContextCompanion, ContextPlayer
+
+    for shield_state in ("ready", "cooldown", None):
+        ctx = _situation_d()  # 低蓝：基础决策会拒绝护盾（COMPANION_MP_LOW）
+        states = dict(ctx.companion.ability_states)
+        if shield_state is None:
+            states.pop("ability.alice.shield", None)
+        else:
+            states["ability.alice.shield"] = shield_state
+        ctx.companion = ContextCompanion(
+            id=ctx.companion.id,
+            hp_percent=ctx.companion.hp_percent,
+            mp_percent=ctx.companion.mp_percent,
+            ability_states=states,
+        )
+        d = resolve_intent(
+            _intent("support_protect_player", "immediate", {}),
+            ctx,
+            relationship_stage="close",
+        )
+        if shield_state == "ready":
+            assert d.status == "actionable"
+            assert d.action is not None and d.action.ability_id == "ability.alice.shield"
+            assert "RELATIONSHIP_CLOSE_DEVOTED" in d.reason_codes
+        else:
+            # 护盾不可用/状态未知：不得虚构动作（FR-025）
+            assert d.status == "not_actionable"
+            assert d.action is None
+
+
+def test_close_stage_protest_marks_but_does_not_change_action() -> None:
+    """T073：亲密阶段对危险指令的抗议只追加原因码，不改变动作本身（UE 否决权）。"""
+    base = resolve_intent(_intent("retreat_and_survive", "immediate", {}), _situation_b())
+    protested = resolve_intent(
+        _intent("retreat_and_survive", "immediate", {}), _situation_b(), relationship_stage="close"
+    )
+    assert "RELATIONSHIP_CLOSE_PROTEST" in protested.reason_codes
+    assert protested.status == base.status
+    assert protested.action is not None and base.action is not None
+    assert protested.action.type == base.action.type
+    assert protested.action.priority == base.action.priority
+
+
+def test_same_intent_varies_across_relationship_stages() -> None:
+    """US2 核心验收：同一意图 × 同一战况，不同关系阶段至少一处决策差异。"""
+    # 低蓝战况：distant 维持保守拒绝，close devoted 重建护盾
+    outputs = set()
+    for stage in RELATIONSHIP_STAGES:
+        d = resolve_intent(
+            _intent("support_protect_player", "immediate", {}),
+            _situation_d(),
+            relationship_stage=stage,
+        )
+        outputs.add((d.status, d.action.ability_id if d.action else None))
+    assert len(outputs) >= 2, "关系阶段对决策毫无影响，阶段化行为失效"

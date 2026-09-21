@@ -722,3 +722,26 @@ v0.1 完全一致，属附加式扩展、不升版本。
   未登记角色 → 404。
 - `AESIR_ASR_BACKEND` 与转写端点共用：`mock` 返回 `AESIR_ASR_MOCK_TEXT`，
   `faster_whisper` 走真实本机 Whisper。
+
+### 附加扩展（2026-09-21，SDD US4 加固 T074/T075）：主入口文本指令
+
+`POST /v1/agent/step` 携带可选 `text` 字段时，与 `/v1/tactical/command`
+共用同一意图解析与决策层（规则/LLM 门面，按域路由），不再返回
+`TEXT_PIPELINE_PENDING` 骨架原因码：
+
+- **战斗意图**（治疗/护盾/爆发/等眩晕集火/撤退，6 类）：复用
+  `resolve_intent` 战术决策（含 US2 关系阶段调制），快照 `world_context.combat`
+  存在时产出统一信封 `DirectiveEnvelope`（`domain="combat"`，
+  `source="player_command"`，action_type 取 combat 白名单
+  major_heal/quick_heal/shield/burst/retreat）；未携带战斗快照 →
+  `action="none"` + `COMBAT_CONTEXT_MISSING`；决策不可执行 → 原因码 +
+  `reply_text` 说明。
+- **非战斗意图**（T074 新增白名单）：`follow_player` / `inspect_interactable`
+  / `pickup_item` / `rest_here` / `wait_here`，映射到 agency 行为目录
+  （follow/inspect/pickup/rest/wait），并按当前 `scene` 做目录域校验
+  （不匹配 → `BEHAVIOR_NOT_IN_SCENE`）、目标类型/距离校验（有目标行为取快照内
+  最近可交互物，无合适目标 → `NO_VALID_TARGET`，不虚构目标）。
+- **不可识别文本**：`action="none"` + `INTENT_UNRECOGNIZED` + 澄清
+  `reply_text`，不猜测执行（FR-028）。
+- 意图解析来源进 `observability.source`（`rule`/`llm`/`rule_fallback`），
+  关系阶段进 `observability.relationship_stage`，原因码完整可解释（US7 前置）。

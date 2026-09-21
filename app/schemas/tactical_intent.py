@@ -10,14 +10,35 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 IntentId = Literal[
+    # --- 战斗域（v0.2 既有 7 意图，保持不变）---
     "support_heal_player",      # 治疗玩家
     "support_protect_player",   # 给玩家护盾/保命
     "burst_boss",               # 对 Boss 使用爆发输出
     "prepare_burst_on_stun",    # Boss 眩晕时爆发
     "focus_fire_boss",          # 集火 Boss
     "retreat_and_survive",      # 撤离保命
-    "follow_player",            # 跟随玩家
+    "follow_player",            # 跟随玩家（战斗/非战斗通用）
+    # --- 非战斗域（T074：按域扩展白名单，映射到 agency 行为目录）---
+    "inspect_interactable",     # 查看/留意某个物件
+    "pickup_item",              # 拾取物品
+    "rest_here",                # 原地休整
+    "wait_here",                # 原地等待玩家
 ]
+
+# 按域维护的意图白名单（T074）：主入口据此路由——战斗意图走
+# resolve_intent 战术决策层，非战斗意图映射到 agency 行为目录。
+COMBAT_INTENT_IDS: frozenset[str] = frozenset(
+    {
+        "support_heal_player", "support_protect_player", "burst_boss",
+        "prepare_burst_on_stun", "focus_fire_boss", "retreat_and_survive",
+    }
+)
+NON_COMBAT_INTENT_IDS: frozenset[str] = frozenset(
+    {
+        "follow_player", "inspect_interactable", "pickup_item",
+        "rest_here", "wait_here",
+    }
+)
 
 Strength = Literal["unspecified", "minor", "major"]
 ResourceConservation = Literal["normal", "conservative", "aggressive"]
