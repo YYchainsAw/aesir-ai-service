@@ -58,27 +58,31 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
             facts = service.last_facts
             salient = service.last_salient
             reply_topics = service.last_reply_topics
+            relationship_signal = service.last_relationship_signal
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
             facts = None
             salient = None
             reply_topics = None
+            relationship_signal = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
         facts = None
         salient = None
         reply_topics = None
+        relationship_signal = None
     response.relationship_stage = stage
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
-    _record_turn(
+    response.relationship_delta = _record_turn(
         request,
         response,
         topics=topics,
         facts=facts,
         salient=salient,
         reply_topics=reply_topics,
+        relationship_signal=relationship_signal,
         injected_topics=[i.topic for i in impressions],
     )
     return response
@@ -145,13 +149,14 @@ def _stream_llm_reply(
                 emitted_delta = True
                 yield event
                 continue
-            _record_turn(
+            event.response.relationship_delta = _record_turn(
                 request,
                 event.response,
                 topics=service.last_topics,
                 facts=service.last_facts,
                 salient=service.last_salient,
                 reply_topics=service.last_reply_topics,
+                relationship_signal=service.last_relationship_signal,
                 injected_topics=[i.topic for i in impressions],
             )
             _annotate_observability(
@@ -230,20 +235,24 @@ def _record_turn(
     facts: list[str] | None = None,
     salient: bool | None = None,
     reply_topics: list[str] | None = None,
+    relationship_signal: str | None = None,
     injected_topics: list[str] | None = None,
-) -> None:
+) -> int:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    三通道：``topics``/``facts``/``salient``/``reply_topics`` 为 LLM 顺带返回；
-    ``None``（mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空
-    ——规则切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案
-    （玩家期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
-    普通发言的主题只入印象层，陈述出的事实经接地校验后入档案。艾莉自己的
-    回复的主题入印象（非显著）——她记得自己说过什么，反复谈起的话题同样形成
-    印象；六修（2026-09-22 实测复盘）起 LLM 路径改用模型自述的 ``reply_topics``
-    ——规则切词没有分词库，产出「主修/厉害/水系本来」这类碎片直接污染印象层
-    （且新印象权重 1.0 立即回注 prompt）。``injected_topics`` 为本轮注入 prompt
-    的印象主题（埋点用，见 ``dialogue_signals``）。
+    四通道：``topics``/``facts``/``salient``/``reply_topics``/``relationship_signal``
+    为 LLM 顺带返回；``None``（mock/回退路径）退化为规则提取（事实通道无规则
+    兜底，直接为空——规则切不出可靠的「事实」，宁可没有；关系信号同理——
+    规则判断不了「玩家的关心是真心还是客套」，mock 路径不推动关系）。郑重声明
+    （salient）逐字入档案（玩家期待精确复述）+ 主题入印象层（等效提及加成按
+    在意值缩放、衰减更慢）；普通发言的主题只入印象层，陈述出的事实经接地校验
+    后入档案。艾莉自己的回复的主题入印象（非显著）——她记得自己说过什么，
+    反复谈起的话题同样形成印象；六修（2026-09-22 实测复盘）起 LLM 路径改用
+    模型自述的 ``reply_topics``——规则切词没有分词库，产出「主修/厉害/水系本来」
+    这类碎片直接污染印象层（且新印象权重 1.0 立即回注 prompt）。
+    ``relationship_signal`` 是对话推动关系（2026-09-22）的入口：把 LLM 判定的
+    玩家发言情感质量计进关系层，返回本轮实际 delta。``injected_topics`` 为
+    本轮注入 prompt 的印象主题（埋点用，见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id) if request.session_id else ()
@@ -298,6 +307,42 @@ def _record_turn(
         previous_player_texts=[t.user_text for t in prior_history],
         previous_reply_texts=[t.reply_text for t in prior_history],
     )
+    return _apply_relationship_signal(request.companion_id, relationship_signal)
+
+
+# 对话推动关系（2026-09-22）：LLM 判定的玩家发言情感质量 → 关系事件类型。
+# none 不计分（绝大多数轮次都是 none——宁漏勿滥）。
+_DIALOGUE_RELATIONSHIP_EVENTS = {
+    "warm": "dialogue_warm_exchange",
+    "deep": "dialogue_deep_connection",
+    "cold": "dialogue_cold_dismissal",
+    "hurtful": "dialogue_hurtful_remark",
+}
+
+
+def _apply_relationship_signal(companion_id: str, signal: str | None) -> int:
+    """把情感质量信号计进关系层；返回本轮实际 delta，故障静默返回 0。
+
+    复用关系规则层全套（同类冷却/日上限/持久化/损坏降级）——对话信号用
+    更严的冷却窗口（默认 300 秒 vs 事实事件 60 秒）：对话每轮都发生，
+    60 秒拦不住连点刷分。关系层故障不中断对话（FR-011 同纪律）。
+    """
+    event_type = _DIALOGUE_RELATIONSHIP_EVENTS.get(signal or "none")
+    if event_type is None:
+        return 0
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        _, delta = get_relationship_store(companion_id).apply_event(
+            event_type,
+            cooldown_seconds=get_settings().relationship_dialogue_cooldown_seconds,
+        )
+        return delta
+    except RelationshipStoreError:
+        return 0
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:

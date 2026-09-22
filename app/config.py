@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     relationship_initial: int = 20               # 初始关系数值（损坏/缺失时也回退到该值）
     relationship_daily_cap: int = 15              # 每日正向净变化上限（防刷）
     relationship_event_cooldown_seconds: float = 60.0  # 同类事件冷却窗口（窗口内重复不计分）
+    relationship_dialogue_cooldown_seconds: float = 300.0  # 对话信号专属冷却（比事实事件严：对话每轮都发生）
 
 
 def get_settings() -> Settings:

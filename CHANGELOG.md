@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-22，**618 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-22，**628 通过 + 2 跳过**）。
+
+## 2026-09-22 — 对话推动关系：聊得动感情了
+
+实测（约 45 轮真诚交流后仍是 distant(20) 被叫「旅行者」）暴露：关系只由 `/v1/world/events` 驱动、对话链路纯只读——但对话才是陪伴玩法的主体。三项用户拍板：信号走 LLM 顺带返回；五档含负面；节奏半天~一天一档。
+
+- **信号通道**：`_DialoguePayload` 新增 `relationship_signal`（none/warm/deep/cold/hurtful，默认 none）。LLM 判的是玩家本轮发言的**情感质量**（不判她自己的语气），prompt 明示「绝大多数轮次必须是 none，宁漏勿滥——误判比漏判伤关系，因为它动的是一个持久分」。零额外请求，与 topics/facts/reply_topics 同构。
+- **写入复用关系规则层全套**：信号映射成 4 类新事件（`dialogue_warm_exchange` +1 / `dialogue_deep_connection` +2 / `dialogue_cold_dismissal` -1 / `dialogue_hurtful_remark` -2）走 `RelationshipStore.apply_event` 唯一入口——冷却/日上限/持久化/损坏降级零新增代码。对话专属冷却 300 秒（新配置 `AESIR_RELATIONSHIP_DIALOGUE_COOLDOWN_SECONDS`，比事实事件的 60 秒严：对话每轮都发生）。
+- **校准**（半天~一天一档）：distant→neutral 需 3~5 轮 warm 或 2~3 轮 deep；每日正向上限 15 与事实事件共享（对话刷不满）；负向不限——疏远不需要配额。
+- **可观测**：`CompanionDialogueResponse` 新增 `relationship_delta`（本轮实际增减，契约附录登记）；阶段变化自下一轮生效（称呼/语气/硬边界/战术调制/自主行为全部下游自动跟随，无需接线）。mock/回退路径不推动关系（规则判不了情感质量）；关系层故障静默 delta=0（FR-011）。
+- **测试**：新增 10 例（枚举校验/暴露/prompt 说明/非法值/缺键兼容、warm +1 落库、冷却拦截、hurtful -2、none 与 mock 不动、5 轮跨 neutral 校准断言、关系故障对话照常、规则层 4 事件 delta 与对话冷却），618 → **628 通过 + 2 跳过**。DeepSeek 实测：普通闲聊 delta 恒 0；「今天辛苦你了」+1；「你对我来说很重要」判为 deep +2；累计跨入 neutral 后她不再叫「旅行者」。
 
 ## 2026-09-22 — 对话实测六修：止住幻觉源头 + 能力有据可依 + 印象噪声走 LLM 通道
 

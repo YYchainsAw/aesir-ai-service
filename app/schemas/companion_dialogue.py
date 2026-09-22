@@ -56,6 +56,10 @@ class CompanionDialogueResponse(BaseModel):
     # US2（T042）：当前关系阶段（distant/neutral/friendly/close）；关系体系
     # 故障降级时为空字符串——UE 不应依赖该字段做表现逻辑。
     relationship_stage: str = ""
+    # 对话推动关系（2026-09-22）：本轮玩家发言的情感质量实际造成的关系增减
+    # （+1/+2/-1/-2，冷却或日上限吃掉则为 0）。阶段变化自下一轮生效——
+    # relationship_stage 读的是本轮生成前的值。
+    relationship_delta: int = 0
     # US7（T076）链路信息：人设 YAML 的 profile_version 与本轮实际注入的
     # 记忆条数（按通道：长期记忆 / 模糊印象）。缺省空——UE 不应依赖。
     persona_revision: str = ""

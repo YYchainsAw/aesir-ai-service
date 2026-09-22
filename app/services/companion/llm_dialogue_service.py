@@ -115,6 +115,7 @@ class _DialoguePayload(BaseModel):
     ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
     ``facts`` 为长期档案的事实提取（玩家陈述过的、跨会话仍然成立的事），
     ``reply_topics`` 为她本轮自述主题（替代规则切词，见 ``_record_turn``），
+    ``relationship_signal`` 为本轮对话的情感质量信号（对话推动关系用），
     均由 LLM 顺带返回，零额外请求。
 
     ``action`` 默认 ``reply``，老模型输出（不带该键）行为不变；只有
@@ -132,6 +133,7 @@ class _DialoguePayload(BaseModel):
     topics: list[str] = Field(default_factory=list, max_length=3)
     facts: list[str] = Field(default_factory=list, max_length=3)
     reply_topics: list[str] = Field(default_factory=list, max_length=3)
+    relationship_signal: Literal["none", "warm", "deep", "cold", "hurtful"] = "none"
     salient: bool = False
 
     @field_validator("facts")
@@ -162,10 +164,11 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
-        # 最近一次成功生成提取的主题/事实/自述主题/显著性（实例按请求创建，见 dialogue_service）。
+        # 最近一次成功生成提取的主题/事实/自述主题/关系信号/显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
         self.last_facts: list[str] = []
         self.last_reply_topics: list[str] | None = None
+        self.last_relationship_signal: str = "none"
         self.last_salient: bool = False
 
     def reply(
@@ -202,6 +205,7 @@ class LLMCompanionDialogueService:
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
         self.last_reply_topics = response_payload.reply_topics
+        self.last_relationship_signal = response_payload.relationship_signal
         self.last_salient = response_payload.salient
 
         return CompanionDialogueResponse(
@@ -344,6 +348,7 @@ class LLMCompanionDialogueService:
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
         self.last_reply_topics = response_payload.reply_topics
+        self.last_relationship_signal = response_payload.relationship_signal
         self.last_salient = response_payload.salient
 
         yield StreamEvent(
@@ -585,7 +590,15 @@ def _build_system_prompt(
         lines.append(_format_lookup_menu())
 
     lines += [
-        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, reply_topics, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, reply_topics, relationship_signal, salient.",
+        'relationship_signal: rate the EMOTIONAL QUALITY of what the PLAYER said in this '
+        'message — not your own tone. "warm" if they showed genuine care, gratitude, or '
+        'friendly warmth; "deep" if they solemnly opened up, entrusted something to you, '
+        'apologized, or expressed real feeling; "cold" if they were dismissive, impatient, '
+        'or brushed you off; "hurtful" if they maliciously belittled, threatened, or '
+        'deliberately hurt you. "none" for ordinary conversation — the vast majority of '
+        'turns MUST be "none"; when in doubt, choose "none" (a missed signal costs far '
+        'less than a wrong one, because it moves a persistent relationship score).',
         'reply_topics: list of 1-3 short Chinese topic words (2-6 chars, concrete nouns '
         'only) that YOUR OWN reply this turn actually talked about; empty list if your '
         'reply had no concrete topic. These become fuzzy impressions of what you care '

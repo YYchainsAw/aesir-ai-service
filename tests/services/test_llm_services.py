@@ -354,7 +354,7 @@ def test_reply_topics_are_exposed_and_prompt_asks_for_them() -> None:
     assert service.last_reply_topics == ["护盾"]
     assert "reply_topics: list of 1-3 short Chinese topic words" in stub.system_prompt
     # keys 清单同步：模型必须知道这个键存在于「exactly these keys」里
-    assert "reply_topics, salient" in stub.system_prompt
+    assert "reply_topics, relationship_signal, salient" in stub.system_prompt
 
 
 def test_old_payloads_without_reply_topics_key_still_work() -> None:
@@ -373,6 +373,64 @@ def test_old_payloads_without_reply_topics_key_still_work() -> None:
     service.reply(CompanionDialogueRequest(text="走吧。"))
 
     assert service.last_reply_topics == []
+
+
+def test_relationship_signal_is_exposed_and_prompt_asks_for_it() -> None:
+    """对话推动关系（2026-09-22）：LLM 顺带返回玩家发言的情感质量信号。
+
+    实测根因：关系只由 world events 驱动、对话纯只读，45 轮真诚交流后
+    仍是 distant(20) 被叫「旅行者」。信号判定只有模型能做——规则判不了
+    「玩家的关心是真心还是客套」。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "……谢谢你。",
+            "emotion_id": "emotion.shy",
+            "gesture_id": "gesture.look_away",
+            "facial_expression_id": "face.shy",
+            "interruptible": True,
+            "relationship_signal": "deep",
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="今天辛苦你了，一直陪着我。"))
+
+    assert service.last_relationship_signal == "deep"
+    prompt = stub.system_prompt
+    assert "relationship_signal: rate the EMOTIONAL QUALITY" in prompt
+    # 宁漏勿滥：绝大多数轮次必须是 none——误判比漏判伤关系
+    assert 'MUST be "none"' in prompt
+
+
+def test_relationship_signal_defaults_to_none_and_rejects_invalid_values() -> None:
+    """缺键 = none（老模型不变）；非法枚举值被 schema 拒绝。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+    service.reply(CompanionDialogueRequest(text="走吧。"))
+    assert service.last_relationship_signal == "none"
+
+    bad = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            "relationship_signal": "passionate",
+        }
+    )
+    service2 = LLMCompanionDialogueService(bad)
+    with pytest.raises(LLMClientError):
+        service2.reply(CompanionDialogueRequest(text="你好。"))
 
 
 def test_tactical_llm_parser_rejects_extra_fields() -> None:
