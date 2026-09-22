@@ -25,6 +25,18 @@ def test_system_prompt_injects_stage_persona() -> None:
     assert "旅行者" in prompt
 
 
+def test_system_prompt_injects_stage_boundary() -> None:
+    """阶段硬边界进入 prompt，并声明与基础人设冲突时以它为准。
+
+    只偏移语气时，基础人设的「暗藏情愫」照常生效——distant 阶段会出现
+    「一边叫旅行者、一边聊两人合披一块油布」的割裂（2026-09-21 实测）。
+    """
+    prompt = _build_system_prompt(get_profile(), relationship_stage="distant")
+    assert "Stage hard boundary" in prompt
+    assert "THIS wins" in prompt
+    assert "不表露好感" in prompt
+
+
 def test_system_prompt_unknown_stage_uses_baseline() -> None:
     """未知/空阶段沿用基线人设，不注入关系块（降级思路）。"""
     prompt = _build_system_prompt(get_profile(), relationship_stage="")

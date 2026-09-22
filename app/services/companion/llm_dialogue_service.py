@@ -472,12 +472,20 @@ def _build_system_prompt(
     # 关系阶段化人设偏移（US2 / T040）：覆盖称呼与语气；缺失阶段沿用基线
     stage_personas = profile.raw.get("relationship_stage_personas", {})
     if relationship_stage and relationship_stage in stage_personas:
-        persona = stage_personas[relationship_stage]
+        stage_persona = stage_personas[relationship_stage]
         lines.append(
             f"Current relationship stage: {relationship_stage} "
-            f"(address the player as: {persona.get('address', '')}). "
-            f"Stage tone shift: {persona.get('tone_shift', '')}"
+            f"(address the player as: {stage_persona.get('address', '')}). "
+            f"Stage tone shift: {stage_persona.get('tone_shift', '')}"
         )
+        # 阶段硬边界（2026-09-21 实测复盘）：只偏移语气时，基础人设的「暗藏情愫」
+        # 照常生效，于是出现「一边叫旅行者、一边聊两人合披一块油布」的割裂。
+        boundary = stage_persona.get("boundary", "")
+        if boundary:
+            lines.append(
+                "Stage hard boundary (when it conflicts with the base persona's "
+                f"subtext or behavior rules, THIS wins): {boundary}"
+            )
     lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
@@ -498,9 +506,20 @@ def _build_system_prompt(
             "Anti-repetition: do NOT reuse sentence structures, catchphrases, or "
             "openings from the recent turns above (e.g. the same '...' + '不过' "
             "pattern); vary your phrasing, length, and rhythm each turn. Also "
-            "vary emotion_id / gesture_id / facial_expression_id choices instead "
-            "of defaulting to the same ones."
+            "vary gesture_id / facial_expression_id choices instead of defaulting "
+            "to the same ones — but NOT emotion_id (see mood continuity below)."
         )
+        # 情绪惯性（2026-09-21 实测复盘）：上一版 Anti-repetition 要求情绪也轮换，
+        # 模型于是每轮重挑一个，出现无来由的情绪跳变与回摆。心情该延续，不是抽签。
+        mood = history[-1].emotion_id
+        if mood:
+            lines.append(
+                f"Your current mood: {mood} — the emotion you were left with after "
+                "your last reply. Feelings have inertia: keep this mood unless the "
+                "player's message genuinely changes the situation (a joke lands, "
+                "something worrying, sad, or exciting comes up). Do NOT switch it "
+                "just to look varied."
+            )
 
     # 事实诚实（实测 2026-09-21「烤鱼幻视」）：无论有没有会话历史都必须遵守——
     # 首轮没有历史时模型最容易把假设当既定事实编圆。涉及具体过去事件，

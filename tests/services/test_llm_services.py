@@ -115,6 +115,62 @@ def test_companion_llm_prompt_injects_conversation_history() -> None:
     assert stub.user_prompt == "刚说到哪了？"
 
 
+def test_companion_llm_prompt_carries_mood_inertia() -> None:
+    """情绪惯性：上一轮的情绪作为「当前心情」注入，且不再要求为变化而换情绪。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯，我还在想刚才那件事。",
+            "emotion_id": "emotion.thoughtful",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="还在想什么？", session_id="s1"),
+        history=(
+            DialogueTurn(
+                user_text="我们出发吧。",
+                reply_text="……好。",
+                emotion_id="emotion.thoughtful",
+            ),
+        ),
+    )
+
+    prompt = stub.system_prompt
+    assert "Your current mood: emotion.thoughtful" in prompt
+    assert "keep this mood" in prompt
+    # 上一版 Anti-repetition 要求 emotion 也轮换，正是情绪跳变的来源——必须收回
+    assert "vary emotion_id" not in prompt
+
+
+def test_mood_absent_without_recorded_emotion() -> None:
+    """旧调用方（或首轮）不传情绪时不注入心情块——行为不变。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "那就接着说。",
+            "emotion_id": "emotion.bright",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.bright_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="刚说到哪了？", session_id="s1"),
+        history=(DialogueTurn(user_text="我们出发吧。", reply_text="当然可以。"),),
+    )
+
+    assert "Your current mood" not in stub.system_prompt
+
+
 def test_facts_are_exposed_and_prompt_asks_for_them() -> None:
     """事实通道：prompt 要求顺带抽出玩家陈述的事实，服务暴露 last_facts。"""
     stub = StubLLMClient(

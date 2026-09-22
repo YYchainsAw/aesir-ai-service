@@ -14,10 +14,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class DialogueTurn:
-    """一轮已完成的多模对话：玩家输入 + 艾莉回复文本。"""
+    """一轮已完成的多模对话：玩家输入 + 艾莉回复文本 + 该轮情绪。
+
+    ``emotion_id`` 是**情绪惯性的载体**（2026-09-21 实测复盘）：此前每轮独立
+    生成、prompt 里没有「她现在什么心情」，模型只能按剧情张力重挑一个，于是
+    出现无来由的情绪跳变与回摆。记下上一轮的情绪，下一轮作为当前心情注入，
+    她才有「心情」可言。旧调用方不传时为空串，行为不变。
+    """
 
     user_text: str
     reply_text: str
+    emotion_id: str = ""
 
 
 class SessionMemoryStore:
@@ -50,15 +57,24 @@ class SessionMemoryStore:
         user_text: str,
         reply_text: str,
         companion_id: str | None = None,
+        emotion_id: str = "",
     ) -> None:
-        """记录一轮对话；超出窗口自动淘汰最旧一轮。"""
+        """记录一轮对话；超出窗口自动淘汰最旧一轮。
+
+        ``emotion_id`` 为该轮回复的情绪（情绪惯性载体）；不传时为空串，
+        调用方按「无心情可延续」处理，旧调用方行为不变。
+        """
         if self._max_turns == 0:
             return
         with self._lock:
             turns = self._sessions.setdefault(
                 (companion_id, session_id), deque(maxlen=self._max_turns)
             )
-            turns.append(DialogueTurn(user_text=user_text, reply_text=reply_text))
+            turns.append(
+                DialogueTurn(
+                    user_text=user_text, reply_text=reply_text, emotion_id=emotion_id
+                )
+            )
 
     def clear(self, companion_id: str | None = None) -> int:
         """清空指定角色的全部会话记忆（console 记忆重置入口，SDD T015/T029）。

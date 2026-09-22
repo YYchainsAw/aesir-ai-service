@@ -241,7 +241,14 @@ def _record_turn(
     prior_history = memory.history(request.session_id) if request.session_id else ()
     _note_runtime(request, response)
     if request.session_id:
-        memory.record(request.session_id, request.text, response.reply_text)
+        # 情绪一并落窗口：下一轮把它作为「当前心情」注入，情绪才有惯性
+        # （mock/回退路径同样有 emotion_id，故降级时也延续）。
+        memory.record(
+            request.session_id,
+            request.text,
+            response.reply_text,
+            emotion_id=response.emotion_id,
+        )
     if topics is None:
         topics = extract_topics(request.text)
     if salient is None:
