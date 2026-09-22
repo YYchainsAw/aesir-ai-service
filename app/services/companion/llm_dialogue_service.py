@@ -23,6 +23,7 @@ from app.services.companion.session_memory import DialogueTurn
 from app.services.memory.retrieval import format_impression_block, format_memory_block
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.services.skills.tools import ToolResult, run_lookup, tool_menu
+from app.services.tactical.policy import get_policy
 
 
 # 事实条目长度上限：一句自足的中文陈述（超长说明模型在写小作文，丢弃）
@@ -113,6 +114,7 @@ class _DialoguePayload(BaseModel):
 
     ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
     ``facts`` 为长期档案的事实提取（玩家陈述过的、跨会话仍然成立的事），
+    ``reply_topics`` 为她本轮自述主题（替代规则切词，见 ``_record_turn``），
     均由 LLM 顺带返回，零额外请求。
 
     ``action`` 默认 ``reply``，老模型输出（不带该键）行为不变；只有
@@ -129,6 +131,7 @@ class _DialoguePayload(BaseModel):
     interruptible: bool = True
     topics: list[str] = Field(default_factory=list, max_length=3)
     facts: list[str] = Field(default_factory=list, max_length=3)
+    reply_topics: list[str] = Field(default_factory=list, max_length=3)
     salient: bool = False
 
     @field_validator("facts")
@@ -159,9 +162,10 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
-        # 最近一次成功生成提取的主题/事实/显著性（实例按请求创建，见 dialogue_service）。
+        # 最近一次成功生成提取的主题/事实/自述主题/显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
         self.last_facts: list[str] = []
+        self.last_reply_topics: list[str] | None = None
         self.last_salient: bool = False
 
     def reply(
@@ -197,6 +201,7 @@ class LLMCompanionDialogueService:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
+        self.last_reply_topics = response_payload.reply_topics
         self.last_salient = response_payload.salient
 
         return CompanionDialogueResponse(
@@ -338,6 +343,7 @@ class LLMCompanionDialogueService:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
+        self.last_reply_topics = response_payload.reply_topics
         self.last_salient = response_payload.salient
 
         yield StreamEvent(
@@ -490,6 +496,25 @@ def _build_system_prompt(
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
 
+    # 能力目录注入（2026-09-22 实测复盘「水系魔法幻视」）：对话链路此前完全不
+    # 引用能力清单，被问「你会什么魔法」时只能现编且越编越自洽。真相源是
+    # tactical_policy 的 abilities（注册表投影会丢 display_name，故直接取
+    # policy）——单份配置，对话与战斗不会漂移。策略层故障时静默不注入，
+    # 对话不中断（FR-041 同纪律）。
+    try:
+        abilities = list(get_policy().abilities.values())
+        if abilities:
+            catalog = "、".join(
+                f"{ability.display_name}（{ability.description}）" for ability in abilities
+            )
+            lines.append(
+                f"Your complete and ONLY abilities: {catalog}. "
+                "You know no other spells; do not invent abilities you were not given. "
+                "If asked about magic outside this list, say plainly you cannot do it."
+            )
+    except Exception:  # pragma: no cover - 配置损坏时对话不陪葬
+        pass
+
     if memories:
         lines.append(format_memory_block(memories, display_name=profile.display_name))
 
@@ -522,16 +547,24 @@ def _build_system_prompt(
             )
 
     # 事实诚实（实测 2026-09-21「烤鱼幻视」）：无论有没有会话历史都必须遵守——
-    # 首轮没有历史时模型最容易把假设当既定事实编圆。涉及具体过去事件，
-    # 没有记录就必须不确定或反问，绝不用确定语气补细节。
+    # 首轮没有历史时模型最容易把假设当既定事实编圆。六修（2026-09-22）把覆盖面
+    # 从「过去事件」扩到四类：实测她还现编了天气（世界状态）与「才几天不见」
+    # （相处时长）。涉及这四类，没有依据就必须不确定或反问，绝不用确定语气补细节。
     lines.append(
         "Memory honesty: everything you know about the past is ONLY the recent "
         "conversation, the long-term memories, and the fuzzy impressions shown "
         "above (fuzzy impressions are topic-level only — they contain no facts). "
         "State a long-term memory plainly when it is relevant — that is what it is "
-        "for — but NEVER add details beyond it. NEVER assert any other specific "
-        "past event (something was eaten, done, said, or promised) unless it appears "
-        "there; if the player asks about something you have no record of, express "
+        "for — but NEVER add details beyond it. This honesty rule covers four areas, "
+        "and in all of them no record means uncertain: (1) past events — NEVER assert "
+        "any other specific past event (something was eaten, done, said, or promised) "
+        "unless it appears in the records above; (2) current world state — weather, "
+        "surroundings, other people — trust ONLY a verification result or world "
+        "snapshot when one is given, otherwise admit you cannot tell; (3) your own "
+        "abilities — trust ONLY the ability list above, never a spell outside it; "
+        "(4) how long you have known the player or how long since you last met — "
+        "you have no clock and no record, so NEVER say things like \"才几天不见\". "
+        "If the player asks about something you have no record of, express "
         "uncertainty or ask them back — never fill in details with a confident tone."
     )
 
@@ -539,7 +572,10 @@ def _build_system_prompt(
     if examples:
         lines.append(
             "Example exchanges (match this pattern of matching reply style and emotion "
-            "to the type of player input; do not reuse the literal sentences):\n" + examples
+            "to the type of player input; do not reuse the literal sentences). Any "
+            "world details in them (names, places, objects, events, weather) are "
+            "placeholders, NOT facts — never cite anything from an example as "
+            "something that actually happened:\n" + examples
         )
 
     # 查证（US6 / T069）：第一轮给工具清单，第二轮把结果回填并要求据此作答。
@@ -549,7 +585,12 @@ def _build_system_prompt(
         lines.append(_format_lookup_menu())
 
     lines += [
-        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, reply_topics, salient.",
+        'reply_topics: list of 1-3 short Chinese topic words (2-6 chars, concrete nouns '
+        'only) that YOUR OWN reply this turn actually talked about; empty list if your '
+        'reply had no concrete topic. These become fuzzy impressions of what you care '
+        'to mention, so keep them clean — no fillers, no verb or adjective fragments '
+        '(like 主修/厉害/代价/不小), no whole phrases.',
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
         '(things worth remembering about them, not your own reply); each keyword must be a '
         'concrete noun or topic word (2-6 chars), never connectives, fillers, or fragments '

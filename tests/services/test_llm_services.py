@@ -256,6 +256,125 @@ def test_memory_honesty_rule_present_even_without_history_or_memories() -> None:
     assert "Recent conversation" not in prompt  # 无历史时不注入对话块
 
 
+def test_memory_honesty_covers_world_state_abilities_and_time() -> None:
+    """六修（2026-09-22 实测复盘）：诚实规则从「过去事件」扩到四类。
+
+    实测她还现编了天气（请求无 world_context 也照答「云层压得有点低」）、
+    水系魔法（对话链路不引用能力清单）和「才几天不见」（无任何相处时长
+    记录）——三类都不在旧的「past event」覆盖里。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯？",
+            "emotion_id": "emotion.thoughtful",
+            "gesture_id": "gesture.think",
+            "facial_expression_id": "face.thoughtful",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="在吗？", session_id="s1"))
+
+    prompt = stub.system_prompt
+    assert "current world state" in prompt
+    assert "your own abilities" in prompt
+    assert "how long you have known the player" in prompt
+
+
+def test_prompt_injects_the_real_ability_catalog() -> None:
+    """六修（2026-09-22 实测复盘「水系魔法幻视」）：对话链路注入能力目录。
+
+    真相源是 tactical_policy.abilities——实测她被问「你会什么魔法」时现编
+    水系且越编越自洽，因为 prompt 里从来没有过能力清单。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你会什么魔法？"))
+
+    prompt = stub.system_prompt
+    assert "Your complete and ONLY abilities" in prompt
+    for display_name in ("奥术弹", "爆裂魔法", "快速治疗", "强效治疗", "魔法护盾"):
+        assert display_name in prompt
+    assert "do not invent abilities you were not given" in prompt
+
+
+def test_prompt_frames_examples_as_placeholders_not_facts() -> None:
+    """六修（2026-09-22 实测复盘）：示例块必须框定「世界细节是占位不是事实」。
+
+    few-shot 的天气条曾被逐字复述成「真实天象」——模型把示例当成了数据源。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你好。"))
+
+    prompt = stub.system_prompt
+    assert "placeholders, NOT facts" in prompt
+    assert "never cite anything from an example" in prompt
+
+
+def test_reply_topics_are_exposed_and_prompt_asks_for_them() -> None:
+    """六修：自述主题通道——LLM 顺带返回她本轮谈及的话题，替代规则切词。
+
+    规则提取无分词库，她自己的回复曾切出「主修/厉害/水系本来」这类碎片
+    直接落印象层（且新印象立即回注 prompt 污染下一轮）。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "护盾我还能撑一会儿，先照顾好你自己。",
+            "emotion_id": "emotion.concerned",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.concerned",
+            "interruptible": True,
+            "reply_topics": ["护盾"],
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你还好吗？"))
+
+    assert service.last_reply_topics == ["护盾"]
+    assert "reply_topics: list of 1-3 short Chinese topic words" in stub.system_prompt
+    # keys 清单同步：模型必须知道这个键存在于「exactly these keys」里
+    assert "reply_topics, salient" in stub.system_prompt
+
+
+def test_old_payloads_without_reply_topics_key_still_work() -> None:
+    """向后兼容：不带 reply_topics 键的老模型输出行为不变（空列表）。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "好。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="走吧。"))
+
+    assert service.last_reply_topics == []
+
+
 def test_tactical_llm_parser_rejects_extra_fields() -> None:
     parser = LLMCommandParser(
         StubLLMClient(

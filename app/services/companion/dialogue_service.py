@@ -57,16 +57,19 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
             topics = service.last_topics
             facts = service.last_facts
             salient = service.last_salient
+            reply_topics = service.last_reply_topics
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
             facts = None
             salient = None
+            reply_topics = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
         facts = None
         salient = None
+        reply_topics = None
     response.relationship_stage = stage
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
     _record_turn(
@@ -75,6 +78,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         topics=topics,
         facts=facts,
         salient=salient,
+        reply_topics=reply_topics,
         injected_topics=[i.topic for i in impressions],
     )
     return response
@@ -147,6 +151,7 @@ def _stream_llm_reply(
                 topics=service.last_topics,
                 facts=service.last_facts,
                 salient=service.last_salient,
+                reply_topics=service.last_reply_topics,
                 injected_topics=[i.topic for i in impressions],
             )
             _annotate_observability(
@@ -224,18 +229,21 @@ def _record_turn(
     topics: list[str] | None = None,
     facts: list[str] | None = None,
     salient: bool | None = None,
+    reply_topics: list[str] | None = None,
     injected_topics: list[str] | None = None,
 ) -> None:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    三通道：``topics``/``facts``/``salient`` 为 LLM 顺带返回；``None``
-    （mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空——规则
-    切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案（玩家
-    期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
+    三通道：``topics``/``facts``/``salient``/``reply_topics`` 为 LLM 顺带返回；
+    ``None``（mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空
+    ——规则切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案
+    （玩家期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
     普通发言的主题只入印象层，陈述出的事实经接地校验后入档案。艾莉自己的
-    回复也提取主题入印象（非显著）——她记得自己说过什么，反复谈起的话题
-    同样形成印象。``injected_topics`` 为本轮注入 prompt 的印象主题（埋点用，
-    见 ``dialogue_signals``）。
+    回复的主题入印象（非显著）——她记得自己说过什么，反复谈起的话题同样形成
+    印象；六修（2026-09-22 实测复盘）起 LLM 路径改用模型自述的 ``reply_topics``
+    ——规则切词没有分词库，产出「主修/厉害/水系本来」这类碎片直接污染印象层
+    （且新印象权重 1.0 立即回注 prompt）。``injected_topics`` 为本轮注入 prompt
+    的印象主题（埋点用，见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id) if request.session_id else ()
@@ -266,7 +274,9 @@ def _record_turn(
     _remember_turn(
         request.companion_id, topics, salient=salient, salience_boost=salience_boost
     )
-    reply_topics = extract_topics(response.reply_text)
+    if reply_topics is None:
+        # mock/回退路径没有 LLM 自述主题，规则提取兜底（玩家侧规则路径维持现状）。
+        reply_topics = extract_topics(response.reply_text)
     if reply_topics:
         # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。

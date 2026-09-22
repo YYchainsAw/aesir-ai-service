@@ -84,6 +84,19 @@ class TestNoiseTopics:
         for topic in ("这话", "那话", "你的", "我的", "那你", "你说", "我说"):
             assert looks_like_noise(topic) is True
 
+    def test_rule_split_fragments_from_her_own_replies_are_noise(self):
+        # 六修实测 2026-09-22：她自述主题走规则切词（无分词库）切出的碎片——
+        # 「主修/厉害/代价/不小」是动/形容词与形态词，「水系本来」「可不能
+        # 当没听见」是切分错误，都不是话题。根治靠 reply_topics 改走 LLM
+        # 自述，这里兜底存量与降级路径。
+        for topic in ("主修", "厉害", "代价", "不小", "水系本来", "可不能当没听见"):
+            assert looks_like_noise(topic) is True
+
+    def test_component_words_inside_real_topics_survive(self):
+        # 全等匹配（非包含）：正常话题包含这些成分字眼时不受误伤。
+        assert looks_like_noise("主修法师") is False
+        assert looks_like_noise("实力差距") is False
+
     def test_real_topics_are_not_noise(self):
         for topic in ("钓鱼", "上海搬家", "下周去医院复查", "不过如此"):
             assert looks_like_noise(topic) is False

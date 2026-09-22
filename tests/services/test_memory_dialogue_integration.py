@@ -221,6 +221,61 @@ def test_archived_fact_is_injected_next_turn(_fresh_memory, monkeypatch) -> None
     assert "sure of these" in block  # 给她「可以直说」的许可，而非含糊其辞
 
 
+class _StubReplyTopicsLLM:
+    """返回固定负载的 LLM 替身：用于验证 reply_topics 通道（六修）。"""
+
+    def __init__(self, reply_topics: list[str]) -> None:
+        self.reply_topics = reply_topics
+
+    def generate_json(self, *, system_prompt: str, user_prompt: str, temperature: float = 0.2):
+        return {
+            "action": "reply",
+            "reply_text": "钓鱼的事先放放，我先给你挂个护盾。",
+            "emotion_id": "emotion.concerned",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.concerned",
+            "interruptible": True,
+            "topics": [],
+            "facts": [],
+            "reply_topics": self.reply_topics,
+            "salient": False,
+        }
+
+
+def _chat_with_reply_topics(monkeypatch, reply_topics: list[str], text: str, session_id: str = "s7"):
+    """走 LLM 后端发一轮对话，LLM 顺带返回指定自述主题。"""
+    from app.services.companion import llm_dialogue_service as llm_module
+
+    monkeypatch.setenv("AESIR_COMPANION_BACKEND", "llm")
+    monkeypatch.setattr(llm_module, "create_llm_client", lambda: _StubReplyTopicsLLM(reply_topics))
+    return _chat(text, session_id=session_id)
+
+
+def test_llm_reply_topics_override_rule_extraction(_fresh_memory, monkeypatch) -> None:
+    """六修：LLM 路径的自述主题入印象（origin=companion），规则切词不再参与。
+
+    实测根因：规则提取无分词库，她自己的回复被切成「主修/厉害/水系本来」
+    这类碎片直接落印象层；现在 LLM 说什么就是什么——回复文本里即使有
+    可提取的词（钓鱼），也不再走规则通道。
+    """
+    response = _chat_with_reply_topics(monkeypatch, ["护盾"], "你还好吗？")
+    assert response.status_code == 200
+
+    impressions = get_memory_store("companion.alice").snapshot().impressions
+    by_topic = {i.topic: i for i in impressions}
+    assert "护盾" in by_topic
+    assert by_topic["护盾"].origin == "companion"
+    assert "钓鱼" not in by_topic  # 规则兜底不再参与 LLM 路径
+
+
+def test_llm_empty_reply_topics_records_nothing(_fresh_memory, monkeypatch) -> None:
+    """LLM 说本轮自述无主题 → 不落印象（空列表是有效答案，不触发规则兜底）。"""
+    _chat_with_reply_topics(monkeypatch, [], "你还好吗？")
+
+    impressions = get_memory_store("companion.alice").snapshot().impressions
+    assert all(i.origin != "companion" for i in impressions)
+
+
 def test_console_reset_clears_long_term_memory(_fresh_memory) -> None:
     _chat("记住：我最讨厌蘑菇。", session_id="s3")
     store = get_memory_store("companion.alice")
