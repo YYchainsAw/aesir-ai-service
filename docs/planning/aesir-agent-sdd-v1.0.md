@@ -966,7 +966,7 @@ scripts/
 ### Phase 11: Polish & Cross-Cutting Concerns
 
 - [x] T083 [P] 表达一致性校验：`app/services/companion/style_guard.py`（出戏术语、禁忌表达、虚构事实拦截；非流式路径重试一次后仍失败则回退候选）并补测试 `tests/services/test_style_guard.py`
-- [ ] T084 [P] 熔断与限流加固：模型连续失败熔断、心跳限流、各子系统超时统一
+- [x] T084 [P] 熔断与限流加固：LLM 连续失败熔断器（`app/services/llm/circuit_breaker.py`）接入 `create_llm_client`；心跳限流已在 `agent.py` 实现；LLM/工具查证超时统一为配置项
 - [ ] T085 [P] 文档同步：更新 `docs/` 与根 `README.md`，登记新端点、新配置项与新演示脚本
 - [ ] T086 全量回归：确认既有 v0.1／v0.2 测试全部通过（向后兼容），且新增测试全绿
 - [ ] T087 端到端预演：运行 `scripts/mock_ue_flow.py` 与三条演示脚本，核对 SC-001～SC-013 指标

@@ -2,7 +2,23 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-24，**659 通过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-24，**669 通过**）。
+
+## 2026-09-24 — SDD Phase 11（T084）：熔断与限流加固
+
+完成 LLM 调用熔断器与各子系统超时统一。
+
+- **新增 `app/services/llm/circuit_breaker.py`**：
+  - `CircuitBreaker` 支持 CLOSED / OPEN / HALF_OPEN 三态，基于连续失败计数与时间窗口恢复
+  - `CircuitBreakerLLMClient` 包装任意 `LLMClient`，失败时自动计数、成功时重置
+  - 线程安全，适合 Web 服务多线程环境
+- **接入工厂**：`app/services/llm/factory.py` 的 `create_llm_client` 现在返回熔断包装后的客户端；陪伴对话、战术意图解析、v0.1 命令解析三条链路共享同一熔断状态，触发后自动走各自的规则/mock fallback。
+- **新增配置项**（`app/config.py`）：
+  - `AESIR_LLM_CIRCUIT_FAILURE_THRESHOLD`（默认 5）
+  - `AESIR_LLM_CIRCUIT_RECOVERY_SECONDS`（默认 60）
+- **超时统一审计**：LLM 调用超时 `llm_timeout_seconds`、工具查证超时 `tools_lookup_timeout_seconds`、心跳最小间隔 `heartbeat_min_interval_seconds` 均已外置为配置；T084 不再新增超时项，只补齐缺失的熔断层。
+- **测试**：新增 `tests/services/test_llm_circuit_breaker.py`（10 例），覆盖阈值触发、OPEN 拒绝、恢复窗口、HALF_OPEN 成功关闭/失败重开、工厂集成。
+- **测试**：659 → **669 通过 + 2 跳过**。
 
 ## 2026-09-24 — SDD Phase 11（T083）：表达一致性校验
 

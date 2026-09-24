@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
     llm_timeout_seconds: float = Field(default=15.0, alias="LLM_TIMEOUT_SECONDS")
 
+    # -- LLM 熔断（SDD T084 / FR-041）----------------------------------------
+    # 连续失败阈值：达到后进入 OPEN 状态，直接拒绝 LLM 调用并走 fallback
+    llm_circuit_failure_threshold: int = 5
+    # OPEN 状态持续时间（秒），之后进入 HALF_OPEN 试恢复
+    llm_circuit_recovery_seconds: float = 60.0
+
     # -- 记忆体系（SDD US1 / T002）-------------------------------------------
     memory_root: str = "data/memory"            # 按角色分目录：data/memory/<npc_id>/，不入版本库
     memory_short_term_limit: int = 50           # 短期上下文条数上限（会话内滚动窗口）
