@@ -82,6 +82,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         reply_topics=reply_topics,
         relationship_signal=relationship_signal,
         injected_topics=[i.topic for i in impressions],
+        style_violations=getattr(service, "last_style_violations", None) if get_settings().companion_backend == "llm" else None,
     )
     return response
 
@@ -154,6 +155,7 @@ def _stream_llm_reply(
                 reply_topics=service.last_reply_topics,
                 relationship_signal=service.last_relationship_signal,
                 injected_topics=[i.topic for i in impressions],
+                style_violations=service.last_style_violations,
             )
             _annotate_observability(
                 event.response, profile, memories=memories, impressions=impressions
@@ -233,6 +235,7 @@ def _record_turn(
     reply_topics: list[str] | None = None,
     relationship_signal: str | None = None,
     injected_topics: list[str] | None = None,
+    style_violations: list[str] | None = None,
 ) -> int:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
@@ -302,6 +305,7 @@ def _record_turn(
         injected_topics=injected_topics,
         previous_player_texts=[t.user_text for t in prior_history],
         previous_reply_texts=[t.reply_text for t in prior_history],
+        style_violations=style_violations,
     )
     return _apply_relationship_signal(request.companion_id, relationship_signal)
 

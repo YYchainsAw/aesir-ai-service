@@ -129,3 +129,23 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 
 > 注：v0.2 的 `/v1/tactical/resolve` 当前为纯规则策略（`source` 固定 `rule`），
 > 不经 LLM；LLM 接入策略层待后续规划（届时将新增后端选型配置）。
+
+## 9. LLM 熔断配置（T084 / FR-041）
+
+所有通过工厂创建的 LLM 客户端共享同一个熔断器。当 LLM 连续失败达到阈值时，熔断器进入 OPEN 状态，在恢复窗口内直接拒绝新的 LLM 调用，避免把外部故障拖垮本地服务；各链路已有的规则/mock fallback 会自动生效。
+
+```ini
+# 连续失败阈值，达到后进入 OPEN（默认 5）
+AESIR_LLM_CIRCUIT_FAILURE_THRESHOLD=5
+# OPEN 状态持续时间（秒），之后进入 HALF_OPEN 试恢复（默认 60）
+AESIR_LLM_CIRCUIT_RECOVERY_SECONDS=60
+
+# 调用超时（秒），与熔断配套使用
+LLM_TIMEOUT_SECONDS=15
+```
+
+- CLOSED：正常调用；成功重置失败计数，失败累计。
+- OPEN：拒绝调用并抛出 `LLMClientError`，业务层走 fallback；持续 `recovery_seconds` 后进入 HALF_OPEN。
+- HALF_OPEN：放行下一次调用；成功则关闭，失败则重新 OPEN。
+
+调试/测试可用 `app.services.llm.factory.get_llm_circuit_breaker()` 获取共享实例查看 `state` 或调用 `reset()`。

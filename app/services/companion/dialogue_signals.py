@@ -15,6 +15,10 @@
 外加当轮注入的印象主题（``injected_topics``）与情绪/手势/表情选择，供
 日后把「记忆调度 / 表现选择」的手调超参换成学出来的策略（bandit/RL）。
 
+T083 风格校验结果（``style_violations``）也落入本埋点，供运行期验收指标
+统计。``None`` 表示该轮未走 LLM 路径（mock/fallback），空列表表示 LLM 路径
+通过校验。
+
 埋点是观测而非流程：任何写盘/检测故障一律静默吞掉（同 FR-011 纪律，
 绝不因埋点阻塞对话主流程）。
 """
@@ -120,6 +124,7 @@ def record_turn_signal(
     injected_topics: list[str] | None = None,
     previous_player_texts: list[str] = (),
     previous_reply_texts: list[str] = (),
+    style_violations: list[str] | None = None,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
@@ -150,6 +155,7 @@ def record_turn_signal(
             "injected_topics": list(injected_topics or []),
             "signals": signals,
             "repetitive": signals["repetition_score"] >= _REPETITION_FLAG_THRESHOLD,
+            "style_violations": style_violations,
         }
         root = Path(get_settings().dialogue_signals_dir)
         root.mkdir(parents=True, exist_ok=True)

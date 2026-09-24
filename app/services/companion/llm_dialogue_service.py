@@ -171,6 +171,8 @@ class LLMCompanionDialogueService:
         self.last_reply_topics: list[str] | None = None
         self.last_relationship_signal: str = "none"
         self.last_salient: bool = False
+        # T083 风格校验：成功时为空列表；如上层需要，可从抛出的异常 detail 中读取失败原因。
+        self.last_style_violations: list[str] = []
 
     def reply(
         self,
@@ -253,6 +255,7 @@ class LLMCompanionDialogueService:
                 self.last_reply_topics = response_payload.reply_topics
                 self.last_relationship_signal = response_payload.relationship_signal
                 self.last_salient = response_payload.salient
+                self.last_style_violations = []
                 return response_payload
 
             last_violations = violations
@@ -406,6 +409,7 @@ class LLMCompanionDialogueService:
         self.last_reply_topics = response_payload.reply_topics
         self.last_relationship_signal = response_payload.relationship_signal
         self.last_salient = response_payload.salient
+        self.last_style_violations = []
 
         yield StreamEvent(
             kind="meta",

@@ -23,7 +23,7 @@
 | 文档 | 说明 | 读者 |
 | --- | --- | --- |
 | [getting-started.md](guides/getting-started.md) | 环境、安装、启动、测试、接口示例 | 开发者 |
-| [llm-integration.md](guides/llm-integration.md) | LLM 联调与密钥安全 | 开发者 |
+| [llm-integration.md](guides/llm-integration.md) | LLM 联调、密钥安全、熔断配置 | 开发者 |
 
 ## design — 设计预研
 
