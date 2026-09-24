@@ -118,16 +118,28 @@ class CompanionProfileRepository:
 
         未登记的角色抛 ``UnknownCompanionError``——调用方据此返回 404，
         **不**回退到默认角色的人格（FR-044）。
+        注册表扫描过程中若任何角色配置损坏，统一抛 ``CompanionProfileError``，
+        由路由层转 503（避免未捕获异常导致 500）。
         """
         for path in self._profile_paths():
-            profile = get_profile(path)
+            try:
+                profile = get_profile(path)
+            except Exception as error:
+                raise CompanionProfileError(
+                    f"Failed to load companion profile from {path}: {error}"
+                ) from error
             if profile.companion_id == companion_id:
                 return profile
         raise UnknownCompanionError(f"Unregistered companion_id: {companion_id}")
 
     def list_registered(self) -> list[str]:
         """当前注册表内的全部角色标识（/health 与 console 展示用）。"""
-        return [get_profile(path).companion_id for path in self._profile_paths()]
+        try:
+            return [get_profile(path).companion_id for path in self._profile_paths()]
+        except Exception as error:
+            raise CompanionProfileError(
+                f"Failed to list companion profiles: {error}"
+            ) from error
 
     def _profile_paths(self) -> list[Path]:
         try:

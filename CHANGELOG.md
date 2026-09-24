@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-24，**633 通过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-24，**643 通过**）。
+
+## 2026-09-24 — SDD Phase 10（US8）：多角色路由与隔离
+
+完成「以后加第二个 NPC 不需要重写系统」的架构验证。
+
+- **T081**：新增 `data/companions/secondary_companion.yaml`（Bruno，寡言可靠的边境守护者），作为第二角色配置骨架；人设结构合法、表现 ID 白名单与 Alice 不重叠。
+- **T082**：`/v1/companion/chat` 与 `/v1/agent/step` 均改为按 `companion_id` 路由到已登记角色（`get_registered_profile`），新增角色无需改动代码结构即可正确处理请求。
+- **T080**：新增 `tests/services/test_multi_npc_isolation.py`，覆盖：注册表发现两角色、不同角色返回不同人设、对话路由到不同 mock 回复、记忆/关系按角色隔离、未登记角色 404 且不回退默认角色、`/v1/agent/step` 可处理第二角色。
+- **健壮性**：`CompanionProfileRepository.load_registered/list_registered` 将注册表扫描中的解析异常统一包装为 `CompanionProfileError`；`companion.py` 捕获该异常返回 503（替代未捕获的 500）。同步修复回归测试 `test_corrupt_profile_yaml_returns_503_not_500`，使其用临时 companions 目录模拟真实损坏场景。
+- **测试**：新增 8 例，635 → **643 通过 + 2 跳过**。
 
 ## 2026-09-24 — 对话实测七修：收尾不再复读 + 诚实规则补第五类 + 被批评不当圣旨
 

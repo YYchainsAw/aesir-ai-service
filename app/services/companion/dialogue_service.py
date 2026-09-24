@@ -13,7 +13,7 @@ from app.services.companion.llm_dialogue_service import LLMCompanionDialogueServ
 from app.services.companion.profile_repository import (
     CompanionProfile,
     UnknownCompanionError,
-    get_profile,
+    get_registered_profile,
 )
 from app.services.companion.dialogue_signals import record_turn_signal
 from app.services.companion.session_memory import get_session_memory
@@ -31,10 +31,8 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     记忆。记忆体系任何故障都降级为「无记忆继续对话」（FR-011 / T030），
     绝不因记忆问题中断玩家流程。
     """
-    # mtime 缓存读取人设；id 校验语义与 require_primary 一致（404 路径不变）。
-    profile = get_profile()
-    if profile.companion_id != request.companion_id:
-        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
+    # 按 companion_id 路由到已登记角色；未登记抛 UnknownCompanionError → 404（FR-044）。
+    profile = get_registered_profile(request.companion_id)
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
@@ -98,9 +96,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     注意：本函数是普通函数（不是生成器），人设校验在调用时立即执行，
     未知名伴的 404 得以在 SSE 响应头发出之前抛出。
     """
-    profile = get_profile()
-    if profile.companion_id != request.companion_id:
-        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
+    profile = get_registered_profile(request.companion_id)
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()

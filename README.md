@@ -64,7 +64,7 @@ aesir-ai-service/
 │   └── rl/
 │       └── boss/                  # Boss 训练/评估入口
 ├── data/
-│   ├── companions/                # 队友 YAML 人设（Alice）
+│   ├── companions/                # 队友 YAML 人设（Alice + Bruno 第二角色验证骨架）
 │   ├── policy/                    # 战术/关系/活动域策略阈值（tactical/relationship/agency_policy.yaml）
 │   ├── world/                     # 世界观知识库 lore.yaml（只读查证用）
 │   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）

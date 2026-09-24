@@ -955,9 +955,9 @@ scripts/
 
 **Goal**: 角色注册、状态隔离、第二角色验证。
 
-- [ ] T080 [P] [US8] 角色隔离测试：`tests/services/test_multi_npc_isolation.py`（记忆与关系互不干扰；未登记角色 404 且不回退默认角色）
-- [ ] T081 [US8] 第二角色配置骨架：`data/companions/` 增加一份最小人格配置（不进入演示，仅验证路由）
-- [ ] T082 [US8] 路由验证：确认新增角色无需改动代码结构即可正确处理请求
+- [x] T080 [P] [US8] 角色隔离测试：`tests/services/test_multi_npc_isolation.py`（记忆与关系互不干扰；未登记角色 404 且不回退默认角色）
+- [x] T081 [US8] 第二角色配置骨架：`data/companions/` 增加 `secondary_companion.yaml`（Bruno，寡言守护者，用于验证路由）
+- [x] T082 [US8] 路由验证：`/v1/companion/chat` 与 `/v1/agent/step` 均按 `companion_id` 路由到对应角色；新增角色无需改动代码结构
 
 **Checkpoint**: 架构扩展性得到证明
 
