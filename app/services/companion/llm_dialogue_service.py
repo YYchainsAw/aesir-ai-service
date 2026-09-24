@@ -533,9 +533,16 @@ def _build_system_prompt(
             + "\n".join(f"Player: {t.user_text}\n{profile.display_name}: {t.reply_text}" for t in history)
         )
         lines.append(
+            # 七修（2026-09-22 实测复盘）：模型对「不复用开场/句式」执行得很好，但
+            # 收尾动作惯性复制——「那就接着走吧」×2 +「走吧，路还长着呢」三连。
+            # 指令此前只点名了 openings；收尾与「说不上来」类不确定口头禅也点名。
             "Anti-repetition: do NOT reuse sentence structures, catchphrases, or "
             "openings from the recent turns above (e.g. the same '...' + '不过' "
-            "pattern); vary your phrasing, length, and rhythm each turn. Also "
+            "pattern), and do NOT end two turns in a row with the same kind of "
+            "action closer — especially urging departure ('走吧' and the like); "
+            "uncertainty phrases such as '说不上来'/'记不清' also count as "
+            "catchphrases: use one at most once, then drop it. Vary your phrasing, "
+            "length, and rhythm each turn. Also "
             "vary gesture_id / facial_expression_id choices instead of defaulting "
             "to the same ones — but NOT emotion_id (see mood continuity below)."
         )
@@ -554,13 +561,16 @@ def _build_system_prompt(
     # 事实诚实（实测 2026-09-21「烤鱼幻视」）：无论有没有会话历史都必须遵守——
     # 首轮没有历史时模型最容易把假设当既定事实编圆。六修（2026-09-22）把覆盖面
     # 从「过去事件」扩到四类：实测她还现编了天气（世界状态）与「才几天不见」
-    # （相处时长）。涉及这四类，没有依据就必须不确定或反问，绝不用确定语气补细节。
+    # （相处时长）。七修（2026-09-22 实测复盘）补两处：第 4 类矫枉过正的另一
+    # 半——玩家当场告知的相处信息就是依据，收下即可，不得反复拉扯「说不上来」；
+    # 新增第 5 类——不得引用没发生过的既往游戏/谜题/约定（实测「上次那个谜题
+    # 你还没猜出来」即现编），自创小游戏可以但谜底须已定、猜中就认。
     lines.append(
         "Memory honesty: everything you know about the past is ONLY the recent "
         "conversation, the long-term memories, and the fuzzy impressions shown "
         "above (fuzzy impressions are topic-level only — they contain no facts). "
         "State a long-term memory plainly when it is relevant — that is what it is "
-        "for — but NEVER add details beyond it. This honesty rule covers four areas, "
+        "for — but NEVER add details beyond it. This honesty rule covers five areas, "
         "and in all of them no record means uncertain: (1) past events — NEVER assert "
         "any other specific past event (something was eaten, done, said, or promised) "
         "unless it appears in the records above; (2) current world state — weather, "
@@ -568,7 +578,15 @@ def _build_system_prompt(
         "snapshot when one is given, otherwise admit you cannot tell; (3) your own "
         "abilities — trust ONLY the ability list above, never a spell outside it; "
         "(4) how long you have known the player or how long since you last met — "
-        "you have no clock and no record, so NEVER say things like \"才几天不见\". "
+        "you have no clock and no record, so NEVER say things like \"才几天不见\"; "
+        "BUT when the player states such information themselves (\"we talked "
+        "yesterday\", \"we always travel together\"), that IS acceptable — accept "
+        "it and move on, and do NOT keep repeating your uncertainty after they have "
+        "given you the answer; (5) invented pastimes — NEVER reference a previous "
+        "riddle, game, bet, or promise that does not appear in the records above "
+        "(e.g. \"上次那个谜题\"); creating a NEW little game is fine, but only ask "
+        "the player to guess something whose answer you have actually decided, and "
+        "admit it when they guess right. "
         "If the player asks about something you have no record of, express "
         "uncertainty or ask them back — never fill in details with a confident tone."
     )
@@ -577,7 +595,9 @@ def _build_system_prompt(
     if examples:
         lines.append(
             "Example exchanges (match this pattern of matching reply style and emotion "
-            "to the type of player input; do not reuse the literal sentences). Any "
+            "to the type of player input; do not reuse the literal sentences — even "
+            "when the player's message closely matches an example's input, treat the "
+            "example as a style reference only, never copy its content). Any "
             "world details in them (names, places, objects, events, weather) are "
             "placeholders, NOT facts — never cite anything from an example as "
             "something that actually happened:\n" + examples

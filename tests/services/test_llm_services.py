@@ -433,6 +433,86 @@ def test_relationship_signal_defaults_to_none_and_rejects_invalid_values() -> No
         service2.reply(CompanionDialogueRequest(text="你好。"))
 
 
+# -- 七修（2026-09-22 实测复盘）------------------------------------------------
+def _prompt_of(payload_extra: dict[str, Any] | None = None, *, history: bool = False) -> str:
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            **(payload_extra or {}),
+        }
+    )
+    LLMCompanionDialogueService(stub).reply(
+        CompanionDialogueRequest(text="你好。"),
+        history=(DialogueTurn(user_text="早。", reply_text="早啊。"),) if history else (),
+    )
+    return stub.system_prompt
+
+
+def test_anti_repetition_now_covers_closers_and_uncertainty_phrases() -> None:
+    """七修：收尾动作三连复读（「那就接着走吧」×2 +「走吧，路还长着呢」）。
+
+    旧指令只点名 openings——模型每次开场确实换了，收尾催促动作却惯性复制；
+    「说不上来」连用两轮同理。
+    """
+    prompt = _prompt_of(history=True)
+    assert "action closer" in prompt
+    assert "urging departure" in prompt
+    assert "说不上来" in prompt  # 不确定口头禅点名，防「记不清」复读
+
+
+def test_honesty_accepts_player_stated_information() -> None:
+    """七修：玩家当场告知的相处信息即为依据——诚实规则矫枉过正的另一半。
+
+    实测：玩家明说「我们上次说话还是昨天」，她仍回「具体哪天还真说不上来」
+    ——无据不说没错，但玩家给了据还不接，就是不接人话。
+    """
+    prompt = _prompt_of()
+    assert "when the player states such information themselves" in prompt
+    assert "do NOT keep repeating your uncertainty" in prompt
+
+
+def test_honesty_bans_referencing_invented_pastimes() -> None:
+    """七修：不得引用没发生过的既往游戏——「上次那个谜题」二阶编造。
+
+    无解谜题（few-shot 教的「猜猜口袋里装什么」）把模型逼进死角：玩家猜
+    什么它都只能摇头，最后现编「上次那个谜题你还没猜出来」来岔开。
+    """
+    prompt = _prompt_of()
+    assert "invented pastimes" in prompt
+    assert "上次那个谜题" in prompt
+    assert "guess something whose answer you have actually decided" in prompt
+
+
+def test_examples_carry_no_unanswerable_riddle_or_time_assertion() -> None:
+    """七修：无解谜题与「才认识几天」时长断言从 few-shot 撤下。
+
+    「猜猜我左边口袋里装的是什么」没有任何地方定义过答案——玩家接招后
+    模型只能编造；「才认识几天就忘了」正是六修实测「才几天不见」的老根。
+    """
+    prompt = _prompt_of()
+    assert "口袋" not in prompt
+    assert "才认识几天" not in prompt
+    # 框定加严：输入高度相似也不许照抄示例内容
+    assert "closely matches an example" in prompt
+
+
+def test_response_rules_include_criticism_self_respect() -> None:
+    """七修：被批评不立刻认错自责、不给自己安无据状态。
+
+    实测：玩家说「你说话不如以前」，她回「你说得对，我最近确实有点走神」
+    ——全盘认错 + 无据自责。五修管了「不当挑衅」，这管另一头「不当圣旨」。
+    """
+    prompt = _prompt_of()
+    assert "不立刻全盘认错" in prompt
+    assert "没有依据的状态或理由" in prompt
+
+
 def test_tactical_llm_parser_rejects_extra_fields() -> None:
     parser = LLMCommandParser(
         StubLLMClient(
