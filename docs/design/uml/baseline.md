@@ -1,6 +1,6 @@
 # UML 建模基线
 
-> 基线日期：2026-09-10  
+> 基线日期：2026-09-24  
 > 建模口径：当前实现（As-Is）优先；目标设计（To-Be）单独建图。
 
 ## 1. 仓库基线
@@ -18,11 +18,11 @@
 ### Python AI 服务
 
 - 仓库：`https://github.com/YYchainsAw/aesir-ai-service.git`
-- 本地路径：`C:/Users/YYchainsaw/PycharmProjects/aesir-ai-service`
-- 分支：`main`
-- 提交：`f548c1ad64c5d284eace084132616d171d45403f`
-- 工作区状态：建立基线时无未提交修改
-- 当前虚拟环境 Python：`3.11.9`
+- 本地路径：`f:/python/aesir-ai-service`
+- 分支：`develop-dyh`
+- 提交：`a7ba5e8`
+- 工作区状态：建立基线前无未提交修改
+- 当前虚拟环境 Python：`3.12.7`
 - FastAPI：`0.141.1`
 - Pydantic：`2.13.5`
 
@@ -46,7 +46,7 @@ Python 服务侧的主要参考文档：
 | DOC-README-001 | `README.md` | 后端模块和端点总览 |
 
 这些相对路径均以
-`C:/Users/YYchainsaw/PycharmProjects/aesir-ai-service/` 为根目录。
+`f:/python/aesir-ai-service/` 为根目录。
 
 ## 3. 当前已确认的 UE → Python 接口
 
