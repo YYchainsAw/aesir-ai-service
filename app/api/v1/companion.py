@@ -15,7 +15,7 @@ from app.services.companion.dialogue_service import (
     stream_dialogue_reply,
 )
 from app.services.companion.llm_dialogue_service import StreamEvent
-from app.services.companion.profile_repository import UnknownCompanionError
+from app.services.companion.profile_repository import CompanionProfileError, UnknownCompanionError
 from app.services.transcribers.base import TranscriptionError
 from app.services.transcribers.factory import get_transcriber
 
@@ -32,6 +32,12 @@ def chat_with_companion(request: CompanionDialogueRequest) -> CompanionDialogueR
         return create_dialogue_reply(request)
     except UnknownCompanionError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except CompanionProfileError as error:
+        # 角色配置损坏（YAML 解析失败或缺字段）→ 503 服务不可用，避免 500。
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Companion profile unavailable: {error}",
+        ) from error
 
 
 @router.post("/chat/stream")
@@ -44,6 +50,11 @@ def chat_with_companion_stream(request: CompanionDialogueRequest) -> StreamingRe
         stream = stream_dialogue_reply(request)
     except UnknownCompanionError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except CompanionProfileError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Companion profile unavailable: {error}",
+        ) from error
     return StreamingResponse(
         _sse_frames(stream),
         media_type="text/event-stream",
@@ -113,6 +124,11 @@ def chat_with_companion_voice(
         response = create_dialogue_reply(request)
     except UnknownCompanionError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except CompanionProfileError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Companion profile unavailable: {error}",
+        ) from error
     return VoiceCompanionDialogueResponse(
         **response.model_dump(), transcribed_text=text
     )

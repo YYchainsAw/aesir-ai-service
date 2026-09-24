@@ -61,10 +61,22 @@ class RelationshipStore:
             return self._state.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
-    def apply_event(self, event_type: str, occurred_at: str | None = None) -> tuple[RelationshipState, int]:
-        """计分一条事实事件并落盘；返回（新状态快照, 实际计分值）。"""
+    def apply_event(
+        self,
+        event_type: str,
+        occurred_at: str | None = None,
+        *,
+        cooldown_seconds: float | None = None,
+    ) -> tuple[RelationshipState, int]:
+        """计分一条事实事件并落盘；返回（新状态快照, 实际计分值）。
+
+        ``cooldown_seconds`` 覆盖默认冷却窗口（对话信号用更严的窗口：
+        对话每轮都发生，60 秒拦不住连点刷分）。
+        """
         with self._lock:
-            new_state, delta = apply_relationship_event(self._state, event_type, occurred_at)
+            new_state, delta = apply_relationship_event(
+                self._state, event_type, occurred_at, cooldown_seconds=cooldown_seconds
+            )
             if delta != 0:
                 self._set(new_state)
                 self._persist_locked()

@@ -115,6 +115,62 @@ def test_companion_llm_prompt_injects_conversation_history() -> None:
     assert stub.user_prompt == "刚说到哪了？"
 
 
+def test_companion_llm_prompt_carries_mood_inertia() -> None:
+    """情绪惯性：上一轮的情绪作为「当前心情」注入，且不再要求为变化而换情绪。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯，我还在想刚才那件事。",
+            "emotion_id": "emotion.thoughtful",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="还在想什么？", session_id="s1"),
+        history=(
+            DialogueTurn(
+                user_text="我们出发吧。",
+                reply_text="……好。",
+                emotion_id="emotion.thoughtful",
+            ),
+        ),
+    )
+
+    prompt = stub.system_prompt
+    assert "Your current mood: emotion.thoughtful" in prompt
+    assert "keep this mood" in prompt
+    # 上一版 Anti-repetition 要求 emotion 也轮换，正是情绪跳变的来源——必须收回
+    assert "vary emotion_id" not in prompt
+
+
+def test_mood_absent_without_recorded_emotion() -> None:
+    """旧调用方（或首轮）不传情绪时不注入心情块——行为不变。"""
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "那就接着说。",
+            "emotion_id": "emotion.bright",
+            "gesture_id": "gesture.cheerful_idle",
+            "facial_expression_id": "face.bright_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(
+        CompanionDialogueRequest(text="刚说到哪了？", session_id="s1"),
+        history=(DialogueTurn(user_text="我们出发吧。", reply_text="当然可以。"),),
+    )
+
+    assert "Your current mood" not in stub.system_prompt
+
+
 def test_facts_are_exposed_and_prompt_asks_for_them() -> None:
     """事实通道：prompt 要求顺带抽出玩家陈述的事实，服务暴露 last_facts。"""
     stub = StubLLMClient(
@@ -198,6 +254,263 @@ def test_memory_honesty_rule_present_even_without_history_or_memories() -> None:
     assert "Memory honesty" in prompt
     assert "NEVER assert any other specific past event" in prompt
     assert "Recent conversation" not in prompt  # 无历史时不注入对话块
+
+
+def test_memory_honesty_covers_world_state_abilities_and_time() -> None:
+    """六修（2026-09-22 实测复盘）：诚实规则从「过去事件」扩到四类。
+
+    实测她还现编了天气（请求无 world_context 也照答「云层压得有点低」）、
+    水系魔法（对话链路不引用能力清单）和「才几天不见」（无任何相处时长
+    记录）——三类都不在旧的「past event」覆盖里。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯？",
+            "emotion_id": "emotion.thoughtful",
+            "gesture_id": "gesture.think",
+            "facial_expression_id": "face.thoughtful",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="在吗？", session_id="s1"))
+
+    prompt = stub.system_prompt
+    assert "current world state" in prompt
+    assert "your own abilities" in prompt
+    assert "how long you have known the player" in prompt
+
+
+def test_prompt_injects_the_real_ability_catalog() -> None:
+    """六修（2026-09-22 实测复盘「水系魔法幻视」）：对话链路注入能力目录。
+
+    真相源是 tactical_policy.abilities——实测她被问「你会什么魔法」时现编
+    水系且越编越自洽，因为 prompt 里从来没有过能力清单。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你会什么魔法？"))
+
+    prompt = stub.system_prompt
+    assert "Your complete and ONLY abilities" in prompt
+    for display_name in ("奥术弹", "爆裂魔法", "快速治疗", "强效治疗", "魔法护盾"):
+        assert display_name in prompt
+    assert "do not invent abilities you were not given" in prompt
+
+
+def test_prompt_frames_examples_as_placeholders_not_facts() -> None:
+    """六修（2026-09-22 实测复盘）：示例块必须框定「世界细节是占位不是事实」。
+
+    few-shot 的天气条曾被逐字复述成「真实天象」——模型把示例当成了数据源。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你好。"))
+
+    prompt = stub.system_prompt
+    assert "placeholders, NOT facts" in prompt
+    assert "never cite anything from an example" in prompt
+
+
+def test_reply_topics_are_exposed_and_prompt_asks_for_them() -> None:
+    """六修：自述主题通道——LLM 顺带返回她本轮谈及的话题，替代规则切词。
+
+    规则提取无分词库，她自己的回复曾切出「主修/厉害/水系本来」这类碎片
+    直接落印象层（且新印象立即回注 prompt 污染下一轮）。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "护盾我还能撑一会儿，先照顾好你自己。",
+            "emotion_id": "emotion.concerned",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.concerned",
+            "interruptible": True,
+            "reply_topics": ["护盾"],
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="你还好吗？"))
+
+    assert service.last_reply_topics == ["护盾"]
+    assert "reply_topics: list of 1-3 short Chinese topic words" in stub.system_prompt
+    # keys 清单同步：模型必须知道这个键存在于「exactly these keys」里
+    assert "reply_topics, relationship_signal, salient" in stub.system_prompt
+
+
+def test_old_payloads_without_reply_topics_key_still_work() -> None:
+    """向后兼容：不带 reply_topics 键的老模型输出行为不变（空列表）。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "好。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="走吧。"))
+
+    assert service.last_reply_topics == []
+
+
+def test_relationship_signal_is_exposed_and_prompt_asks_for_it() -> None:
+    """对话推动关系（2026-09-22）：LLM 顺带返回玩家发言的情感质量信号。
+
+    实测根因：关系只由 world events 驱动、对话纯只读，45 轮真诚交流后
+    仍是 distant(20) 被叫「旅行者」。信号判定只有模型能做——规则判不了
+    「玩家的关心是真心还是客套」。
+    """
+    stub = StubLLMClient(
+        {
+            "reply_text": "……谢谢你。",
+            "emotion_id": "emotion.shy",
+            "gesture_id": "gesture.look_away",
+            "facial_expression_id": "face.shy",
+            "interruptible": True,
+            "relationship_signal": "deep",
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+
+    service.reply(CompanionDialogueRequest(text="今天辛苦你了，一直陪着我。"))
+
+    assert service.last_relationship_signal == "deep"
+    prompt = stub.system_prompt
+    assert "relationship_signal: rate the EMOTIONAL QUALITY" in prompt
+    # 宁漏勿滥：绝大多数轮次必须是 none——误判比漏判伤关系
+    assert 'MUST be "none"' in prompt
+
+
+def test_relationship_signal_defaults_to_none_and_rejects_invalid_values() -> None:
+    """缺键 = none（老模型不变）；非法枚举值被 schema 拒绝。"""
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+        }
+    )
+    service = LLMCompanionDialogueService(stub)
+    service.reply(CompanionDialogueRequest(text="走吧。"))
+    assert service.last_relationship_signal == "none"
+
+    bad = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            "relationship_signal": "passionate",
+        }
+    )
+    service2 = LLMCompanionDialogueService(bad)
+    with pytest.raises(LLMClientError):
+        service2.reply(CompanionDialogueRequest(text="你好。"))
+
+
+# -- 七修（2026-09-22 实测复盘）------------------------------------------------
+def _prompt_of(payload_extra: dict[str, Any] | None = None, *, history: bool = False) -> str:
+    from app.services.companion.session_memory import DialogueTurn
+
+    stub = StubLLMClient(
+        {
+            "reply_text": "嗯。",
+            "emotion_id": "emotion.pleased",
+            "gesture_id": "gesture.small_wave",
+            "facial_expression_id": "face.gentle_smile",
+            "interruptible": True,
+            **(payload_extra or {}),
+        }
+    )
+    LLMCompanionDialogueService(stub).reply(
+        CompanionDialogueRequest(text="你好。"),
+        history=(DialogueTurn(user_text="早。", reply_text="早啊。"),) if history else (),
+    )
+    return stub.system_prompt
+
+
+def test_anti_repetition_now_covers_closers_and_uncertainty_phrases() -> None:
+    """七修：收尾动作三连复读（「那就接着走吧」×2 +「走吧，路还长着呢」）。
+
+    旧指令只点名 openings——模型每次开场确实换了，收尾催促动作却惯性复制；
+    「说不上来」连用两轮同理。
+    """
+    prompt = _prompt_of(history=True)
+    assert "action closer" in prompt
+    assert "urging departure" in prompt
+    assert "说不上来" in prompt  # 不确定口头禅点名，防「记不清」复读
+
+
+def test_honesty_accepts_player_stated_information() -> None:
+    """七修：玩家当场告知的相处信息即为依据——诚实规则矫枉过正的另一半。
+
+    实测：玩家明说「我们上次说话还是昨天」，她仍回「具体哪天还真说不上来」
+    ——无据不说没错，但玩家给了据还不接，就是不接人话。
+    """
+    prompt = _prompt_of()
+    assert "when the player states such information themselves" in prompt
+    assert "do NOT keep repeating your uncertainty" in prompt
+
+
+def test_honesty_bans_referencing_invented_pastimes() -> None:
+    """七修：不得引用没发生过的既往游戏——「上次那个谜题」二阶编造。
+
+    无解谜题（few-shot 教的「猜猜口袋里装什么」）把模型逼进死角：玩家猜
+    什么它都只能摇头，最后现编「上次那个谜题你还没猜出来」来岔开。
+    """
+    prompt = _prompt_of()
+    assert "invented pastimes" in prompt
+    assert "上次那个谜题" in prompt
+    assert "guess something whose answer you have actually decided" in prompt
+
+
+def test_examples_carry_no_unanswerable_riddle_or_time_assertion() -> None:
+    """七修：无解谜题与「才认识几天」时长断言从 few-shot 撤下。
+
+    「猜猜我左边口袋里装的是什么」没有任何地方定义过答案——玩家接招后
+    模型只能编造；「才认识几天就忘了」正是六修实测「才几天不见」的老根。
+    """
+    prompt = _prompt_of()
+    assert "口袋" not in prompt
+    assert "才认识几天" not in prompt
+    # 框定加严：输入高度相似也不许照抄示例内容
+    assert "closely matches an example" in prompt
+
+
+def test_response_rules_include_criticism_self_respect() -> None:
+    """七修：被批评不立刻认错自责、不给自己安无据状态。
+
+    实测：玩家说「你说话不如以前」，她回「你说得对，我最近确实有点走神」
+    ——全盘认错 + 无据自责。五修管了「不当挑衅」，这管另一头「不当圣旨」。
+    """
+    prompt = _prompt_of()
+    assert "不立刻全盘认错" in prompt
+    assert "没有依据的状态或理由" in prompt
 
 
 def test_tactical_llm_parser_rejects_extra_fields() -> None:

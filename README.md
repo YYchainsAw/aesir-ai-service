@@ -64,8 +64,8 @@ aesir-ai-service/
 │   └── rl/
 │       └── boss/                  # Boss 训练/评估入口
 ├── data/
-│   ├── companions/                # 队友 YAML 人设（Alice）
-│   ├── policy/                    # 战术/关系/活动域策略阈值（tactical/relationship/agency_policy.yaml）
+│   ├── companions/                # 队友 YAML 人设（Alice + Bruno 第二角色验证骨架）
+│   ├── policy/                    # 策略阈值：战术/关系/活动域/表达一致性（tactical/relationship/agency/style_policy.yaml）
 │   ├── world/                     # 世界观知识库 lore.yaml（只读查证用）
 │   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）
 │   ├── memory/                    # 运行期 NPC 记忆（gitignore 不入库）
@@ -116,8 +116,8 @@ aesir-ai-service/
 | `POST` | `/v1/tactical/command` | v0.2 组合端点：文本 + 战斗快照 → 上下文决策，一次调用 |
 | `POST` | `/v1/tactical/executions` | v0.2 §7：UE 执行回执（202 受理，落 JSONL） |
 | `POST` | `/v1/combat/events` | v0.2 §6：战斗事件 → 艾莉反应/建议/候选动作 |
-| `POST` | `/v1/companion/chat` | 陪伴对话 |
-| `POST` | `/v1/companion/chat/stream` | 陪伴对话流式变体（SSE：delta 增量 + meta 权威帧，契约附录 A） |
+| `POST` | `/v1/companion/chat` | 陪伴对话（按 `companion_id` 路由到已登记角色） |
+| `POST` | `/v1/companion/chat/stream` | 陪伴对话流式变体（SSE：delta 增量 + meta 权威帧，契约附录 A；同按 `companion_id` 路由） |
 | `POST` | `/v1/agent/step` | v0.3 主入口：心跳/世界快照 → 禁打断判定 → 候选生成 → 仲裁 → 节流 → 自主行为指令（US3）；携带 `text` 时与 `/v1/tactical/command` 同源处理玩家指令（战斗/非战斗意图按域路由，US4） |
 | `POST` | `/v1/world/events` | v0.3 世界事件（含幂等回放） |
 | `GET` | `/v1/console/state` · `/memory`，`POST /memory/reset` | v0.3 调试台（状态查询含场景/情绪/关系/近期记忆，US7） |
@@ -171,6 +171,32 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 ```
 
 解析逻辑隔离在 `app/services/parsers/`，输出 `ParseCommandResponse` 由 schema 固定。`source` 字段标注最终实际来源（`rule` / `llm` / `rule_fallback`），供 UE 端日志与降级观测。
+
+## Polish 加固（SDD Phase 11）
+
+### 多角色隔离（US8）
+
+`/v1/companion/chat`、`/v1/companion/chat/stream` 与 `/v1/agent/step` 均按请求中的 `companion_id` 路由到已登记角色。当前已登记角色见 `data/companions/`（Alice 主角色 + Bruno 第二角色验证骨架）。不同角色拥有独立的记忆目录、关系目录与表现 ID 白名单；未登记的 `companion_id` 返回 `404`，不会静默回退默认角色。
+
+### 表达一致性校验（T083）
+
+`app/services/companion/style_guard.py` 在 LLM 对话输出后执行三类配置驱动校验：
+
+- **出戏术语**：拦截 "指令/协议/系统/模型/客户端" 等破坏沉浸感的元语言（`data/policy/style_policy.yaml` 的 `meta_terms`）。
+- **禁忌表达**：拦截占有、控制、贬低、胁迫、情感勒索式短语（`forbidden_expressions`）。
+- **虚构事实信号**：当回复包含 "你说过/你答应过/当然记得" 等短语且当前上下文无记忆支撑时拦截（`fabrication_signals`）。
+
+非流式路径命中后自动重试一次；两次失败抛 `LLMClientError`，由 `dialogue_service` 回退到 YAML 分类候选回复。流式路径在完整接收后校验，失败由 SSE `error` 事件兜底。
+
+### LLM 熔断与超时统一（T084）
+
+`app/services/llm/circuit_breaker.py` 提供进程内共享熔断器，包装所有通过 `create_llm_client()` 创建的 LLM 客户端：
+
+- 连续失败达到 `AESIR_LLM_CIRCUIT_FAILURE_THRESHOLD`（默认 5）后进入 OPEN 状态，在 `AESIR_LLM_CIRCUIT_RECOVERY_SECONDS`（默认 60 秒）内直接拒绝 LLM 调用。
+- 恢复窗口后进入 HALF_OPEN，下一次调用成功则关闭，失败则重新打开。
+- 陪伴对话、战术意图解析、v0.1 命令解析三条链路共享同一熔断状态；熔断后各链路既有 fallback（规则 / mock）自动生效，不阻塞游戏流程。
+
+超时配置已统一外置：`AESIR_LLM_TIMEOUT_SECONDS`、`AESIR_TOOLS_LOOKUP_TIMEOUT_SECONDS`、`AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS`。
 
 ## Boss RL（当前答辩主线）
 
@@ -231,6 +257,12 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 - [x] US7 可解释性（2026-09-21）：响应统一携带 persona_revision / memory_layers 链路字段；调试台扩展场景/情绪/关系/近期记忆；mock_ue_flow 全链路可解释演示；`scripts.metrics_report` 验收指标采集
 - [x] 对话实测三修（2026-09-21）：prompt 常驻「不得凭空断言过去事件」（修首轮幻视）；`origin=companion` 的提及不再自我强化 + 近期已聊话题检索冷却（修印象正反馈回路与复读）；印象噪声/黑名单扩充 + 历史数据清洗脚本
 - [x] 记忆四层接线（2026-09-21）：LLM 顺带抽出玩家**事实**入档案（写档前过接地校验，编造的事实丢弃）、世界事件里的共同经历入摘要层；注入端按来源分口吻并许可「记得的可以直说」——她终于有据可说，不再靠脑补补全过去
+- [x] 对话实测五修（2026-09-22）：情绪惯性（上一轮情绪作为「当前心情」注入，同时收回「情绪也要轮换」的旧指令）；关系阶段硬边界（`boundary` 与基础人设冲突时以边界为准）；按字面理解玩家（禁止敌意归因与安上玩家没表达过的态度）
+- [x] 对话实测六修（2026-09-22）：重写教她编造记忆的 few-shot 示范（示例与诚实规则同向）；能力目录注入对话 prompt（不再现编水系魔法）；Memory honesty 扩到过去/世界/能力/时长四类；她自述主题改走 LLM 顺带返回（印象层不再被规则切词碎片污染）
+- [x] 对话推动关系（2026-09-22）：LLM 顺带判定玩家发言情感质量（warm/deep/cold/hurtful），映射 `dialogue_*` 事件复用关系规则层全套（300 秒冷却/日上限/持久化）；响应回带 `relationship_delta`，约 5 轮真诚交流升一档——聊得动感情了
+- [x] US8 多角色路由与隔离（2026-09-24）：`/v1/companion/chat` 与 `/v1/agent/step` 按 `companion_id` 路由；新增 Bruno 作为第二角色验证骨架；记忆/关系按角色隔离；未登记角色 404
+- [x] T083 表达一致性校验（2026-09-24）：配置驱动的 style_guard，拦截出戏术语、禁忌表达与无记忆支撑的虚构事实信号；LLM 对话链路自动重试一次，失败回退 mock
+- [x] T084 LLM 熔断与限流加固（2026-09-24）：`CircuitBreaker` 包装共享 LLM 客户端，三态熔断；陪伴对话/战术意图解析/v0.1 命令解析共享同一熔断状态；超时配置外置统一
 - [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
 - [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
 

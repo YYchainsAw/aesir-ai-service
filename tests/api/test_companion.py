@@ -128,17 +128,20 @@ def test_companion_chat_requires_text() -> None:
 def test_corrupt_profile_yaml_returns_503_not_500(monkeypatch, tmp_path) -> None:
     # 回归锁定（docs/logs/2026-09-07.md 已知未修项）：YAML 损坏 → 503 配置错误，
     # 而不是未捕获 CompanionProfileError 导致的 500。
+    # 多角色路由后，损坏发生在注册表扫描阶段，须 monkeypatch 整个 companions 目录。
     from fastapi.testclient import TestClient
 
     from app.main import app
     from app.services.companion import profile_repository as pr
 
-    bad = tmp_path / "bad.yaml"
+    companions_dir = tmp_path / "companions"
+    companions_dir.mkdir()
+    bad = companions_dir / "primary_companion.yaml"
     bad.write_text("identity: {id: [unclosed", encoding="utf-8")
-    # __init__ 的默认路径在 import 时已绑定，须替换构造逻辑指向坏文件。
-    monkeypatch.setattr(
-        pr.CompanionProfileRepository, "__init__", lambda self: setattr(self, "_profile_path", bad)
-    )
+    monkeypatch.setattr(pr, "_COMPANIONS_DIR", companions_dir)
+    monkeypatch.setattr(pr, "_PRIMARY_PROFILE_PATH", bad)
+    # 清除 mtime 缓存，避免旧缓存命中
+    pr._profile_cache.clear()
 
     client = TestClient(app, raise_server_exceptions=False)
     response = client.post(

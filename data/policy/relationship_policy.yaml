@@ -52,3 +52,13 @@ events:
   player_ignored_warning: { delta: -4 }       # 无视警告导致 NPC 受伤
   companion_downed: { delta: -5 }             # NPC 倒地
   long_idle: { delta: -1 }                    # 长时间冷落
+  # -- 对话推动关系（2026-09-22：实测 45 轮真诚交流后仍 distant 的修复）---------
+  # 信号由 LLM 顺带返回（dialogue_service._record_turn → apply_event），
+  # 幂等/冷却/日上限全套复用规则层。校准依据（半天~一天一档）：
+  # distant(20)→neutral(25) 需 3~5 轮 warm 或 2~3 轮 deep；对话冷却 300 秒
+  # 防连点；每日正向上限与事实事件共享（对话刷不满）。负向不设上限——
+  # 疏远不需要配额，且对话是最容易伤人的场合。
+  dialogue_warm_exchange: { delta: +1 }       # 玩家真诚的关心/感谢/友好玩笑
+  dialogue_deep_connection: { delta: +2 }     # 郑重交心、托付、道歉、真挚情感
+  dialogue_cold_dismissal: { delta: -1 }      # 冷漠敷衍、不耐烦、顶撞
+  dialogue_hurtful_remark: { delta: -2 }      # 恶意贬低、威胁、故意伤人

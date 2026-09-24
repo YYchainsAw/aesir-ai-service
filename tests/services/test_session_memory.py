@@ -13,6 +13,17 @@ def test_record_and_history_roundtrip() -> None:
     assert [t.reply_text for t in history] == ["我在呢。", "好呀。"]
 
 
+def test_record_carries_emotion_for_mood_continuity() -> None:
+    """情绪惯性载体：该轮情绪随轮次落窗口；未记录时为空串。"""
+    store = SessionMemoryStore(max_turns=3)
+    store.record("s1", "你好", "我在呢。", emotion_id="emotion.bright")
+    store.record("s1", "聊点什么", "好呀。")
+
+    history = store.history("s1")
+    assert history[0].emotion_id == "emotion.bright"
+    assert history[1].emotion_id == ""  # 未记录 → 下一轮「无心情可延续」
+
+
 def test_history_window_evicts_oldest() -> None:
     store = SessionMemoryStore(max_turns=2)
     for i in range(4):
@@ -50,6 +61,8 @@ def test_create_dialogue_reply_records_session_turns(monkeypatch) -> None:
     assert len(history) == 1
     assert history[0].user_text == "今天过得怎么样？"
     assert history[0].reply_text == response.reply_text
+    # 情绪一并落窗口，供下一轮延续（mock 路径同样有 emotion_id）
+    assert history[0].emotion_id == response.emotion_id
 
     ds.create_dialogue_reply(CompanionDialogueRequest(text="天气不错"))
     assert len(store.history("it-1")) == 1  # 无 session_id 的请求不写入任何会话

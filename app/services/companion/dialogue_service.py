@@ -13,7 +13,7 @@ from app.services.companion.llm_dialogue_service import LLMCompanionDialogueServ
 from app.services.companion.profile_repository import (
     CompanionProfile,
     UnknownCompanionError,
-    get_profile,
+    get_registered_profile,
 )
 from app.services.companion.dialogue_signals import record_turn_signal
 from app.services.companion.session_memory import get_session_memory
@@ -31,10 +31,8 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     记忆。记忆体系任何故障都降级为「无记忆继续对话」（FR-011 / T030），
     绝不因记忆问题中断玩家流程。
     """
-    # mtime 缓存读取人设；id 校验语义与 require_primary 一致（404 路径不变）。
-    profile = get_profile()
-    if profile.companion_id != request.companion_id:
-        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
+    # 按 companion_id 路由到已登记角色；未登记抛 UnknownCompanionError → 404（FR-044）。
+    profile = get_registered_profile(request.companion_id)
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
@@ -57,25 +55,34 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
             topics = service.last_topics
             facts = service.last_facts
             salient = service.last_salient
+            reply_topics = service.last_reply_topics
+            relationship_signal = service.last_relationship_signal
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
             facts = None
             salient = None
+            reply_topics = None
+            relationship_signal = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
         facts = None
         salient = None
+        reply_topics = None
+        relationship_signal = None
     response.relationship_stage = stage
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
-    _record_turn(
+    response.relationship_delta = _record_turn(
         request,
         response,
         topics=topics,
         facts=facts,
         salient=salient,
+        reply_topics=reply_topics,
+        relationship_signal=relationship_signal,
         injected_topics=[i.topic for i in impressions],
+        style_violations=getattr(service, "last_style_violations", None) if get_settings().companion_backend == "llm" else None,
     )
     return response
 
@@ -90,9 +97,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     注意：本函数是普通函数（不是生成器），人设校验在调用时立即执行，
     未知名伴的 404 得以在 SSE 响应头发出之前抛出。
     """
-    profile = get_profile()
-    if profile.companion_id != request.companion_id:
-        raise UnknownCompanionError(f"Unsupported companion_id: {request.companion_id}")
+    profile = get_registered_profile(request.companion_id)
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
@@ -141,13 +146,16 @@ def _stream_llm_reply(
                 emitted_delta = True
                 yield event
                 continue
-            _record_turn(
+            event.response.relationship_delta = _record_turn(
                 request,
                 event.response,
                 topics=service.last_topics,
                 facts=service.last_facts,
                 salient=service.last_salient,
+                reply_topics=service.last_reply_topics,
+                relationship_signal=service.last_relationship_signal,
                 injected_topics=[i.topic for i in impressions],
+                style_violations=service.last_style_violations,
             )
             _annotate_observability(
                 event.response, profile, memories=memories, impressions=impressions
@@ -224,24 +232,39 @@ def _record_turn(
     topics: list[str] | None = None,
     facts: list[str] | None = None,
     salient: bool | None = None,
+    reply_topics: list[str] | None = None,
+    relationship_signal: str | None = None,
     injected_topics: list[str] | None = None,
-) -> None:
+    style_violations: list[str] | None = None,
+) -> int:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
-    三通道：``topics``/``facts``/``salient`` 为 LLM 顺带返回；``None``
-    （mock/回退路径）退化为规则提取（事实通道无规则兜底，直接为空——规则
-    切不出可靠的「事实」，宁可没有）。郑重声明（salient）逐字入档案（玩家
-    期待精确复述）+ 主题入印象层（等效提及加成按在意值缩放、衰减更慢）；
-    普通发言的主题只入印象层，陈述出的事实经接地校验后入档案。艾莉自己的
-    回复也提取主题入印象（非显著）——她记得自己说过什么，反复谈起的话题
-    同样形成印象。``injected_topics`` 为本轮注入 prompt 的印象主题（埋点用，
-    见 ``dialogue_signals``）。
+    四通道：``topics``/``facts``/``salient``/``reply_topics``/``relationship_signal``
+    为 LLM 顺带返回；``None``（mock/回退路径）退化为规则提取（事实通道无规则
+    兜底，直接为空——规则切不出可靠的「事实」，宁可没有；关系信号同理——
+    规则判断不了「玩家的关心是真心还是客套」，mock 路径不推动关系）。郑重声明
+    （salient）逐字入档案（玩家期待精确复述）+ 主题入印象层（等效提及加成按
+    在意值缩放、衰减更慢）；普通发言的主题只入印象层，陈述出的事实经接地校验
+    后入档案。艾莉自己的回复的主题入印象（非显著）——她记得自己说过什么，
+    反复谈起的话题同样形成印象；六修（2026-09-22 实测复盘）起 LLM 路径改用
+    模型自述的 ``reply_topics``——规则切词没有分词库，产出「主修/厉害/水系本来」
+    这类碎片直接污染印象层（且新印象权重 1.0 立即回注 prompt）。
+    ``relationship_signal`` 是对话推动关系（2026-09-22）的入口：把 LLM 判定的
+    玩家发言情感质量计进关系层，返回本轮实际 delta。``injected_topics`` 为
+    本轮注入 prompt 的印象主题（埋点用，见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id) if request.session_id else ()
     _note_runtime(request, response)
     if request.session_id:
-        memory.record(request.session_id, request.text, response.reply_text)
+        # 情绪一并落窗口：下一轮把它作为「当前心情」注入，情绪才有惯性
+        # （mock/回退路径同样有 emotion_id，故降级时也延续）。
+        memory.record(
+            request.session_id,
+            request.text,
+            response.reply_text,
+            emotion_id=response.emotion_id,
+        )
     if topics is None:
         topics = extract_topics(request.text)
     if salient is None:
@@ -259,7 +282,9 @@ def _record_turn(
     _remember_turn(
         request.companion_id, topics, salient=salient, salience_boost=salience_boost
     )
-    reply_topics = extract_topics(response.reply_text)
+    if reply_topics is None:
+        # mock/回退路径没有 LLM 自述主题，规则提取兜底（玩家侧规则路径维持现状）。
+        reply_topics = extract_topics(response.reply_text)
     if reply_topics:
         # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
@@ -280,7 +305,44 @@ def _record_turn(
         injected_topics=injected_topics,
         previous_player_texts=[t.user_text for t in prior_history],
         previous_reply_texts=[t.reply_text for t in prior_history],
+        style_violations=style_violations,
     )
+    return _apply_relationship_signal(request.companion_id, relationship_signal)
+
+
+# 对话推动关系（2026-09-22）：LLM 判定的玩家发言情感质量 → 关系事件类型。
+# none 不计分（绝大多数轮次都是 none——宁漏勿滥）。
+_DIALOGUE_RELATIONSHIP_EVENTS = {
+    "warm": "dialogue_warm_exchange",
+    "deep": "dialogue_deep_connection",
+    "cold": "dialogue_cold_dismissal",
+    "hurtful": "dialogue_hurtful_remark",
+}
+
+
+def _apply_relationship_signal(companion_id: str, signal: str | None) -> int:
+    """把情感质量信号计进关系层；返回本轮实际 delta，故障静默返回 0。
+
+    复用关系规则层全套（同类冷却/日上限/持久化/损坏降级）——对话信号用
+    更严的冷却窗口（默认 300 秒 vs 事实事件 60 秒）：对话每轮都发生，
+    60 秒拦不住连点刷分。关系层故障不中断对话（FR-011 同纪律）。
+    """
+    event_type = _DIALOGUE_RELATIONSHIP_EVENTS.get(signal or "none")
+    if event_type is None:
+        return 0
+    from app.services.relationship.state import (
+        RelationshipStoreError,
+        get_relationship_store,
+    )
+
+    try:
+        _, delta = get_relationship_store(companion_id).apply_event(
+            event_type,
+            cooldown_seconds=get_settings().relationship_dialogue_cooldown_seconds,
+        )
+        return delta
+    except RelationshipStoreError:
+        return 0
 
 
 def _recall(companion_id: str) -> list[MemoryEntry]:

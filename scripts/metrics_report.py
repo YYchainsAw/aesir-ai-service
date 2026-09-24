@@ -9,7 +9,7 @@
   复读轮数（repetitive=true）、负反馈次数、话题延续率。
 - 重复响应：幂等重复在响应内标记（duplicate=true），不落盘——此处以
   「重复回复检测」（repetitive）作为可测代理指标。
-- 风格违规：style_guard（T083）尚未实现，如实报告「暂无数据源」。
+- 风格违规：统计 ``data/runtime/dialogue_signals/*.jsonl`` 中 ``style_violations`` 字段非空且非 None 的记录数（T083 已实现并落盘）。
 
 用法：
     .venv/Scripts/python -m scripts.metrics_report
@@ -70,6 +70,8 @@ def collect_signals() -> dict:
     negative = 0
     topic_continued_true = 0
     topic_continued_known = 0
+    style_violations = 0
+    llm_checked_turns = 0
     for path in sorted(signals_dir.glob("*.jsonl")):
         for record in _iter_jsonl(path):
             total += 1
@@ -84,6 +86,11 @@ def collect_signals() -> dict:
                 topic_continued_known += 1
                 if continued:
                     topic_continued_true += 1
+            violations = record.get("style_violations")
+            if violations is not None:
+                llm_checked_turns += 1
+                if violations:
+                    style_violations += len(violations)
     return {
         "files": len(list(signals_dir.glob("*.jsonl"))),
         "total_turns": total,
@@ -95,14 +102,21 @@ def collect_signals() -> dict:
             round(topic_continued_true / topic_continued_known, 3)
             if topic_continued_known else None
         ),
+        "style_violations": style_violations,
+        "llm_checked_turns": llm_checked_turns,
     }
 
 
 def build_report() -> dict:
+    signals = collect_signals()
     return {
         "receipts": collect_receipts(),
-        "dialogue_signals": collect_signals(),
-        "style_violations": "暂无数据源（style_guard 为 SDD T083，尚未实现）",
+        "dialogue_signals": signals,
+        "style_violations": {
+            "total": signals["style_violations"],
+            "llm_checked_turns": signals["llm_checked_turns"],
+            "note": "LLM 路径通过 style_guard 后落盘；mock/fallback 路径为 None（未校验）。",
+        },
         "duplicate_responses": "幂等重复在响应内标记（duplicate=true），不落盘；"
                                "复读轮数见 dialogue_signals.repetitive_replies",
     }
@@ -124,8 +138,12 @@ def _print_report(report: dict) -> None:
     print(f"  复读轮数: {s['repetitive_replies']}")
     print(f"  负反馈次数: {s['negative_feedback']}")
     print(f"  话题延续率: {s['topic_continuation_rate']}")
+    print(f"  style_guard 校验轮数: {s['llm_checked_turns']}")
+    print(f"  风格违规次数: {s['style_violations']}")
     print("\n[风格违规]")
-    print(f"  {report['style_violations']}")
+    sv = report["style_violations"]
+    print(f"  总数: {sv['total']}（LLM 校验轮数 {sv['llm_checked_turns']}）")
+    print(f"  {sv['note']}")
     print("\n[重复响应]")
     print(f"  {report['duplicate_responses']}")
     print("=" * 56)

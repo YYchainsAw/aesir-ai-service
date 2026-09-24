@@ -20,9 +20,11 @@ from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
+from app.services.companion import style_guard
 from app.services.memory.retrieval import format_impression_block, format_memory_block
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.services.skills.tools import ToolResult, run_lookup, tool_menu
+from app.services.tactical.policy import get_policy
 
 
 # 事实条目长度上限：一句自足的中文陈述（超长说明模型在写小作文，丢弃）
@@ -113,6 +115,8 @@ class _DialoguePayload(BaseModel):
 
     ``topics`` 为模糊印象层的主题提取（1~3 个玩家本轮谈及的关键词），
     ``facts`` 为长期档案的事实提取（玩家陈述过的、跨会话仍然成立的事），
+    ``reply_topics`` 为她本轮自述主题（替代规则切词，见 ``_record_turn``），
+    ``relationship_signal`` 为本轮对话的情感质量信号（对话推动关系用），
     均由 LLM 顺带返回，零额外请求。
 
     ``action`` 默认 ``reply``，老模型输出（不带该键）行为不变；只有
@@ -129,6 +133,8 @@ class _DialoguePayload(BaseModel):
     interruptible: bool = True
     topics: list[str] = Field(default_factory=list, max_length=3)
     facts: list[str] = Field(default_factory=list, max_length=3)
+    reply_topics: list[str] = Field(default_factory=list, max_length=3)
+    relationship_signal: Literal["none", "warm", "deep", "cold", "hurtful"] = "none"
     salient: bool = False
 
     @field_validator("facts")
@@ -159,10 +165,14 @@ class LLMCompanionDialogueService:
     ) -> None:
         self._client = client or create_llm_client()
         self._profile = profile or get_profile()
-        # 最近一次成功生成提取的主题/事实/显著性（实例按请求创建，见 dialogue_service）。
+        # 最近一次成功生成提取的主题/事实/自述主题/关系信号/显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
         self.last_facts: list[str] = []
+        self.last_reply_topics: list[str] | None = None
+        self.last_relationship_signal: str = "none"
         self.last_salient: bool = False
+        # T083 风格校验：成功时为空列表；如上层需要，可从抛出的异常 detail 中读取失败原因。
+        self.last_style_violations: list[str] = []
 
     def reply(
         self,
@@ -174,31 +184,14 @@ class LLMCompanionDialogueService:
         relationship_stage: str = "",
         world_context: WorldContext | None = None,
     ) -> CompanionDialogueResponse:
-        deadline = _lookup_deadline()
-        payload = self._client.generate_json(
-            system_prompt=_build_system_prompt(
-                self._profile,
-                history=history,
-                memories=list(memories),
-                impressions=list(impressions),
-                relationship_stage=relationship_stage,
-            ),
-            user_prompt=request.text,
-        )
-        payload = self._verify_if_requested(
-            payload, request=request, world_context=world_context, deadline=deadline,
-            history=history, memories=memories, impressions=impressions,
+        response_payload = self._generate_payload_with_retry(
+            request,
+            history=history,
+            memories=memories,
+            impressions=impressions,
             relationship_stage=relationship_stage,
+            world_context=world_context,
         )
-
-        try:
-            response_payload = _validate_dialogue_payload(payload, self._profile)
-        except ValidationError as error:
-            raise LLMClientError("LLM dialogue response does not match the required schema.") from error
-        self.last_topics = response_payload.topics
-        self.last_facts = response_payload.facts
-        self.last_salient = response_payload.salient
-
         return CompanionDialogueResponse(
             companion_id=request.companion_id,
             session_id=request.session_id,
@@ -209,6 +202,67 @@ class LLMCompanionDialogueService:
             interruptible=response_payload.interruptible,
             source="llm",
         )
+
+    def _generate_payload_with_retry(
+        self,
+        request: CompanionDialogueRequest,
+        *,
+        history: tuple[DialogueTurn, ...],
+        memories: list[MemoryEntry],
+        impressions: list[TopicImpression],
+        relationship_stage: str,
+        world_context: WorldContext | None,
+    ) -> "_DialoguePayload":
+        """内部完整生成一轮回复：schema 校验 + style_guard + 查证轮；最多重试 1 次。
+
+        重试机制（T083）：LLM 首次输出风格违规时，用同一份 system prompt
+        重新生成一次；若第二次仍违规，抛 LLMClientError，由 dialogue_service
+        回退到 mock/安全候选。
+        """
+        deadline = _lookup_deadline()
+        last_violations: list[style_guard.StyleViolation] = []
+
+        for attempt in range(2):
+            payload = self._client.generate_json(
+                system_prompt=_build_system_prompt(
+                    self._profile,
+                    history=history,
+                    memories=list(memories),
+                    impressions=list(impressions),
+                    relationship_stage=relationship_stage,
+                ),
+                user_prompt=request.text,
+            )
+            payload = self._verify_if_requested(
+                payload, request=request, world_context=world_context, deadline=deadline,
+                history=history, memories=memories, impressions=impressions,
+                relationship_stage=relationship_stage,
+            )
+
+            try:
+                response_payload = _validate_dialogue_payload(payload, self._profile)
+            except ValidationError as error:
+                raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+
+            violations = style_guard.check_reply(
+                response_payload.reply_text,
+                injected_memories=memories or None,
+                injected_impressions=impressions or None,
+            )
+            if not violations:
+                self.last_topics = response_payload.topics
+                self.last_facts = response_payload.facts
+                self.last_reply_topics = response_payload.reply_topics
+                self.last_relationship_signal = response_payload.relationship_signal
+                self.last_salient = response_payload.salient
+                self.last_style_violations = []
+                return response_payload
+
+            last_violations = violations
+
+        # 两次尝试均失败：把违规原因带给上层日志/观测。
+        detail = "; ".join(f"{v.category}: {v.message}" for v in last_violations)
+        raise LLMClientError(f"LLM dialogue response failed style guard after retry: {detail}")
 
     def _verify_if_requested(
         self,
@@ -288,6 +342,9 @@ class LLMCompanionDialogueService:
 
         查证轮是安全的：索取查证的负载里没有 ``reply_text``，抽取器一个字符
         都不会吐出去，因此换轮不会让玩家看到半截话。
+
+        风格校验在完整流接收后进行：若发现违规，已发出的 delta 无法收回，
+        只能向上抛异常，由 dialogue_service 在 SSE 中发出 error 事件并停止。
         """
         deadline = _lookup_deadline()
         payload: dict[str, Any] = {}
@@ -336,9 +393,23 @@ class LLMCompanionDialogueService:
             response_payload = _validate_dialogue_payload(payload, self._profile)
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+
+        # 风格校验：流式路径不重试（delta 已发出），违规即失败，由上层兜底。
+        violations = style_guard.check_reply(
+            response_payload.reply_text,
+            injected_memories=memories or None,
+            injected_impressions=impressions or None,
+        )
+        if violations:
+            detail = "; ".join(f"{v.category}: {v.message}" for v in violations)
+            raise LLMClientError(f"LLM streamed response failed style guard: {detail}")
+
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
+        self.last_reply_topics = response_payload.reply_topics
+        self.last_relationship_signal = response_payload.relationship_signal
         self.last_salient = response_payload.salient
+        self.last_style_violations = []
 
         yield StreamEvent(
             kind="meta",
@@ -472,15 +543,42 @@ def _build_system_prompt(
     # 关系阶段化人设偏移（US2 / T040）：覆盖称呼与语气；缺失阶段沿用基线
     stage_personas = profile.raw.get("relationship_stage_personas", {})
     if relationship_stage and relationship_stage in stage_personas:
-        persona = stage_personas[relationship_stage]
+        stage_persona = stage_personas[relationship_stage]
         lines.append(
             f"Current relationship stage: {relationship_stage} "
-            f"(address the player as: {persona.get('address', '')}). "
-            f"Stage tone shift: {persona.get('tone_shift', '')}"
+            f"(address the player as: {stage_persona.get('address', '')}). "
+            f"Stage tone shift: {stage_persona.get('tone_shift', '')}"
         )
+        # 阶段硬边界（2026-09-21 实测复盘）：只偏移语气时，基础人设的「暗藏情愫」
+        # 照常生效，于是出现「一边叫旅行者、一边聊两人合披一块油布」的割裂。
+        boundary = stage_persona.get("boundary", "")
+        if boundary:
+            lines.append(
+                "Stage hard boundary (when it conflicts with the base persona's "
+                f"subtext or behavior rules, THIS wins): {boundary}"
+            )
     lines.append(f"Speaking habits: {' '.join(str(h) for h in speaking_style.get('habits', []))}")
     lines.append(f"Speaking avoid: {' '.join(str(a) for a in speaking_style.get('avoid', []))}")
     lines.append("Response rules: " + " ".join(str(rule) for rule in rules))
+
+    # 能力目录注入（2026-09-22 实测复盘「水系魔法幻视」）：对话链路此前完全不
+    # 引用能力清单，被问「你会什么魔法」时只能现编且越编越自洽。真相源是
+    # tactical_policy 的 abilities（注册表投影会丢 display_name，故直接取
+    # policy）——单份配置，对话与战斗不会漂移。策略层故障时静默不注入，
+    # 对话不中断（FR-041 同纪律）。
+    try:
+        abilities = list(get_policy().abilities.values())
+        if abilities:
+            catalog = "、".join(
+                f"{ability.display_name}（{ability.description}）" for ability in abilities
+            )
+            lines.append(
+                f"Your complete and ONLY abilities: {catalog}. "
+                "You know no other spells; do not invent abilities you were not given. "
+                "If asked about magic outside this list, say plainly you cannot do it."
+            )
+    except Exception:  # pragma: no cover - 配置损坏时对话不陪葬
+        pass
 
     if memories:
         lines.append(format_memory_block(memories, display_name=profile.display_name))
@@ -495,24 +593,61 @@ def _build_system_prompt(
             + "\n".join(f"Player: {t.user_text}\n{profile.display_name}: {t.reply_text}" for t in history)
         )
         lines.append(
+            # 七修（2026-09-22 实测复盘）：模型对「不复用开场/句式」执行得很好，但
+            # 收尾动作惯性复制——「那就接着走吧」×2 +「走吧，路还长着呢」三连。
+            # 指令此前只点名了 openings；收尾与「说不上来」类不确定口头禅也点名。
             "Anti-repetition: do NOT reuse sentence structures, catchphrases, or "
             "openings from the recent turns above (e.g. the same '...' + '不过' "
-            "pattern); vary your phrasing, length, and rhythm each turn. Also "
-            "vary emotion_id / gesture_id / facial_expression_id choices instead "
-            "of defaulting to the same ones."
+            "pattern), and do NOT end two turns in a row with the same kind of "
+            "action closer — especially urging departure ('走吧' and the like); "
+            "uncertainty phrases such as '说不上来'/'记不清' also count as "
+            "catchphrases: use one at most once, then drop it. Vary your phrasing, "
+            "length, and rhythm each turn. Also "
+            "vary gesture_id / facial_expression_id choices instead of defaulting "
+            "to the same ones — but NOT emotion_id (see mood continuity below)."
         )
+        # 情绪惯性（2026-09-21 实测复盘）：上一版 Anti-repetition 要求情绪也轮换，
+        # 模型于是每轮重挑一个，出现无来由的情绪跳变与回摆。心情该延续，不是抽签。
+        mood = history[-1].emotion_id
+        if mood:
+            lines.append(
+                f"Your current mood: {mood} — the emotion you were left with after "
+                "your last reply. Feelings have inertia: keep this mood unless the "
+                "player's message genuinely changes the situation (a joke lands, "
+                "something worrying, sad, or exciting comes up). Do NOT switch it "
+                "just to look varied."
+            )
 
     # 事实诚实（实测 2026-09-21「烤鱼幻视」）：无论有没有会话历史都必须遵守——
-    # 首轮没有历史时模型最容易把假设当既定事实编圆。涉及具体过去事件，
-    # 没有记录就必须不确定或反问，绝不用确定语气补细节。
+    # 首轮没有历史时模型最容易把假设当既定事实编圆。六修（2026-09-22）把覆盖面
+    # 从「过去事件」扩到四类：实测她还现编了天气（世界状态）与「才几天不见」
+    # （相处时长）。七修（2026-09-22 实测复盘）补两处：第 4 类矫枉过正的另一
+    # 半——玩家当场告知的相处信息就是依据，收下即可，不得反复拉扯「说不上来」；
+    # 新增第 5 类——不得引用没发生过的既往游戏/谜题/约定（实测「上次那个谜题
+    # 你还没猜出来」即现编），自创小游戏可以但谜底须已定、猜中就认。
     lines.append(
         "Memory honesty: everything you know about the past is ONLY the recent "
         "conversation, the long-term memories, and the fuzzy impressions shown "
         "above (fuzzy impressions are topic-level only — they contain no facts). "
         "State a long-term memory plainly when it is relevant — that is what it is "
-        "for — but NEVER add details beyond it. NEVER assert any other specific "
-        "past event (something was eaten, done, said, or promised) unless it appears "
-        "there; if the player asks about something you have no record of, express "
+        "for — but NEVER add details beyond it. This honesty rule covers five areas, "
+        "and in all of them no record means uncertain: (1) past events — NEVER assert "
+        "any other specific past event (something was eaten, done, said, or promised) "
+        "unless it appears in the records above; (2) current world state — weather, "
+        "surroundings, other people — trust ONLY a verification result or world "
+        "snapshot when one is given, otherwise admit you cannot tell; (3) your own "
+        "abilities — trust ONLY the ability list above, never a spell outside it; "
+        "(4) how long you have known the player or how long since you last met — "
+        "you have no clock and no record, so NEVER say things like \"才几天不见\"; "
+        "BUT when the player states such information themselves (\"we talked "
+        "yesterday\", \"we always travel together\"), that IS acceptable — accept "
+        "it and move on, and do NOT keep repeating your uncertainty after they have "
+        "given you the answer; (5) invented pastimes — NEVER reference a previous "
+        "riddle, game, bet, or promise that does not appear in the records above "
+        "(e.g. \"上次那个谜题\"); creating a NEW little game is fine, but only ask "
+        "the player to guess something whose answer you have actually decided, and "
+        "admit it when they guess right. "
+        "If the player asks about something you have no record of, express "
         "uncertainty or ask them back — never fill in details with a confident tone."
     )
 
@@ -520,7 +655,12 @@ def _build_system_prompt(
     if examples:
         lines.append(
             "Example exchanges (match this pattern of matching reply style and emotion "
-            "to the type of player input; do not reuse the literal sentences):\n" + examples
+            "to the type of player input; do not reuse the literal sentences — even "
+            "when the player's message closely matches an example's input, treat the "
+            "example as a style reference only, never copy its content). Any "
+            "world details in them (names, places, objects, events, weather) are "
+            "placeholders, NOT facts — never cite anything from an example as "
+            "something that actually happened:\n" + examples
         )
 
     # 查证（US6 / T069）：第一轮给工具清单，第二轮把结果回填并要求据此作答。
@@ -530,7 +670,20 @@ def _build_system_prompt(
         lines.append(_format_lookup_menu())
 
     lines += [
-        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, reply_topics, relationship_signal, salient.",
+        'relationship_signal: rate the EMOTIONAL QUALITY of what the PLAYER said in this '
+        'message — not your own tone. "warm" if they showed genuine care, gratitude, or '
+        'friendly warmth; "deep" if they solemnly opened up, entrusted something to you, '
+        'apologized, or expressed real feeling; "cold" if they were dismissive, impatient, '
+        'or brushed you off; "hurtful" if they maliciously belittled, threatened, or '
+        'deliberately hurt you. "none" for ordinary conversation — the vast majority of '
+        'turns MUST be "none"; when in doubt, choose "none" (a missed signal costs far '
+        'less than a wrong one, because it moves a persistent relationship score).',
+        'reply_topics: list of 1-3 short Chinese topic words (2-6 chars, concrete nouns '
+        'only) that YOUR OWN reply this turn actually talked about; empty list if your '
+        'reply had no concrete topic. These become fuzzy impressions of what you care '
+        'to mention, so keep them clean — no fillers, no verb or adjective fragments '
+        '(like 主修/厉害/代价/不小), no whole phrases.',
         'topics: list of 1-3 short Chinese keywords the PLAYER talked about in this message '
         '(things worth remembering about them, not your own reply); each keyword must be a '
         'concrete noun or topic word (2-6 chars), never connectives, fillers, or fragments '

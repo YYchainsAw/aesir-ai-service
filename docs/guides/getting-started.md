@@ -88,9 +88,9 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 .\.venv\Scripts\python -m pytest
 ```
 
-测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、v0.3 骨架端点、语料红线。测试数以 `pytest` 输出为准（2026-09-14：**286 通过 + 3 条冒烟默认跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
+测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况 × 关系阶段维度）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、US2 关系驱动、US3 自主行为编排、US4 意图域扩展、US7 可解释性、US8 多角色隔离、T083 表达一致性校验、T084 LLM 熔断、语料红线。测试数以 `pytest` 输出为准（2026-09-24：**669 通过 + 2 跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
 
-另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions。
+另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions → v0.3 主入口心跳/限流/自主行为 → 世界事件幂等 → 调试台 → US7 可解释链路演示。
 
 ## 5. 接口验证示例
 
@@ -233,10 +233,11 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
   -d '{\"text\": \"艾莉，今天心情怎么样？\", \"companion_id\": \"companion.alice\", \"game_state\": \"conversation\", \"session_id\": \"ue-session-42\"}'
 ```
 
-- `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文；缺省时请求完全无状态。
+- `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文，并**在同一窗口内延续上一轮的情绪**（每轮回复的 `emotion_id` 随轮次落窗口，下一轮作为「当前心情」注入；缺省时不延续）；缺省 `session_id` 时请求完全无状态。
 - **流式变体（2026-09-15）**：`POST /v1/companion/chat/stream` 返回 SSE——`delta` 帧出 `reply_text` 增量（打字机式即时展示），`meta` 帧出权威完整响应（表现 ID/来源以此为准），`error` 帧表示流中途故障；帧语法与语义见契约 `ue-protocol-contract-v0.1.md` 附录 A。非流式端点行为不变。终端调试台默认已走流式（`--no-stream` 回退）。
 - **长期记忆已接入（SDD US1）**：每轮对话玩家发言写入分级记忆（`data/memory/<companion_id>/`，重启保留）；LLM 生成时按预算（`AESIR_MEMORY_INJECTION_BUDGET`，默认 12 条）注入档案/摘要/短期记忆，角色可自然引用历史信息。记忆故障自动降级为无记忆继续对话（FR-011）。重置入口：`POST /v1/console/memory/reset`；持久化演示：`python -m scripts.demo_memory_persistence`。
 - 未登记的 `companion_id` 返回 `404`。
+- **T083 表达一致性校验**：LLM 输出后由 `style_guard` 拦截出戏术语、禁忌表达与无记忆支撑的虚构事实信号；命中后非流式路径自动重试一次，失败回退 mock。词表见 `data/policy/style_policy.yaml`。
 
 ### 5.6 v0.3 端点（主入口/世界事件/调试台；US3 自主行为已接入）
 
@@ -244,7 +245,7 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 
 | 端点 | 状态 | 说明 |
 | --- | --- | --- |
-| `POST /v1/agent/step` | **已实现（US3）** | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）。非战斗场景产出自主行为指令 `action:"directive"`（`source:"autonomy"`，策略版本 `agency-policy-002`）；禁打断/节流/无候选时返回空动作并附原因码（`INTERRUPT_FORBIDDEN:*` / `THROTTLED` / `NO_AUTONOMOUS_CANDIDATE`）。战斗场景不产生活类行为（决策归 v0.1/v0.2 链路）。未登记角色 404。行为白名单与优先级配置：`data/policy/agency_policy.yaml` |
+| `POST /v1/agent/step` | **已实现（US3/US8/T084）** | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）。非战斗场景产出自主行为指令 `action:"directive"`（`source:"autonomy"`，策略版本 `agency-policy-002`）；禁打断/节流/无候选时返回空动作并附原因码（`INTERRUPT_FORBIDDEN:*` / `THROTTLED` / `NO_AUTONOMOUS_CANDIDATE`）。战斗场景不产生活类行为（决策归 v0.1/v0.2 链路）。按 `companion_id` 路由到已登记角色，未登记 404。行为白名单与优先级配置：`data/policy/agency_policy.yaml` |
 | `POST /v1/world/events` | 骨架 | 世界事件（战斗+生活类型白名单）：`companion_id + event_id` 幂等回放（`duplicate:true`）；反应暂回退角色默认表现 |
 | `GET /v1/console/state` / `GET /v1/console/memory` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、三级长期记忆视图、会话+长期记忆重置 |
 
