@@ -20,6 +20,7 @@ from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
+from app.services.companion import style_guard
 from app.services.memory.retrieval import format_impression_block, format_memory_block
 from app.schemas.memory import MemoryEntry, TopicImpression
 from app.services.skills.tools import ToolResult, run_lookup, tool_menu
@@ -181,33 +182,14 @@ class LLMCompanionDialogueService:
         relationship_stage: str = "",
         world_context: WorldContext | None = None,
     ) -> CompanionDialogueResponse:
-        deadline = _lookup_deadline()
-        payload = self._client.generate_json(
-            system_prompt=_build_system_prompt(
-                self._profile,
-                history=history,
-                memories=list(memories),
-                impressions=list(impressions),
-                relationship_stage=relationship_stage,
-            ),
-            user_prompt=request.text,
-        )
-        payload = self._verify_if_requested(
-            payload, request=request, world_context=world_context, deadline=deadline,
-            history=history, memories=memories, impressions=impressions,
+        response_payload = self._generate_payload_with_retry(
+            request,
+            history=history,
+            memories=memories,
+            impressions=impressions,
             relationship_stage=relationship_stage,
+            world_context=world_context,
         )
-
-        try:
-            response_payload = _validate_dialogue_payload(payload, self._profile)
-        except ValidationError as error:
-            raise LLMClientError("LLM dialogue response does not match the required schema.") from error
-        self.last_topics = response_payload.topics
-        self.last_facts = response_payload.facts
-        self.last_reply_topics = response_payload.reply_topics
-        self.last_relationship_signal = response_payload.relationship_signal
-        self.last_salient = response_payload.salient
-
         return CompanionDialogueResponse(
             companion_id=request.companion_id,
             session_id=request.session_id,
@@ -218,6 +200,66 @@ class LLMCompanionDialogueService:
             interruptible=response_payload.interruptible,
             source="llm",
         )
+
+    def _generate_payload_with_retry(
+        self,
+        request: CompanionDialogueRequest,
+        *,
+        history: tuple[DialogueTurn, ...],
+        memories: list[MemoryEntry],
+        impressions: list[TopicImpression],
+        relationship_stage: str,
+        world_context: WorldContext | None,
+    ) -> "_DialoguePayload":
+        """内部完整生成一轮回复：schema 校验 + style_guard + 查证轮；最多重试 1 次。
+
+        重试机制（T083）：LLM 首次输出风格违规时，用同一份 system prompt
+        重新生成一次；若第二次仍违规，抛 LLMClientError，由 dialogue_service
+        回退到 mock/安全候选。
+        """
+        deadline = _lookup_deadline()
+        last_violations: list[style_guard.StyleViolation] = []
+
+        for attempt in range(2):
+            payload = self._client.generate_json(
+                system_prompt=_build_system_prompt(
+                    self._profile,
+                    history=history,
+                    memories=list(memories),
+                    impressions=list(impressions),
+                    relationship_stage=relationship_stage,
+                ),
+                user_prompt=request.text,
+            )
+            payload = self._verify_if_requested(
+                payload, request=request, world_context=world_context, deadline=deadline,
+                history=history, memories=memories, impressions=impressions,
+                relationship_stage=relationship_stage,
+            )
+
+            try:
+                response_payload = _validate_dialogue_payload(payload, self._profile)
+            except ValidationError as error:
+                raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+
+            violations = style_guard.check_reply(
+                response_payload.reply_text,
+                injected_memories=memories or None,
+                injected_impressions=impressions or None,
+            )
+            if not violations:
+                self.last_topics = response_payload.topics
+                self.last_facts = response_payload.facts
+                self.last_reply_topics = response_payload.reply_topics
+                self.last_relationship_signal = response_payload.relationship_signal
+                self.last_salient = response_payload.salient
+                return response_payload
+
+            last_violations = violations
+
+        # 两次尝试均失败：把违规原因带给上层日志/观测。
+        detail = "; ".join(f"{v.category}: {v.message}" for v in last_violations)
+        raise LLMClientError(f"LLM dialogue response failed style guard after retry: {detail}")
 
     def _verify_if_requested(
         self,
@@ -297,6 +339,9 @@ class LLMCompanionDialogueService:
 
         查证轮是安全的：索取查证的负载里没有 ``reply_text``，抽取器一个字符
         都不会吐出去，因此换轮不会让玩家看到半截话。
+
+        风格校验在完整流接收后进行：若发现违规，已发出的 delta 无法收回，
+        只能向上抛异常，由 dialogue_service 在 SSE 中发出 error 事件并停止。
         """
         deadline = _lookup_deadline()
         payload: dict[str, Any] = {}
@@ -345,6 +390,17 @@ class LLMCompanionDialogueService:
             response_payload = _validate_dialogue_payload(payload, self._profile)
         except ValidationError as error:
             raise LLMClientError("LLM dialogue response does not match the required schema.") from error
+
+        # 风格校验：流式路径不重试（delta 已发出），违规即失败，由上层兜底。
+        violations = style_guard.check_reply(
+            response_payload.reply_text,
+            injected_memories=memories or None,
+            injected_impressions=impressions or None,
+        )
+        if violations:
+            detail = "; ".join(f"{v.category}: {v.message}" for v in violations)
+            raise LLMClientError(f"LLM streamed response failed style guard: {detail}")
+
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
         self.last_reply_topics = response_payload.reply_topics
