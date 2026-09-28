@@ -8,6 +8,7 @@ JSON 的 ``TacticalIntent``（``intent_id`` 受 ``Literal`` 白名单约束，�
 """
 
 from app.schemas.tactical_intent import TacticalIntent
+from app.services.llm.untrusted_input import untrusted_input_notice, wrap_untrusted_input
 from app.services.tactical.intent_parser import parse_text_to_intent
 
 try:  # 顶层 import 会让服务进程在缺 httpx 网络配置时变脆，延迟到用时再建
@@ -21,7 +22,7 @@ class LLMIntentError(LLMClientError):
     """LLM 意图解析链路中的任何失败。"""
 
 
-_SYSTEM_PROMPT = """你是一名游戏《Aesir》的战术意图解析器。玩家指令都发给队友艾莉。
+_SYSTEM_PROMPT = untrusted_input_notice() + "\n\n" + """你是一名游戏《Aesir》的战术意图解析器。玩家指令都发给队友艾莉。
 请把中文自然语言指令解析为受限 JSON，只输出 JSON，不要任何解释、代码块或说明。
 
 intent_id 只能取以下白名单值（禁止发明），按域分两组：
@@ -71,7 +72,7 @@ def parse_text_to_intent_llm(text: str, client=None) -> TacticalIntent | None:
 
     payload = client.generate_json(
         system_prompt=_SYSTEM_PROMPT,
-        user_prompt=f"玩家指令：{text}",
+        user_prompt=wrap_untrusted_input(text, role="玩家指令"),
         temperature=0.0,
     )
 

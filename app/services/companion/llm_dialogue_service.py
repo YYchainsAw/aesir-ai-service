@@ -18,6 +18,7 @@ from app.schemas.companion_dialogue import (
 from app.schemas.world_context import WorldContext
 from app.services.llm.client import LLMClient, LLMClientError
 from app.services.llm.factory import create_llm_client
+from app.services.llm.untrusted_input import untrusted_input_notice, wrap_untrusted_input
 from app.services.companion.profile_repository import CompanionProfile, get_profile
 from app.services.companion.session_memory import DialogueTurn
 from app.services.companion import style_guard
@@ -231,7 +232,7 @@ class LLMCompanionDialogueService:
                     impressions=list(impressions),
                     relationship_stage=relationship_stage,
                 ),
-                user_prompt=request.text,
+                user_prompt=wrap_untrusted_input(request.text),
             )
             payload = self._verify_if_requested(
                 payload, request=request, world_context=world_context, deadline=deadline,
@@ -300,7 +301,7 @@ class LLMCompanionDialogueService:
                 relationship_stage=relationship_stage,
                 lookup_result=result,
             ),
-            user_prompt=request.text,
+            user_prompt=wrap_untrusted_input(request.text),
         )
         if _lookup_request(second) is not None:
             raise LLMClientError("LLM exceeded the lookup round limit.")
@@ -356,7 +357,7 @@ class LLMCompanionDialogueService:
                 impressions=list(impressions),
                 relationship_stage=relationship_stage,
             ),
-            user_prompt=request.text,
+            user_prompt=wrap_untrusted_input(request.text),
         ):
             if kind == "delta":
                 yield StreamEvent(kind="delta", text=value)
@@ -380,7 +381,7 @@ class LLMCompanionDialogueService:
                     relationship_stage=relationship_stage,
                     lookup_result=result,
                 ),
-                user_prompt=request.text,
+                user_prompt=wrap_untrusted_input(request.text),
             ):
                 if kind == "delta":
                     yield StreamEvent(kind="delta", text=value)
@@ -521,6 +522,7 @@ def _build_system_prompt(
     rules = profile.raw.get("conversation_rules", {}).get("response_rules", [])
 
     lines = [
+        untrusted_input_notice(),
         "You are a non-combat game companion. Reply in Chinese.",
         f"Character: {profile.display_name}.",
         f"Short description: {identity.get('short_description', '')}",

@@ -101,7 +101,7 @@ class DirectiveEnvelope(BaseModel):
     directive_id: UUID = Field(default_factory=uuid4)
     agent_id: str                        # 目标角色（如 companion.alice）
     domain: DirectiveDomain              # 所属活动场景
-    action_type: str                     # 行为类型；具体取值由各域文件声明（T049）
+    action_type: DirectiveActionType     # 行为类型；取值必须落在 combat/movement/interaction/routine/social 白名单并集内
     priority: int = Field(default=50, ge=0, le=100)
     expires: DirectiveExpires = ExpiresImmediate()
     source: Literal["player_command", "autonomy", "event", "fallback"] = "player_command"

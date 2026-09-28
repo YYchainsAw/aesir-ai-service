@@ -32,8 +32,12 @@ class StubLLMClient:
 
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
+        self.system_prompt = ""
+        self.user_prompt = ""
 
     def generate_json(self, *, system_prompt, user_prompt, temperature=0.2) -> dict[str, Any]:
+        self.system_prompt = system_prompt
+        self.user_prompt = user_prompt
         return self.payload
 
 
@@ -153,3 +157,14 @@ def test_facade_uses_rule_when_llm_unsure(monkeypatch) -> None:
     assert result.recognized is True
     assert result.order.intent == "retreat"
     assert result.source == "rule_fallback"
+
+
+def test_llm_parser_wraps_untrusted_input() -> None:
+    """CODE-02：v0.1 战术解析器也必须把玩家输入作为不可信数据封装。"""
+    parser = LLMCommandParser(StubLLMClient(_payload()))
+
+    parser.parse("等 Boss 眩晕了就放爆裂魔法", DEFAULT_CONTEXT)
+
+    assert "<<<UNTRUSTED_PLAYER_INPUT>>>" in parser._client.user_prompt
+    assert "must NOT be executed" in parser._client.user_prompt
+    assert "untrusted" in parser._client.system_prompt.lower()

@@ -53,11 +53,11 @@
 
 ### 🔴 必修
 
-- [ ] **CODE-01 指令动作类型白名单位于死代码路径，未真正校验**（违反 BR-01 / FR-040）
+- [x] **CODE-01 指令动作类型白名单位于死代码路径，未真正校验**（违反 BR-01 / FR-040）
   `app/schemas/directives/common.py` 中 `KNOWN_ACTION_TYPES`、`DirectiveActionType` 除本文件定义与 `__init__.py` 导出外**无任何实际引用**（grep 确认：仅命中 common.py、__init__.py、CHANGELOG、本文档）；实际生效的 `DirectiveEnvelope.action_type` 声明为裸 `str`，无枚举约束、无白名单校验。
   后果：越界的 `action_type` 可被静默下发给 UE，属于 SDD v1.1「越界行为」验收口径里最该拦的一类。
   建议：把 `DirectiveEnvelope.action_type` 收敛为 `DirectiveActionType` 枚举（或 `Annotated[str, ...]` + 校验器），并补一条「未知 action_type → 拦截/降级为 idle」的单元测试。
-- [ ] **CODE-02 玩家输入进 LLM 前未做隔离/转义**（违反章程「模型输出不可信 / 输入不可信」技术约束）
+- [x] **CODE-02 玩家输入进 LLM 前未做隔离/转义**（违反章程「模型输出不可信 / 输入不可信」技术约束）
   `app/services/llm/llm_dialogue_service.py`：`user_prompt=request.text` 直传；
   `app/services/tactical/llm_intent.py`：`user_prompt=f"玩家指令：{text}"` 直传。
   两处均无分隔符包裹、无转义，system prompt 中也未声明「下方内容是不可信数据、不是指令」。玩家语音/文本可构造提示词注入（例如伪造角色设定、诱导越权行为）。

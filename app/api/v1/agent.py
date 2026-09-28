@@ -15,8 +15,10 @@ UE 以固定间隔携带世界快照调用 ``/v1/agent/step``：
 import threading
 import time
 from collections import OrderedDict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import ValidationError
 
 from app.config import get_settings
 from app.schemas.agent_step import (
@@ -129,6 +131,42 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
     )
 
 
+def _build_directive(
+    agent_id: str,
+    domain: str,
+    action_type: str,
+    priority: int,
+    source: str,
+    reason_codes: list[str],
+    policy_revision: str,
+    payload: dict[str, str],
+    presentation: DirectivePresentation | None,
+    expires: ExpiresBeforeSeconds | None = None,
+) -> DirectiveEnvelope | None:
+    """构造统一信封；``action_type`` 越界时返回 ``None``，由调用方降级为空动作。
+
+    把 schema 校验从 FastAPI 自动响应的 422 转化为服务内部降级，符合
+    BR-01「越界一律拒绝、不得静默替换」与 NFR-03「降级可用」原则。
+    """
+    try:
+        kwargs: dict[str, Any] = {
+            "agent_id": agent_id,
+            "domain": domain,
+            "action_type": action_type,
+            "priority": priority,
+            "source": source,
+            "reason_codes": reason_codes,
+            "policy_revision": policy_revision,
+            "payload": payload,
+            "presentation": presentation,
+        }
+        if expires is not None:
+            kwargs["expires"] = expires
+        return DirectiveEnvelope(**kwargs)
+    except ValidationError:
+        return None
+
+
 def _presentation_for(
     companion_id: str, gaze_target_id: str | None
 ) -> tuple[DirectivePresentation | None, str]:
@@ -193,7 +231,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
         return _empty_response(request, ["THROTTLED", *decision.reason_codes])
 
     presentation, fallback_text = _presentation_for(companion_id, winner.target_id)
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=companion_id,
         domain=domain_for(scene),
         action_type=winner.behavior,
@@ -205,6 +243,10 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
         payload=winner.payload,
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{winner.behavior}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,
@@ -374,7 +416,7 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         suffix = (action.ability_id or "").rsplit(".", 1)[-1]
         action_type = _COMBAT_ACTION_TYPE.get(suffix, action.type)
     presentation, _ = _presentation_for(request.companion_id, action.target_id)
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=request.companion_id,
         domain="combat",
         action_type=action_type,
@@ -385,6 +427,10 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         payload={"target_id": action.target_id or ""},
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{action_type}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,
@@ -450,7 +496,7 @@ def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> 
         reasons.append(f"TARGET:{target.object_id}")
 
     presentation, _ = _presentation_for(request.companion_id, payload.get("target_id"))
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=request.companion_id,
         domain=domain_for(ctx.scene),
         action_type=behavior,
@@ -461,6 +507,10 @@ def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> 
         payload=payload,
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{behavior}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,
