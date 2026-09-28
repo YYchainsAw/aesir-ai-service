@@ -72,6 +72,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         reply_topics = None
         relationship_signal = None
     response.relationship_stage = stage
+    response.relationship_stage_display = _relationship_stage_display(stage)
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
     response.relationship_delta = _record_turn(
         request,
@@ -193,7 +194,15 @@ def _stream_mock_reply(
 def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
     if event.response is not None:
         event.response.relationship_stage = stage
+        event.response.relationship_stage_display = _relationship_stage_display(stage)
     return event
+
+
+def _relationship_stage_display(stage: str) -> str:
+    """FIX-05：关系阶段中文展示名；空 stage 或故障时返回空字符串。"""
+    from app.services.relationship.policy import get_stage_display_name
+
+    return get_stage_display_name(stage)
 
 
 def _note_runtime(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:

@@ -94,6 +94,13 @@ def _relationship_stage_or_empty(companion_id: str) -> str:
         return ""
 
 
+def _relationship_stage_display_or_empty(companion_id: str) -> str:
+    """FIX-05：读取关系阶段中文展示名；故障降级为空字符串。"""
+    from app.services.relationship.policy import get_stage_display_name
+
+    return get_stage_display_name(_relationship_stage_or_empty(companion_id))
+
+
 def _persona_revision_or_empty(companion_id: str) -> str:
     """人设 YAML 的 profile_version（US7 / T076）；读取失败降级为空字符串。"""
     try:
@@ -116,6 +123,7 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             policy_revision=_policy_revision(),
             used_snapshot_id=request.world_context.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(request.companion_id),
+            relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
             persona_revision=_persona_revision_or_empty(request.companion_id),
         ),
     )
@@ -210,6 +218,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
             policy_revision=_policy_revision(),
             used_snapshot_id=ctx.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(companion_id),
+            relationship_stage_display=_relationship_stage_display_or_empty(companion_id),
             persona_revision=_persona_revision_or_empty(companion_id),
         ),
     )
@@ -287,6 +296,7 @@ def _intent_observability(
         policy_revision=_policy_revision(),
         used_snapshot_id=snapshot_id,
         relationship_stage=_relationship_stage_or_empty(request.companion_id),
+        relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
         persona_revision=_persona_revision_or_empty(request.companion_id),
     )
 

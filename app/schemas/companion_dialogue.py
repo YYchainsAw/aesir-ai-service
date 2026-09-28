@@ -56,6 +56,8 @@ class CompanionDialogueResponse(BaseModel):
     # US2（T042）：当前关系阶段（distant/neutral/friendly/close）；关系体系
     # 故障降级时为空字符串——UE 不应依赖该字段做表现逻辑。
     relationship_stage: str = ""
+    # FIX-05：关系阶段中文展示名（疏远/平常/友好/亲密），供 UI 直接展示。
+    relationship_stage_display: str = ""
     # 对话推动关系（2026-09-22）：本轮玩家发言的情感质量实际造成的关系增减
     # （+1/+2/-1/-2，冷却或日上限吃掉则为 0）。阶段变化自下一轮生效——
     # relationship_stage 读的是本轮生成前的值。

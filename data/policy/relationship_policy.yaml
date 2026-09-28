@@ -6,7 +6,7 @@
 #
 # Phase 1 仅骨架：数值为占位默认值，待 T038 实现时与试玩调参一起定稿。
 
-revision: relationship-policy-001
+revision: relationship-policy-002
 
 # 关系数值范围与初值（须与 app/config.py 的 AESIR_RELATIONSHIP_* 保持一致或覆盖之）
 bounds:
@@ -15,27 +15,32 @@ bounds:
   initial: 20
 
 # 关系阶段划分（FR-016：每阶段须定义可观察差异——称呼/语气、主动度、资源投入意愿、服从度）
+# display_name 为通用中文展示名（FIX-05），与角色无关；address 为 NPC 对玩家的称呼。
 stages:
   - name: distant          # 疏远
     range: [0, 24]
+    display_name: "疏远"
     address: "旅行者"      # 阶段化称呼示例
     autonomy: low          # 主动互动频率
     resource_willingness: conservative   # 资源投入意愿
     obedience: high        # 对危险指令的服从度（高=不质疑执行）
   - name: neutral          # 平常
     range: [25, 49]
+    display_name: "平常"
     address: "你"
     autonomy: medium
     resource_willingness: balanced
     obedience: high
   - name: friendly          # 友好
     range: [50, 74]
+    display_name: "友好"
     address: "朋友"
     autonomy: medium
     resource_willingness: generous
     obedience: medium
   - name: close             # 亲密
     range: [75, 100]
+    display_name: "亲密"
     address: "指挥官"
     autonomy: high
     resource_willingness: devoted

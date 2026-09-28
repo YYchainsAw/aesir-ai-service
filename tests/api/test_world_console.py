@@ -71,9 +71,11 @@ def test_console_state_exposes_us7_debug_fields() -> None:
     assert body["agency_policy_revision"]
     # 关系字段（体系故障降级为空，但不缺字段）
     assert "relationship_stage" in body
+    assert "relationship_stage_display" in body
     assert "relationship_value" in body
     # 运行观测：对话路径只记录情绪；场景来自 /v1/agent/step（此处未调用，可为空）
     assert body["last_emotion_id"]
+    assert "last_seen" in body
     assert isinstance(body["recent_memory"], list)
 
 
@@ -115,3 +117,14 @@ def test_console_memory_view_shows_tiers_after_chat() -> None:
 def test_console_memory_view_unknown_companion_returns_404() -> None:
     response = client.get("/v1/console/memory", params={"companion_id": "companion.unknown"})
     assert response.status_code == 404
+
+
+def test_console_ui_returns_html() -> None:
+    """EXT-06：调试台 UI 返回单页 HTML。"""
+    response = client.get("/v1/console/ui")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    text = response.text
+    assert "Aesir 调试台" in text
+    assert "/state" in text
+    assert "/memory" in text

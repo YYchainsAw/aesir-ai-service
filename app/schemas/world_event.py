@@ -82,6 +82,7 @@ class WorldEventObservability(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     # 关系联动留痕（FR-014 / US7 可解释）：未触发关系计分时为空串与 0
     relationship_stage: str = ""
+    relationship_stage_display: str = ""
     relationship_delta: int = 0
 
 

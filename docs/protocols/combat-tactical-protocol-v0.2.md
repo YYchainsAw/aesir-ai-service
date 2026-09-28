@@ -336,10 +336,14 @@
 >（字段与本节示例一致，另含可选 `request_id`/`reported_at`/`policy_revision`/
 > `sequence`/`agent_id`/`ability_id`）；`reported_at` 由 UE 可选提供，服务端
 > 受理时间 `received_at` 自动补齐。成功返回 **202** + `{"stored": true, ...}`，
-> 按天落 `data/rl/executions/{YYYYMMDD}.jsonl`。批量上传留待 v0.3 再定。
+> 按天落 `data/runtime/command_service/executions/{YYYYMMDD}.jsonl`。
+> **v0.3 更新（2026-09-28）**：同一端点新增批量模式 `{"receipts": [...]}`，
+> 与单条模式二选一，旧客户端保持兼容。
 > 实现细节：`app/schemas/tactical_execution.py`、`app/services/tactical/receipt_store.py`。
 
 UE 的回执用于观察、异常反馈与后续评测，不能反向改变已经结算的战斗事实。
+
+### 单条回执（v0.2 保留）
 
 ```json
 {
@@ -352,6 +356,52 @@ UE 的回执用于观察、异常反馈与后续评测，不能反向改变已�
     "reason_code": "ABILITY_ENTERED_COOLDOWN",
     "reported_at": "2026-09-03T12:00:01Z"
   }
+}
+```
+
+响应：
+
+```json
+{
+  "stored": true,
+  "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
+  "path": "data/runtime/command_service/executions/20260903.jsonl"
+}
+```
+
+### 批量回执（v0.3）
+
+```json
+{
+  "protocol_version": "0.2",
+  "request_id": "88d7e6b4-f4f2-4d39-8c96-a23d293882f6",
+  "receipts": [
+    {
+      "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
+      "encounter_id": "encounter.20260903.001",
+      "result": "executed"
+    },
+    {
+      "order_id": "8a2c1f9e-3d4b-4e5c-9f0a-1b2c3d4e5f6a",
+      "encounter_id": "encounter.20260903.001",
+      "result": "rejected",
+      "reason_code": "UE_TARGET_GONE"
+    }
+  ]
+}
+```
+
+响应：
+
+```json
+{
+  "stored": true,
+  "count": 2,
+  "order_ids": [
+    "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
+    "8a2c1f9e-3d4b-4e5c-9f0a-1b2c3d4e5f6a"
+  ],
+  "path": "data/runtime/command_service/executions/20260903.jsonl"
 }
 ```
 

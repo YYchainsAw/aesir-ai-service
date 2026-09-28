@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.schemas.relationship import RelationshipState
+from app.services.relationship.policy import get_stage_display_name
 from app.services.relationship.rules import stage_of
 from app.services.relationship.state import RelationshipStore
 
@@ -76,3 +77,13 @@ def test_partitions_by_npc(tmp_path) -> None:
     bob = RelationshipStore("companion.bob", root=str(tmp_path))
     bob.load()
     assert bob.state().value != alice.state().value
+
+
+def test_stage_display_name_mapping() -> None:
+    """FIX-05：中文阶段展示名与英文机器名一一对应。"""
+    assert get_stage_display_name("distant") == "疏远"
+    assert get_stage_display_name("neutral") == "平常"
+    assert get_stage_display_name("friendly") == "友好"
+    assert get_stage_display_name("close") == "亲密"
+    assert get_stage_display_name("unknown") == ""
+    assert get_stage_display_name("") == ""

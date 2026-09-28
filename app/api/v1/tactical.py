@@ -5,7 +5,6 @@
 """
 
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 from app.config import get_settings
 from app.schemas.tactical_decision import (
@@ -16,11 +15,11 @@ from app.schemas.tactical_decision import (
     TacticalCommandRequest,
     TacticalDecision,
 )
-from app.schemas.tactical_execution import ExecutionReceipt
+from app.schemas.tactical_execution import ExecutionReceiptRequest
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
 from app.services.tactical.llm_intent import parse_intent_with_source
 from app.services.tactical.policy import get_policy
-from app.services.tactical.receipt_store import append_receipt
+from app.services.tactical.receipt_store import append_receipt, append_receipts
 from app.services.tactical.resolver import resolve_intent
 
 router = APIRouter(prefix="/v1/tactical", tags=["tactical"])
@@ -119,14 +118,20 @@ def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
     )
 
 
-class ExecutionReceiptRequest(BaseModel):
-    """executions 回执请求信封；首版单条，批量待 v0.2 定稿再扩展。"""
-
-    receipt: ExecutionReceipt
-
-
 @router.post("/executions", status_code=202)
 def record_execution(request: ExecutionReceiptRequest) -> dict:
-    """UE 对 order 的执行回执（v0.2 草案 §7）：落 JSONL，202 表示受理。"""
-    path = append_receipt(request.receipt)
-    return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}
+    """UE 对 order 的执行回执（v0.2/v0.3）：落 JSONL，202 表示受理。
+
+    兼容单条 ``{"receipt": {...}}`` 与批量 ``{"receipts": [...]}``。
+    """
+    if request.receipt is not None:
+        path = append_receipt(request.receipt)
+        return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}
+
+    path = append_receipts(request.receipts)
+    return {
+        "stored": True,
+        "count": len(request.receipts),
+        "order_ids": [r.order_id for r in request.receipts],
+        "path": str(path),
+    }

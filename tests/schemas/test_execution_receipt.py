@@ -68,3 +68,56 @@ def test_receipt_appends_across_days(tmp_path, monkeypatch) -> None:
     lines = files[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     assert json.loads(lines[1])["result"] == "rejected"
+
+
+def _batch_payload(count: int = 2) -> dict:
+    return {
+        "receipts": [
+            {
+                "order_id": f"ord-batch-{i:03d}",
+                "result": "executed" if i % 2 == 0 else "rejected",
+                "encounter_id": "encounter.batch.001",
+                "reason_code": "" if i % 2 == 0 else "UE_BUSY",
+            }
+            for i in range(count)
+        ]
+    }
+
+
+def test_batch_receipts_accepted_and_persisted(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AESIR_RECEIPTS_DIR", str(tmp_path / "exec"))
+    resp = client.post("/v1/tactical/executions", json=_batch_payload(3))
+    assert resp.status_code == 202
+    body = resp.json()
+    assert body["stored"] is True
+    assert body["count"] == 3
+    assert len(body["order_ids"]) == 3
+    assert body["order_ids"][0] == "ord-batch-000"
+    assert body["path"].endswith(".jsonl")
+
+    files = list((tmp_path / "exec").glob("*.jsonl"))
+    assert len(files) == 1
+    lines = files[0].read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 3
+    records = [json.loads(line) for line in lines]
+    assert [r["order_id"] for r in records] == ["ord-batch-000", "ord-batch-001", "ord-batch-002"]
+    assert all(r["received_at"] for r in records)
+
+
+def test_batch_receipts_empty_list_rejected() -> None:
+    resp = client.post("/v1/tactical/executions", json={"receipts": []})
+    assert resp.status_code == 422
+
+
+def test_batch_and_single_mutually_exclusive() -> None:
+    payload = {
+        "receipt": _payload()["receipt"],
+        "receipts": _batch_payload()["receipts"],
+    }
+    resp = client.post("/v1/tactical/executions", json=payload)
+    assert resp.status_code == 422
+
+
+def test_batch_missing_both_fields_rejected() -> None:
+    resp = client.post("/v1/tactical/executions", json={})
+    assert resp.status_code == 422
