@@ -43,6 +43,11 @@ arbiter:
     - relationship_event     # 关系事件
     - routine_autonomy       # 日常自主行为
 
+# 统一信封默认有效期（CODE-03/CODE-07）
+directives:
+  autonomy_expires_seconds: 10.0   # 自主行为指令有效期
+  combat_expires_seconds: 10.0     # 战斗指令有效期
+
 # 节流与禁打断（FR-022 / FR-023）；窗口参数默认值见 app/config.py
 throttle:
   dedup_window_seconds: 300   # 同一触发源短期内不重复触发

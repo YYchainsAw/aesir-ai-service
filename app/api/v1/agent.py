@@ -236,7 +236,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
         domain=domain_for(scene),
         action_type=winner.behavior,
         priority=winner.priority,
-        expires=ExpiresBeforeSeconds(remaining_seconds=10.0),
+        expires=ExpiresBeforeSeconds(remaining_seconds=get_agency_policy().directives.autonomy_expires_seconds),
         source="autonomy",
         reason_codes=[*winner.reason_codes, f"ARB_WON:{winner.category}"],
         policy_revision=_policy_revision(),
@@ -421,6 +421,7 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         domain="combat",
         action_type=action_type,
         priority=action.priority,
+        expires=ExpiresBeforeSeconds(remaining_seconds=get_agency_policy().directives.combat_expires_seconds),
         source="player_command",
         reason_codes=decision.reason_codes,
         policy_revision=_policy_revision(),
@@ -446,7 +447,11 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
 def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> AgentStepResponse:
     """非战斗意图：映射 agency 行为目录，按场景与距离校验（不虚构目标）。"""
     ctx = request.world_context
-    behavior = _NON_COMBAT_BEHAVIOR[intent.intent_id]
+    behavior = _NON_COMBAT_BEHAVIOR.get(intent.intent_id)
+    if behavior is None:
+        return _empty_response(
+            request, ["BEHAVIOR_UNMAPPED", f"INTENT:{intent.intent_id}"]
+        )
 
     spec = next(
         (s for s in behaviors_allowed(ctx.scene) if s.name == behavior), None

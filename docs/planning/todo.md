@@ -65,20 +65,20 @@
 
 ### 🟠 应修
 
-- [ ] **CODE-03 业务参数硬编码**（违反章程原则 I「配置外置」）
+- [x] **CODE-03 业务参数硬编码**（违反章程原则 I「配置外置」）
   `app/api/v1/agent.py:201`：`ExpiresBeforeSeconds(remaining_seconds=10.0)` 写死在代码里。
   建议：移入 `data/policy/`（如 `directive_policy.yaml`），与 BR-04/05/06/07 其余参数同处一地，并在 SDD v1.1 参数表中登记。
-- [ ] **CODE-04 行为映射直接下标，存在 KeyError / 500 风险**
+- [x] **CODE-04 行为映射直接下标，存在 KeyError / 500 风险**
   `app/api/v1/agent.py`：`_NON_COMBAT_BEHAVIOR[intent.intent_id]` 未做缺失兜底；行为目录一旦新增意图而映射表未同步，直接 500。
   建议：改 `.get(intent_id, BEHAVIOR_UNMAPPED)`，命中不到时走降级路径并记录 `decision_trace` 的 fallback 原因（同时满足章程「可解释」）。
-- [ ] **CODE-05 生产路径使用 `assert`**
+- [x] **CODE-05 生产路径使用 `assert`**
   `app/services/llm/circuit_breaker.py:65`：`assert self._opened_at is not None`。`python -O` 下 assert 会被剥离，保护失效。
   建议：改为显式 `if ... is None: raise` 或返回安全默认值。
 
 ### 🟡 可选（一致性 / 健壮性小项）
 
 - [ ] **CODE-06 `resolve_scene` 与 `ctx.scene` 判定口径可能不一致**：两者各自推导场景，任一侧改口径就会分叉。建议抽单一 `resolve_scene()` 供两处共用。
-- [ ] **CODE-07 战斗指令缺 `expires` 字段**：非战斗指令有过期时间而战斗指令没有，UE 侧可能长期持有过期战术指令。建议统一补上（与 CODE-03 一起做，参数同样外置）。
+- [x] **CODE-07 战斗指令缺 `expires` 字段**：非战斗指令有过期时间而战斗指令没有，UE 侧可能长期持有过期战术指令。建议统一补上（与 CODE-03 一起做，参数同样外置）。
 - [ ] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**：`get_throttle()` 单例在构造时读一次策略，热更新 `data/policy/` 不生效；且关系冷却依赖 `recent_events`（上限 20 条），长时间高频交互会挤出历史事件导致冷却判定漂移。建议：① 节流器支持策略重载（或明确「改配置需重启」写入文档）；② 评估冷却改用独立时间戳字段而非扫 `recent_events`。
 
 ## 四、明确不做（边界提醒，防止方向跑偏）

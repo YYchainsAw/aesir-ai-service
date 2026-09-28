@@ -179,6 +179,16 @@ def test_stream_completion_counts_success_and_failure() -> None:
 # 工厂集成
 # ---------------------------------------------------------------------------
 
+def test_open_state_without_opened_at_raises_instead_of_assert() -> None:
+    """CODE-05：生产路径 assert 改为显式 raise，避免 `python -O` 剥离后保护失效。"""
+    breaker = CircuitBreaker(failure_threshold=1, recovery_seconds=10.0)
+    # 手动破坏内部不变量：状态为 OPEN 但 opened_at 为 None
+    breaker._state = CircuitState.OPEN
+    breaker._opened_at = None
+    with pytest.raises(RuntimeError, match="circuit breaker invariant broken"):
+        breaker.can_execute()
+
+
 def test_factory_creates_circuit_breaker_wrapped_client(monkeypatch) -> None:
     """create_llm_client returns a CircuitBreakerLLMClient-wrapped client."""
     monkeypatch.setenv("LLM_API_KEY", "test-key")

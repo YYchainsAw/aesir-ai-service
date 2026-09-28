@@ -81,7 +81,7 @@
 | BR-03 | 世界事件幂等：同一 `event_id` 重复上报时回放首次结果并标记重复，**不产生第二次实际行为**；反应仅由状态边沿变化触发，不依赖逐帧上报 | FR-033/034；`world_event.py`（协议 0.3） |
 | BR-04 | 关系规则：数值 0～100、初始 20；阶段 distant[0,24] / neutral[25,49] / friendly[50,74] / close[75,100]，各阶段须可观察地区分称呼、主动度、资源投入意愿、服从度；增减只由**事实事件＋对话情感信号**驱动（事件表见 `relationship-policy-001`，含 8 类事实事件与 4 类对话信号）；同类事实事件冷却 60 秒、对话信号冷却 300 秒；每日正向净变化上限 15、负向不限；数据损坏回退 20 继续服务 | `data/policy/relationship_policy.yaml`；`app/config.py`；**2026-09-22 用户拍板**「信号走 LLM 顺带返回；五档含负面；半天~一天一档」（CHANGELOG） |
 | BR-05 | 记忆规则：短期上下文 ≤50 条、经历摘要 ≤80 条、长期档案 ≤40 条；单次注入预算 12 条；印象层主题 ≤200、注入权重阈值 0.75、半衰期 7 天（显著话题 28 天）；容量满按重要性与时间淘汰，**承诺类与重大事件类优先保留**；推测内容不得写入长期事实，条目须可追溯来源与时间 | `app/config.py`（memory_* 默认值）；FR-006～012 |
-| BR-06 | 自主行为规则：行为白名单 11 类——follow / move_to / observe / inspect / interact / pickup / rest / wait / express / self_talk / alert_player（非战斗 ≥8 类，达标）；同一触发源 300 秒内不重复触发、单窗口 ≤3 次；禁打断四情形（cutscene_playing / player_speaking / npc_casting / ui_popup）下一律不发起；优先级：危险自保＞战斗战术＞玩家指令＞剧情事件＞关系事件＞日常自主；目标不在快照、类型不允许或超距离上限时**不虚构行为**，返回不可执行说明 | `data/policy/agency_policy.yaml`（revision agency-policy-002）；FR-019～025 |
+| BR-06 | 自主行为规则：行为白名单 11 类——follow / move_to / observe / inspect / interact / pickup / rest / wait / express / self_talk / alert_player（非战斗 ≥8 类，达标）；同一触发源 300 秒内不重复触发、单窗口 ≤3 次；禁打断四情形（cutscene_playing / player_speaking / npc_casting / ui_popup）下一律不发起；优先级：危险自保＞战斗战术＞玩家指令＞剧情事件＞关系事件＞日常自主；目标不在快照、类型不允许或超距离上限时**不虚构行为**，返回不可执行说明；指令有效期与战斗指令有效期参数外置于 `data/policy/agency_policy.yaml`，行为意图到 action_type 的映射缺失时降级为空动作 | `data/policy/agency_policy.yaml`（revision agency-policy-002）；FR-019～025 |
 | BR-07 | 查证规则：只读工具 5 个——`tool.lore.query`、`tool.world.snapshot`、`tool.world.interactables`、`tool.self.status`、`tool.memory.recall`；模型侧至多 2 轮（1 轮查证＋1 轮正式回复）；查证总预算 2 秒、回填 ≤400 字符，超限降级为直接回应；未命中返回 `TOOL_NO_RESULT`，必须明确表示不确定，**不得编造** | `app/services/skills/tools.py`；`app/config.py`（tools_*）；FR-035～038 |
 | BR-08 | 多角色规则：请求按 `companion_id` 路由到已登记角色；未登记返回 404，**不得回退默认角色**；记忆目录、关系目录、表现 ID 白名单按角色隔离，跨角色互不泄露 | FR-044；2026-09-24 实现记录（Alice＋Bruno 骨架） |
 | BR-09 | 表达合规：输出经风格守门校验——出戏术语、禁忌表达（占有/控制/贬低/胁迫/情感勒索）、无记忆支撑的虚构事实信号，三类一律拦截；失败重试一次，再失败以角色化安全候选兜底 | `data/policy/style_policy.yaml`；FR-002/003；章程「表现与合规内容」 |
@@ -516,6 +516,7 @@ S ..> D : 判定产生（observe，目标在快照内且 ≤25m）
 | CH-05 | 无用例模型/对象模型 → 补 7 个 UC 描述表、候选表、CRC、分析类图、对象图正反例 | 第 3/4 课交付要求 |
 | CH-06 | 新增 REQ/UC/BR/AT 编号，旧 US/FR/SC 保留并建立映射 | 第 3 课 p.11：编号在两轮中保持稳定 |
 | CH-07 | BR-01 补 `action_type` 白名单枚举校验与降级口径；BR-02 补 LLM 输入不可信封装口径 | CODE-01/CODE-02 实现；todo.md 2026-09-28 |
+| CH-08 | BR-06 补指令有效期参数外置、战斗指令统一带 expires、行为映射缺失降级口径 | CODE-03/CODE-04/CODE-05/CODE-07 实现；todo.md 2026-09-28 |
 
 ---
 

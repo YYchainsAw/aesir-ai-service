@@ -62,7 +62,8 @@ class CircuitBreaker:
             if self._state == CircuitState.HALF_OPEN:
                 return True
             # OPEN 状态：检查是否已过恢复时间
-            assert self._opened_at is not None
+            if self._opened_at is None:
+                raise RuntimeError("circuit breaker invariant broken: opened_at is None in OPEN state")
             if time.monotonic() - self._opened_at >= self._recovery_seconds:
                 self._state = CircuitState.HALF_OPEN
                 return True
