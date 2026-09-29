@@ -53,6 +53,9 @@ class CompanionProfile:
 
     companion_id: str
     display_name: str
+    game_name: str
+    wake_words: frozenset[str]
+    self_reference_blacklist: frozenset[str]
     raw: dict[str, Any]
     allowed_emotion_ids: frozenset[str]
     allowed_gesture_ids: frozenset[str]
@@ -80,6 +83,13 @@ class CompanionProfileRepository:
         identity = _required_mapping(raw_profile, "identity")
         companion_id = _required_string(identity, "id")
         display_name = _required_string(identity, "display_name")
+        game_name = _optional_string(identity, "game_name") or "Aesir"
+        wake_words = _optional_string_set(identity, "wake_words") or _optional_string_set(identity, "aliases") or frozenset({display_name.lower()})
+        # 角色自指黑名单：默认取 aliases + display_name + 常见变体，避免把她自己的名字/称呼当成玩家话题。
+        default_self_blacklist = set(wake_words)
+        default_self_blacklist.add(display_name.lower())
+        default_self_blacklist.update({"爱莉"})
+        self_reference_blacklist = _optional_string_set(identity, "self_reference_blacklist") or frozenset(default_self_blacklist)
         allowed_emotions = _id_set(raw_profile, "allowed_emotion_ids")
         allowed_gestures = _id_set(raw_profile, "allowed_gesture_ids")
         allowed_faces = _id_set(raw_profile, "allowed_facial_expression_ids")
@@ -95,6 +105,9 @@ class CompanionProfileRepository:
         return CompanionProfile(
             companion_id=companion_id,
             display_name=display_name,
+            game_name=game_name,
+            wake_words=frozenset(wake_words),
+            self_reference_blacklist=frozenset(self_reference_blacklist),
             raw=raw_profile,
             allowed_emotion_ids=frozenset(allowed_emotions),
             allowed_gesture_ids=frozenset(allowed_gestures),
@@ -204,6 +217,23 @@ def _required_string(container: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CompanionProfileError(f"Profile field '{key}' must be a non-empty string.")
     return value
+
+
+def _optional_string(container: dict[str, Any], key: str) -> str | None:
+    """读取可选字符串字段；缺失或空字符串均返回 None。"""
+    value = container.get(key)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value
+
+
+def _optional_string_set(container: dict[str, Any], key: str) -> frozenset[str] | None:
+    """读取可选字符串列表字段并去重；缺失、非列表或全空时返回 None。"""
+    values = container.get(key)
+    if not isinstance(values, list):
+        return None
+    items = {str(v).strip().lower() for v in values if isinstance(v, str) and v.strip()}
+    return frozenset(items) if items else None
 
 
 def _id_set(profile: dict[str, Any], key: str) -> set[str]:

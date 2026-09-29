@@ -289,6 +289,7 @@ class LLMCompanionDialogueService:
         result = run_lookup(
             lookup,
             companion_id=request.companion_id,
+            game_id=self._profile.game_name.lower(),
             world_context=world_context,
             deadline=deadline,
         )
@@ -369,6 +370,7 @@ class LLMCompanionDialogueService:
             result = run_lookup(
                 lookup,
                 companion_id=request.companion_id,
+                game_id=self._profile.game_name.lower(),
                 world_context=world_context,
                 deadline=deadline,
             )

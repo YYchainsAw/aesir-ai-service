@@ -29,7 +29,11 @@ from app.schemas.combat_event import (
 )
 from app.schemas.tactical_decision import DecisionAction, Expires
 from app.schemas.world_event import WorldEventObservability, WorldEventReaction, WorldEventRequest, WorldEventResponse
-from app.services.companion.profile_repository import DialoguePresentation, get_profile
+from app.services.companion.profile_repository import (
+    CompanionProfileError,
+    DialoguePresentation,
+    get_registered_profile,
+)
 from app.services.memory.experiences import record_world_event_experience
 from app.services.relationship.policy import get_policy as get_relationship_policy
 from app.services.relationship.state import RelationshipStoreError, get_relationship_store
@@ -56,14 +60,19 @@ _FALLBACK_REACTION = EventReaction(
 
 
 def _load_reaction(
-    event_type: str, *, section: str = "combat_event_reactions"
+    event_type: str, *, companion_id: str, section: str = "combat_event_reactions"
 ) -> EventReaction:
-    """从主队友 YAML 的指定段落读取事件反应；配置缺失/越界时回退安全默认。
+    """从指定角色 YAML 的指定段落读取事件反应；配置缺失/越界时回退安全默认。
 
     战斗类走 ``combat_event_reactions``，生活类走 ``world_event_reactions``；
     两段结构一致，校验路径共用（FR-002：模型输出不可信，表现 ID 必须过白名单）。
+    未登记角色返回默认反应，不中断事件处理。
     """
-    profile = get_profile()
+    try:
+        profile = get_registered_profile(companion_id)
+    except CompanionProfileError:
+        return _FALLBACK_REACTION
+
     reactions = profile.raw.get(section)
     if isinstance(reactions, dict):
         entry = reactions.get(event_type)
@@ -150,7 +159,7 @@ def _evt_player_hp_critical(request: CombatEventRequest, ctx: CombatContext) -> 
         reasons.append("HEAL_NOT_READY")
     return _response(
         request,
-        reaction=_load_reaction("player_hp_critical"),
+        reaction=_load_reaction("player_hp_critical", companion_id=ctx.companion.id),
         recommendation=EventRecommendation(
             type="retreat_or_defend",
             target_id=ctx.player.id,
@@ -169,7 +178,7 @@ def _evt_boss_stun_near(request: CombatEventRequest, ctx: CombatContext) -> Comb
         reasons.append("EXPLOSION_NOT_READY")
     return _response(
         request,
-        reaction=_load_reaction("boss_stun_near"),
+        reaction=_load_reaction("boss_stun_near", companion_id=ctx.companion.id),
         recommendation=EventRecommendation(
             type="hold_burst",
             target_id=ctx.boss.id,
@@ -202,7 +211,7 @@ def _evt_boss_stunned(request: CombatEventRequest, ctx: CombatContext) -> Combat
         )
     return _response(
         request,
-        reaction=_load_reaction("boss_stunned"),
+        reaction=_load_reaction("boss_stunned", companion_id=ctx.companion.id),
         recommendation=EventRecommendation(
             type="focus_fire",
             target_id=ctx.boss.id,
@@ -226,7 +235,7 @@ def _evt_boss_enraged(request: CombatEventRequest, ctx: CombatContext) -> Combat
         reasons.append("SHIELD_NOT_READY")
     return _response(
         request,
-        reaction=_load_reaction("boss_enraged"),
+        reaction=_load_reaction("boss_enraged", companion_id=ctx.companion.id),
         recommendation=EventRecommendation(
             type="retreat_or_defend",
             target_id=ctx.boss.id,
@@ -240,7 +249,7 @@ def _evt_boss_enraged(request: CombatEventRequest, ctx: CombatContext) -> Combat
 def _evt_companion_mp_low(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     return _response(
         request,
-        reaction=_load_reaction("companion_mp_low"),
+        reaction=_load_reaction("companion_mp_low", companion_id=ctx.companion.id),
         recommendation=EventRecommendation(
             type="conserve_resources",
             target_id=ctx.companion.id,
@@ -254,7 +263,7 @@ def _evt_companion_mp_low(request: CombatEventRequest, ctx: CombatContext) -> Co
 def _evt_boss_defeated(request: CombatEventRequest, ctx: CombatContext) -> CombatEventResponse:
     return _response(
         request,
-        reaction=_load_reaction("boss_defeated"),
+        reaction=_load_reaction("boss_defeated", companion_id=ctx.companion.id),
         recommendation=None,
         companion_action=None,
     )
@@ -425,7 +434,7 @@ def _evaluate_world_combat(request: WorldEventRequest) -> EventEvaluation:
     if ctx is None:
         # 快照缺失：只给反应与保守建议，绝不猜动作。
         return EventEvaluation(
-            reaction=_load_reaction(request.event.event_type),
+            reaction=_load_reaction(request.event.event_type, companion_id=request.companion_id),
             recommendation=EventRecommendation(
                 type="hold_position",
                 target_id=None,
@@ -459,7 +468,9 @@ def _score_relationship(
 
 def _evaluate_lifestyle(request: WorldEventRequest) -> EventEvaluation:
     event_type = request.event.event_type
-    reaction = _load_reaction(event_type, section="world_event_reactions")
+    reaction = _load_reaction(
+        event_type, companion_id=request.companion_id, section="world_event_reactions"
+    )
     status, stage, delta = _score_relationship(
         request.companion_id, event_type, request.event.occurred_at
     )

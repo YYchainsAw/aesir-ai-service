@@ -47,10 +47,15 @@ class TestExtractTopics:
 
 
 # -- 主题黑名单（角色自指 / 元语言碎片不构成对玩家的印象）-------------------
+_SELF_REF_BLACKLIST = frozenset({"艾莉", "爱莉", "alice"})
+
+
 class TestTopicBlacklist:
     def test_self_reference_and_meta_fragments_are_blocked(self):
         for topic in ("艾莉", "爱莉", "alice", "名字", "记得", "记住"):
-            assert is_blocked_topic(topic) is True
+            assert is_blocked_topic(
+                topic, self_reference_blacklist=_SELF_REF_BLACKLIST
+            ) is True
 
     def test_real_topics_are_not_blocked(self):
         for topic in ("钓鱼", "上海", "蘑菇"):
@@ -64,12 +69,18 @@ class TestTopicBlacklist:
 
     def test_extract_topics_filters_blacklisted_fragments(self):
         # 迁移实测出现过的碎片：角色名 / 记忆元语言，不该成为印象主题。
-        assert extract_topics("我叫艾莉，记得我的名字") == []
+        assert extract_topics(
+            "我叫艾莉，记得我的名字",
+            self_reference_blacklist=_SELF_REF_BLACKLIST,
+        ) == []
 
     def test_blacklisted_topic_kept_out_of_impressions_via_store(self):
         # 合并入口统一过滤：LLM 顺带返回「艾莉」也不入印象（store 级测试见
         # test_memory_store.py，此处验证规则路径）。
-        assert "艾莉" not in extract_topics("艾莉，我们聊聊钓鱼吧")
+        assert "艾莉" not in extract_topics(
+            "艾莉，我们聊聊钓鱼吧",
+            self_reference_blacklist=_SELF_REF_BLACKLIST,
+        )
 
 
 # -- 口语噪声碎片（连接词 / 应付词 / 语气词尾巴不构成话题）------------------

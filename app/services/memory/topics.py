@@ -34,11 +34,13 @@ _SPLIT_PATTERN = re.compile(
 )
 
 # 主题黑名单：无论规则提取还是 LLM 顺带返回，都不该成为「对玩家的印象」——
-# 角色自指（她的名字）、记忆/对话本身的元语言碎片（迁移实测出现过「艾莉」「记得」「名字」）。
+# 记忆/对话本身的元语言碎片（迁移实测出现过「记得」「名字」）。
+# 角色自指词（艾莉/Alice 等）已从人格包外置，通过 ``self_reference_blacklist``
+# 参数注入；本常量只保留游戏/记忆通用元语言碎片。
 # 过滤点在 ``store._merge_mentions_locked``（合并入口，三条路径共用）与 ``extract_topics``。
 _TOPIC_BLACKLIST = frozenset(
     """
-    艾莉 爱莉 alice 名字 记得 记住 忘了 忘记 告诉 答应 说话 对话 回复 聊天
+    名字 记得 记住 忘了 忘记 告诉 答应 说话 对话 回复 聊天
     重要 事情 感觉 时候 现在 幻视 幻觉 人机 人机味
     """.split()
 )
@@ -81,17 +83,26 @@ def looks_like_noise(topic: str) -> bool:
     return stripped in _NOISE_TOPICS
 
 
-def is_blocked_topic(topic: str) -> bool:
+def is_blocked_topic(
+    topic: str, *, self_reference_blacklist: frozenset[str] | None = None
+) -> bool:
     """主题是否含黑名单词（角色自指 / 元语言碎片，不构成对玩家的印象）。
 
     按「包含」而非全等匹配：规则提取的碎片常是「叫艾莉」「不记得」这类
     带粘连字的形式，全等匹配漏掉；黑名单词本身即为不该出现的内容。
+    ``self_reference_blacklist`` 从人格包注入，覆盖角色自指词。
     """
     lowered = topic.strip().lower()
-    return any(word in lowered for word in _TOPIC_BLACKLIST)
+    blacklist = _TOPIC_BLACKLIST | (self_reference_blacklist or frozenset())
+    return any(word in lowered for word in blacklist)
 
 
-def extract_topics(text: str, *, max_topics: int = MAX_TOPICS) -> list[str]:
+def extract_topics(
+    text: str,
+    *,
+    max_topics: int = MAX_TOPICS,
+    self_reference_blacklist: frozenset[str] | None = None,
+) -> list[str]:
     """规则降级提取：切段 → 去停用词 → 保留 ≥2 字 → 去黑名单/噪声 → 去重截断。"""
     topics: list[str] = []
     for segment in _SPLIT_PATTERN.split(text):
@@ -99,7 +110,7 @@ def extract_topics(text: str, *, max_topics: int = MAX_TOPICS) -> list[str]:
             if (
                 len(run) >= 2
                 and run not in topics
-                and not is_blocked_topic(run)
+                and not is_blocked_topic(run, self_reference_blacklist=self_reference_blacklist)
                 and not looks_like_noise(run)
             ):
                 topics.append(run)
