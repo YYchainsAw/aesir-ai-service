@@ -75,7 +75,7 @@ flowchart TB
     subgraph DATA["本地数据资产（无数据库 / 无中间件）"]
         F1["data/companions/*.yaml<br/>人格 + 表现 ID 白名单"]
         F2["data/policy/*.yaml<br/>关系 / 活动域 / 战斗策略"]
-        F3["data/world/lore.yaml<br/>世界观知识库"]
+        F3["data/lore/aesir/lore.yaml<br/>世界观知识库"]
         F4["data/memory/ 按 npc_id 分区<br/>持久化记忆与关系（运行期生成）"]
     end
 

@@ -128,10 +128,10 @@ def record_execution(request: ExecutionReceiptRequest) -> dict:
     兼容单条 ``{"receipt": {...}}`` 与批量 ``{"receipts": [...]}``。
     """
     if request.receipt is not None:
-        path = append_receipt(request.receipt)
+        path = append_receipt(request.receipt, game_id=request.game_id)
         return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}
 
-    path = append_receipts(request.receipts)
+    path = append_receipts(request.receipts, game_id=request.game_id)
     return {
         "stored": True,
         "count": len(request.receipts),

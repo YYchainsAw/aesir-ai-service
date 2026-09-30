@@ -37,6 +37,7 @@ class ExecutionReceiptRequest(BaseModel):
 
     receipt: ExecutionReceipt | None = None
     receipts: list[ExecutionReceipt] | None = None
+    game_id: str = "aesir"  # 多游戏隔离：回执按 game_id 分目录
 
     @model_validator(mode="after")
     def _check_exactly_one(self) -> "ExecutionReceiptRequest":

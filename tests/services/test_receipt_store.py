@@ -80,3 +80,14 @@ def test_append_receipts_then_single_mixed(tmp_path) -> None:
 def test_append_receipts_empty_list_raises(tmp_path) -> None:
     with pytest.raises(ValueError, match="不能为空列表"):
         append_receipts([], directory=str(tmp_path))
+
+
+def test_game_id_partitions_receipt_files(monkeypatch, tmp_path) -> None:
+    """不同 game_id 的回执写入不同子目录（S1）。"""
+    monkeypatch.setenv("AESIR_RECEIPTS_DIR", str(tmp_path))
+    path1 = append_receipt(_receipt(order_id="ord-aesir"), game_id="aesir")
+    path2 = append_receipt(_receipt(order_id="ord-other"), game_id="other")
+    assert path1.parent.name == "aesir"
+    assert path2.parent.name == "other"
+    assert list(read_receipts(path1))[0].order_id == "ord-aesir"
+    assert list(read_receipts(path2))[0].order_id == "ord-other"

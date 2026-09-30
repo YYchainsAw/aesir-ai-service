@@ -91,7 +91,11 @@ def _relationship_stage_or_empty(companion_id: str) -> str:
     )
 
     try:
-        return get_relationship_store(companion_id).state().stage
+        game_id = get_registered_profile(companion_id).game_name.lower()
+    except CompanionProfileError:
+        game_id = "aesir"
+    try:
+        return get_relationship_store(companion_id, game_id=game_id).state().stage
     except RelationshipStoreError:
         return ""
 

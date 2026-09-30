@@ -77,6 +77,8 @@ def console_state(companion_id: str) -> ConsoleStateResponse:
     except UnknownCompanionError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
+    game_id = profile.game_name.lower()
+
     # US7（T077）：关系（故障降级为空阶段/None，不阻塞调试台）
     from app.services.relationship.policy import get_stage_display_name
     from app.services.relationship.state import (
@@ -85,7 +87,7 @@ def console_state(companion_id: str) -> ConsoleStateResponse:
     )
 
     try:
-        rel = get_relationship_store(companion_id).state()
+        rel = get_relationship_store(companion_id, game_id=game_id).state()
         relationship_stage, relationship_value = rel.stage, rel.value
     except RelationshipStoreError:
         relationship_stage, relationship_value = "", None
@@ -95,7 +97,7 @@ def console_state(companion_id: str) -> ConsoleStateResponse:
     try:
         from app.services.memory.retrieval import retrieve
 
-        recent = retrieve(get_memory_store(companion_id))[:5]
+        recent = retrieve(get_memory_store(companion_id, game_id=game_id))[:5]
     except MemoryStoreError:
         recent = []
 
@@ -155,12 +157,12 @@ class MemoryViewResponse(BaseModel):
 @router.get("/memory", response_model=MemoryViewResponse)
 def view_memory(companion_id: str) -> MemoryViewResponse:
     try:
-        get_registered_profile(companion_id)
+        profile = get_registered_profile(companion_id)
     except UnknownCompanionError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
     try:
-        snapshot = get_memory_store(companion_id).snapshot()
+        snapshot = get_memory_store(companion_id, game_id=profile.game_name.lower()).snapshot()
     except MemoryStoreError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
@@ -194,7 +196,7 @@ def view_memory(companion_id: str) -> MemoryViewResponse:
 @router.post("/memory/reset", response_model=MemoryResetResponse)
 def reset_memory(request: MemoryResetRequest) -> MemoryResetResponse:
     try:
-        get_registered_profile(request.companion_id)
+        profile = get_registered_profile(request.companion_id)
     except UnknownCompanionError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -204,7 +206,7 @@ def reset_memory(request: MemoryResetRequest) -> MemoryResetResponse:
     cleared = memory.clear(request.companion_id)
     long_term_reset = True
     try:
-        get_memory_store(request.companion_id).clear()
+        get_memory_store(request.companion_id, game_id=profile.game_name.lower()).clear()
     except MemoryStoreError:
         long_term_reset = False
     return MemoryResetResponse(

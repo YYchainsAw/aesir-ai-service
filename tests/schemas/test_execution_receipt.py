@@ -37,7 +37,7 @@ def test_receipt_accepted_and_persisted(tmp_path, monkeypatch) -> None:
     assert body["order_id"] == "ord-test-001"
     assert body["path"].endswith(".jsonl")
 
-    files = list((tmp_path / "exec").glob("*.jsonl"))
+    files = list((tmp_path / "exec" / "aesir").glob("*.jsonl"))
     assert len(files) == 1
     record = json.loads(files[0].read_text(encoding="utf-8"))
     assert record["order_id"] == "ord-test-001"
@@ -63,7 +63,7 @@ def test_receipt_appends_across_days(tmp_path, monkeypatch) -> None:
         "/v1/tactical/executions",
         json=_payload(order_id="ord-test-002", result="rejected", reason_code="UE_CAST_INTERRUPTED"),
     )
-    files = list((tmp_path / "exec").glob("*.jsonl"))
+    files = list((tmp_path / "exec" / "aesir").glob("*.jsonl"))
     assert len(files) == 1
     lines = files[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
@@ -95,7 +95,7 @@ def test_batch_receipts_accepted_and_persisted(tmp_path, monkeypatch) -> None:
     assert body["order_ids"][0] == "ord-batch-000"
     assert body["path"].endswith(".jsonl")
 
-    files = list((tmp_path / "exec").glob("*.jsonl"))
+    files = list((tmp_path / "exec" / "aesir").glob("*.jsonl"))
     assert len(files) == 1
     lines = files[0].read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3

@@ -1,6 +1,6 @@
 """关系状态持久化（SDD T037 / FR-015、FR-018）。
 
-按角色分区落盘 ``data/relationship/<npc_id>/relationship.json``，原子写入
+按角色分区落盘 ``data/relationship/<game_id>/<npc_id>/relationship.json``，原子写入
 + 单版本备份 + 损坏隔离——与 Phase 3 记忆存储同一套故障语义：
 
 - 主文件损坏 → 先尝试恢复 ``.bak``，再不行隔离为 ``.corrupt`` 并回退初值
@@ -20,6 +20,9 @@ from app.schemas.relationship import RelationshipState
 from app.services.relationship.rules import apply_relationship_event, stage_of
 
 
+_DEFAULT_GAME_ID = "aesir"
+
+
 class RelationshipStoreError(RuntimeError):
     """关系存储故障（不可写/IO 失败）；调用方捕获后降级，不得中断玩家流程。"""
 
@@ -27,10 +30,18 @@ class RelationshipStoreError(RuntimeError):
 class RelationshipStore:
     """单个 NPC 的关系状态存储；线程安全，写穿透落盘。"""
 
-    def __init__(self, npc_id: str, *, root: str | None = None) -> None:
+    def __init__(
+        self,
+        npc_id: str,
+        *,
+        game_id: str = _DEFAULT_GAME_ID,
+        root: str | None = None,
+    ) -> None:
         settings = get_settings()
         self.npc_id = npc_id
-        self._dir = Path(root or settings.relationship_root) / npc_id
+        self.game_id = game_id
+        # 多游戏隔离：路径为 <relationship_root>/<game_id>/<npc_id>（S1）
+        self._dir = Path(root or settings.relationship_root) / game_id / npc_id
         self._path = self._dir / "relationship.json"
         self._lock = threading.Lock()
         self._state = RelationshipState(value=settings.relationship_initial, stage="")
@@ -137,18 +148,25 @@ _stores: dict[str, RelationshipStore] = {}
 _stores_lock = threading.Lock()
 
 
-def get_relationship_store(npc_id: str, *, root: str | None = None) -> RelationshipStore:
+def get_relationship_store(
+    npc_id: str, *, game_id: str = _DEFAULT_GAME_ID, root: str | None = None
+) -> RelationshipStore:
     """获取（并惰性加载）该角色的关系存储；测试可传 root 隔离目录。
 
-    缓存按「角色 + 实际根目录」失效：配置根目录变化时重建实例。
+    缓存按「角色 + game_id + 实际根目录」失效：配置根目录变化时重建实例。
     """
-    effective_root = str(Path(root if root is not None else get_settings().relationship_root) / npc_id)
+    effective_root = str(
+        Path(root if root is not None else get_settings().relationship_root)
+        / game_id
+        / npc_id
+    )
+    cache_key = (npc_id, game_id, root)
     with _stores_lock:
-        store = _stores.get(npc_id)
+        store = _stores.get(cache_key)
         if store is None or str(store._dir) != effective_root:
-            store = RelationshipStore(npc_id, root=root)
+            store = RelationshipStore(npc_id, game_id=game_id, root=root)
             store.load()
-            _stores[npc_id] = store
+            _stores[cache_key] = store
         return store
 
 

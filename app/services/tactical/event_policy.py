@@ -59,6 +59,14 @@ _FALLBACK_REACTION = EventReaction(
 )
 
 
+def _game_id_for(companion_id: str) -> str:
+    """从已登记角色 profile 取 game_id；未登记时回退默认 aesir。"""
+    try:
+        return get_registered_profile(companion_id).game_name.lower()
+    except CompanionProfileError:
+        return "aesir"
+
+
 def _load_reaction(
     event_type: str, *, companion_id: str, section: str = "combat_event_reactions"
 ) -> EventReaction:
@@ -399,6 +407,7 @@ def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
         record_world_event_experience(
             request.combat_context.companion.id,
             request.event.event_type,
+            game_id=_game_id_for(request.combat_context.companion.id),
             occurred_at=request.event.occurred_at,
         )
     return _combat_response(request, evaluation, duplicate=duplicate)
@@ -448,7 +457,7 @@ def _evaluate_world_combat(request: WorldEventRequest) -> EventEvaluation:
 
 
 def _score_relationship(
-    companion_id: str, event_type: str, occurred_at: str
+    companion_id: str, event_type: str, occurred_at: str, *, game_id: str
 ) -> tuple[str, str, int]:
     """事件驱动关系计分（FR-014）；返回（状态, 阶段, 实际计分值）。
 
@@ -458,7 +467,7 @@ def _score_relationship(
     if event_type not in _relationship_policy.events:
         return _REL_SKIPPED, "", 0
     try:
-        state, delta = get_relationship_store(companion_id).apply_event(
+        state, delta = get_relationship_store(companion_id, game_id=game_id).apply_event(
             event_type, occurred_at
         )
     except RelationshipStoreError:
@@ -468,11 +477,12 @@ def _score_relationship(
 
 def _evaluate_lifestyle(request: WorldEventRequest) -> EventEvaluation:
     event_type = request.event.event_type
+    game_id = _game_id_for(request.companion_id)
     reaction = _load_reaction(
         event_type, companion_id=request.companion_id, section="world_event_reactions"
     )
     status, stage, delta = _score_relationship(
-        request.companion_id, event_type, request.event.occurred_at
+        request.companion_id, event_type, request.event.occurred_at, game_id=game_id
     )
     return EventEvaluation(
         reaction=reaction,
@@ -553,6 +563,7 @@ def handle_world_event(request: WorldEventRequest) -> WorldEventResponse:
         record_world_event_experience(
             request.companion_id,
             request.event.event_type,
+            game_id=_game_id_for(request.companion_id),
             details=request.event.details,
             occurred_at=request.event.occurred_at,
             region_id=(

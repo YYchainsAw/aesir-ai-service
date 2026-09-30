@@ -110,6 +110,9 @@ def topic_continued(current_text: str, previous_text: str | None) -> bool | None
     return _jaccard(_char_bigrams(current_text), _char_bigrams(previous_text)) >= 0.3
 
 
+_DEFAULT_GAME_ID = "aesir"
+
+
 def record_turn_signal(
     companion_id: str,
     session_id: str | None,
@@ -125,6 +128,7 @@ def record_turn_signal(
     previous_player_texts: list[str] = (),
     previous_reply_texts: list[str] = (),
     style_violations: list[str] | None = None,
+    game_id: str = _DEFAULT_GAME_ID,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
@@ -157,7 +161,7 @@ def record_turn_signal(
             "repetitive": signals["repetition_score"] >= _REPETITION_FLAG_THRESHOLD,
             "style_violations": style_violations,
         }
-        root = Path(get_settings().dialogue_signals_dir)
+        root = Path(get_settings().dialogue_signals_dir) / game_id
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")

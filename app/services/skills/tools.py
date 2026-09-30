@@ -59,7 +59,7 @@ class LoreError(RuntimeError):
 
 
 # ---------------------------------------------------------------------------
-# 世界观知识库（data/world/lore.yaml）
+# 世界观知识库（data/lore/<game_id>/lore.yaml）
 # ---------------------------------------------------------------------------
 
 
@@ -282,7 +282,7 @@ def _memory_recall(request: ToolRequest) -> ToolResult:
     if not query:
         return _miss("tool.memory.recall", "不知道该回想什么。")
     try:
-        snapshot = get_memory_store(request.companion_id).snapshot()
+        snapshot = get_memory_store(request.companion_id, game_id=request.game_id).snapshot()
     except MemoryStoreError:
         return _miss("tool.memory.recall", "这会儿想不起来什么。", reason=ERROR)
 

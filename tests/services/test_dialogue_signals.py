@@ -85,7 +85,7 @@ class TestRecordTurnSignal:
         response = client.post("/v1/companion/chat", json=payload)
         assert response.status_code == 200
 
-        lines = (tmp_path / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
+        lines = (tmp_path / "aesir" / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
         record = json.loads(lines[-1])
         assert record["session_id"] == "sig-1"
         assert record["player_text"] == "钓鱼吗"
@@ -119,7 +119,26 @@ class TestRecordTurnSignal:
         client.post("/v1/companion/chat", json={**payload, "text": "钓鱼吗"})
         client.post("/v1/companion/chat", json={**payload, "text": "记得我上次说我们一起去钓鱼吗"})
 
-        lines = (tmp_path / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
+        lines = (tmp_path / "aesir" / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
         second = json.loads(lines[-1])
         assert second["signals"]["topic_continued"] is True
         assert second["signals"]["repetition_score"] >= 0.0
+
+    def test_game_id_partitions_signal_files(self, monkeypatch, tmp_path):
+        """不同 game_id 的信号写入不同子目录（S1）。"""
+        monkeypatch.setenv("AESIR_DIALOGUE_SIGNALS_DIR", str(tmp_path))
+        base = {
+            "companion_id": "companion.alice",
+            "session_id": None,
+            "player_text": "你好",
+            "reply_text": "嗯，我在。",
+            "source": "mock",
+            "emotion_id": "",
+            "gesture_id": "",
+            "facial_expression_id": "",
+            "game_state": "conversation",
+        }
+        record_turn_signal(**base, game_id="aesir")
+        record_turn_signal(**base, game_id="other")
+        assert (tmp_path / "aesir" / "companion.alice.jsonl").exists()
+        assert (tmp_path / "other" / "companion.alice.jsonl").exists()
