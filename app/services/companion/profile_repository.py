@@ -8,8 +8,18 @@ from typing import Any
 
 import yaml
 
+from app.services.companion.persona_pack_loader import PersonaPackLoadError, PersonaPackLoader
+from app.services.companion.persona_pack_validator import (
+    Capability,
+    PersonaPackValidationError,
+    PersonaPackValidator,
+)
+
 _PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
 _COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
+_PERSONAS_DIR = Path(__file__).resolve().parents[3] / "data" / "personas"
+_CAPABILITY_PATH = Path(__file__).resolve().parents[3] / "data" / "games" / "aesir" / "capability.yaml"
+_capability_cache: Capability | None = None
 
 
 class CompanionProfileError(RuntimeError):
@@ -53,6 +63,9 @@ class CompanionProfile:
 
     companion_id: str
     display_name: str
+    game_name: str
+    wake_words: frozenset[str]
+    self_reference_blacklist: frozenset[str]
     raw: dict[str, Any]
     allowed_emotion_ids: frozenset[str]
     allowed_gesture_ids: frozenset[str]
@@ -63,23 +76,51 @@ class CompanionProfile:
 
 
 class CompanionProfileRepository:
-    """人设 YAML 的读取与校验；调用方一般走 ``get_profile()`` 的 mtime 缓存。"""
+    """人设 YAML / 人格包目录的读取与校验；调用方一般走 ``get_profile()`` 的 mtime 缓存。"""
 
-    def __init__(self, profile_path: Path = _PRIMARY_PROFILE_PATH) -> None:
-        self._profile_path = profile_path
+    def __init__(self, profile_source: Path = _PRIMARY_PROFILE_PATH) -> None:
+        self._profile_source = profile_source
+
+    def _load_raw(self) -> dict[str, Any]:
+        """从单文件或人格包目录读取原始 YAML 数据。"""
+        source = getattr(self, "_profile_source", None) or getattr(self, "_profile_path", None)
+        if source is None:
+            raise CompanionProfileError("CompanionProfileRepository has no profile source.")
+        if source.is_dir():
+            return PersonaPackLoader(source).load()
+        return yaml.safe_load(source.read_text(encoding="utf-8"))
 
     def load_primary(self) -> CompanionProfile:
+        source = getattr(self, "_profile_source", None) or getattr(self, "_profile_path", None)
         try:
-            raw_profile = yaml.safe_load(self._profile_path.read_text(encoding="utf-8"))
+            raw_profile = self._load_raw()
+        except PersonaPackLoadError as error:
+            raise CompanionProfileError(str(error)) from error
         except (OSError, yaml.YAMLError) as error:
             raise CompanionProfileError("Unable to load the primary companion profile.") from error
 
         if not isinstance(raw_profile, dict):
             raise CompanionProfileError("Primary companion profile must be a YAML mapping.")
 
+        # 人格包目录在加载后进行归属校验；旧单文件 YAML 兼容期跳过。
+        if source is not None and source.is_dir():
+            validator = PersonaPackValidator(_get_capability())
+            try:
+                validator.validate(source, raw_profile)
+            except PersonaPackValidationError as error:
+                raise CompanionProfileError(str(error)) from error
+
         identity = _required_mapping(raw_profile, "identity")
         companion_id = _required_string(identity, "id")
         display_name = _required_string(identity, "display_name")
+        # persona pack 的 game_name 来自 manifest.yaml 顶层；旧单文件来自 identity.game_name。
+        game_name = _optional_string(raw_profile, "game_name") or _optional_string(identity, "game_name") or "Aesir"
+        wake_words = _optional_string_set(identity, "wake_words") or _optional_string_set(identity, "aliases") or frozenset({display_name.lower()})
+        # 角色自指黑名单：默认取 aliases + display_name + 常见变体，避免把她自己的名字/称呼当成玩家话题。
+        default_self_blacklist = set(wake_words)
+        default_self_blacklist.add(display_name.lower())
+        default_self_blacklist.update({"爱莉"})
+        self_reference_blacklist = _optional_string_set(identity, "self_reference_blacklist") or frozenset(default_self_blacklist)
         allowed_emotions = _id_set(raw_profile, "allowed_emotion_ids")
         allowed_gestures = _id_set(raw_profile, "allowed_gesture_ids")
         allowed_faces = _id_set(raw_profile, "allowed_facial_expression_ids")
@@ -95,6 +136,9 @@ class CompanionProfileRepository:
         return CompanionProfile(
             companion_id=companion_id,
             display_name=display_name,
+            game_name=game_name,
+            wake_words=frozenset(wake_words),
+            self_reference_blacklist=frozenset(self_reference_blacklist),
             raw=raw_profile,
             allowed_emotion_ids=frozenset(allowed_emotions),
             allowed_gesture_ids=frozenset(allowed_gestures),
@@ -114,19 +158,19 @@ class CompanionProfileRepository:
 
     # -- 多角色注册表（SDD T010 / FR-044）------------------------------------
     def load_registered(self, companion_id: str) -> CompanionProfile:
-        """按角色标识解析注册表内任意角色（data/companions/ 下每个 YAML 一名角色）。
+        """按角色标识解析注册表内任意角色（data/personas/ 目录优先，兼容 data/companions/*.yaml）。
 
         未登记的角色抛 ``UnknownCompanionError``——调用方据此返回 404，
         **不**回退到默认角色的人格（FR-044）。
         注册表扫描过程中若任何角色配置损坏，统一抛 ``CompanionProfileError``，
         由路由层转 503（避免未捕获异常导致 500）。
         """
-        for path in self._profile_paths():
+        for source in self._profile_sources():
             try:
-                profile = get_profile(path)
+                profile = get_profile(source)
             except Exception as error:
                 raise CompanionProfileError(
-                    f"Failed to load companion profile from {path}: {error}"
+                    f"Failed to load companion profile from {source}: {error}"
                 ) from error
             if profile.companion_id == companion_id:
                 return profile
@@ -135,17 +179,40 @@ class CompanionProfileRepository:
     def list_registered(self) -> list[str]:
         """当前注册表内的全部角色标识（/health 与 console 展示用）。"""
         try:
-            return [get_profile(path).companion_id for path in self._profile_paths()]
+            return [get_profile(source).companion_id for source in self._profile_sources()]
         except Exception as error:
             raise CompanionProfileError(
                 f"Failed to list companion profiles: {error}"
             ) from error
 
-    def _profile_paths(self) -> list[Path]:
+    def _profile_sources(self) -> list[Path]:
+        """返回所有可加载的人设源：人格包目录优先，旧单文件 YAML 兼容。"""
+        sources: list[Path] = []
+        # 1) 人格包目录：data/personas/<game_id>/<companion_id>/
         try:
-            return sorted(_COMPANIONS_DIR.glob("*.yaml"))
-        except OSError:  # 目录不可读时退化为仅主队友
+            if _PERSONAS_DIR.is_dir():
+                for game_dir in sorted(_PERSONAS_DIR.iterdir()):
+                    if game_dir.is_dir():
+                        sources.extend(sorted(d for d in game_dir.iterdir() if d.is_dir()))
+        except OSError:
+            pass
+        # 2) 旧单文件 YAML：data/companions/*.yaml（兼容期）
+        try:
+            sources.extend(sorted(_COMPANIONS_DIR.glob("*.yaml")))
+        except OSError:
+            pass
+        # 3) 兜底主队友
+        if not sources:
             return [_PRIMARY_PROFILE_PATH]
+        return sources
+
+
+def _get_capability() -> Capability:
+    """读取当前游戏档案；进程内缓存。"""
+    global _capability_cache  # noqa: PLW0603
+    if _capability_cache is None:
+        _capability_cache = Capability.from_yaml(_CAPABILITY_PATH)
+    return _capability_cache
 
 
 # ---------------------------------------------------------------------------
@@ -156,25 +223,36 @@ class CompanionProfileRepository:
 _profile_cache: dict[Path, tuple[int, CompanionProfile]] = {}
 
 
-def get_profile(profile_path: Path | None = None) -> CompanionProfile:
-    """读取主队友人设（带 mtime 缓存）。
+def _source_mtime(source: Path) -> int:
+    """计算人设源的 mtime：单文件取文件 mtime；人格包目录取所有 YAML 最大 mtime。"""
+    if source.is_dir():
+        mtimes = [p.stat().st_mtime_ns for p in source.rglob("*.yaml") if p.is_file()]
+        if not mtimes:
+            raise OSError(f"No YAML files found in persona pack: {source}")
+        return max(mtimes)
+    return source.stat().st_mtime_ns
+
+
+def get_profile(profile_source: Path | None = None) -> CompanionProfile:
+    """读取主队友人设（带 mtime 缓存）。支持单文件路径或人格包目录。
 
     注意：测试 monkeypatch ``CompanionProfileRepository.__init__`` 指向坏文件时，
     缓存 key 按构造时的实际路径计算，异常不落缓存，行为与每次直读一致。
     """
-    repo = CompanionProfileRepository(profile_path) if profile_path is not None else CompanionProfileRepository()
-    path = repo._profile_path  # noqa: SLF001 - 同模块内访问
+    repo = CompanionProfileRepository(profile_source) if profile_source is not None else CompanionProfileRepository()
+    # 兼容旧测试 monkeypatch：优先 _profile_source，回退 _profile_path。
+    source = getattr(repo, "_profile_source", None) or getattr(repo, "_profile_path", None)  # noqa: SLF001
     try:
-        mtime = path.stat().st_mtime_ns
+        mtime = _source_mtime(source)
     except OSError:
-        _profile_cache.pop(path, None)
+        _profile_cache.pop(source, None)
         return repo.load_primary()  # 抛 CompanionProfileError → 503
 
-    cached = _profile_cache.get(path)
+    cached = _profile_cache.get(source)
     if cached is not None and cached[0] == mtime:
         return cached[1]
     profile = repo.load_primary()
-    _profile_cache[path] = (mtime, profile)
+    _profile_cache[source] = (mtime, profile)
     return profile
 
 
@@ -204,6 +282,23 @@ def _required_string(container: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CompanionProfileError(f"Profile field '{key}' must be a non-empty string.")
     return value
+
+
+def _optional_string(container: dict[str, Any], key: str) -> str | None:
+    """读取可选字符串字段；缺失或空字符串均返回 None。"""
+    value = container.get(key)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value
+
+
+def _optional_string_set(container: dict[str, Any], key: str) -> frozenset[str] | None:
+    """读取可选字符串列表字段并去重；缺失、非列表或全空时返回 None。"""
+    values = container.get(key)
+    if not isinstance(values, list):
+        return None
+    items = {str(v).strip().lower() for v in values if isinstance(v, str) and v.strip()}
+    return frozenset(items) if items else None
 
 
 def _id_set(profile: dict[str, Any], key: str) -> set[str]:

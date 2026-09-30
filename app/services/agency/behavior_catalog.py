@@ -55,11 +55,18 @@ class ThrottlePolicy:
 
 
 @dataclass(frozen=True)
+class DirectivePolicy:
+    autonomy_expires_seconds: float
+    combat_expires_seconds: float
+
+
+@dataclass(frozen=True)
 class AgencyPolicy:
     revision: str
     behaviors: Mapping[str, BehaviorSpec]
     arbiter: ArbiterPolicy
     throttle: ThrottlePolicy
+    directives: DirectivePolicy
 
 
 @dataclass(frozen=True)
@@ -141,11 +148,20 @@ def _build(path: Path) -> AgencyPolicy:
     if throttle.dedup_window_seconds < 0 or throttle.max_per_window < 1:
         raise AgencyPolicyError("throttle 参数必须为正")
 
+    directives_raw = _require(raw, "directives", "顶层")
+    directives = DirectivePolicy(
+        autonomy_expires_seconds=float(_require(directives_raw, "autonomy_expires_seconds", "directives")),
+        combat_expires_seconds=float(_require(directives_raw, "combat_expires_seconds", "directives")),
+    )
+    if directives.autonomy_expires_seconds <= 0 or directives.combat_expires_seconds <= 0:
+        raise AgencyPolicyError("directives 有效期必须为正")
+
     return AgencyPolicy(
         revision=revision,
         behaviors=behaviors,
         arbiter=ArbiterPolicy(priority_order=priority_order),
         throttle=throttle,
+        directives=directives,
     )
 
 

@@ -11,7 +11,7 @@ from app.services.relationship.state import RelationshipStoreError, reset_relati
 
 def test_chat_response_carries_relationship_stage(monkeypatch) -> None:
     """T042：对话响应回带当前关系阶段。"""
-    monkeypatch.setattr(dialogue_service, "_relationship_stage", lambda cid: "close")
+    monkeypatch.setattr(dialogue_service, "_relationship_stage", lambda cid, *, game_id="aesir": "close")
     response = dialogue_service.create_dialogue_reply(
         CompanionDialogueRequest(text="今天休息一下吧？")
     )
@@ -47,11 +47,11 @@ def test_stage_lookup_degrades_to_empty(monkeypatch) -> None:
     """关系体系故障时对话不中断（FR-018 同思路的链路级降级）。"""
     from app.services.relationship import state as rel_state
 
-    def _boom(npc_id, *, root=None):
+    def _boom(npc_id, *, game_id="aesir", root=None):
         raise RelationshipStoreError("disk on fire")
 
     monkeypatch.setattr(rel_state, "get_relationship_store", _boom)
-    assert dialogue_service._relationship_stage("companion.alice") == ""
+    assert dialogue_service._relationship_stage("companion.alice", game_id="aesir") == ""
     reset_relationship_stores()
 
 
@@ -154,7 +154,7 @@ def test_relationship_failure_keeps_dialogue_alive(monkeypatch) -> None:
     """关系层故障 → 对话照常返回且 delta 为 0（FR-011 同纪律）。"""
     from app.services.relationship import state as rel_state
 
-    def _boom(npc_id, *, root=None):
+    def _boom(npc_id, *, game_id="aesir", root=None):
         raise RelationshipStoreError("disk on fire")
 
     monkeypatch.setattr(rel_state, "get_relationship_store", _boom)

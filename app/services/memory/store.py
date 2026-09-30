@@ -26,6 +26,8 @@ from app.services.memory.topics import impression_weight as _impression_weight
 from app.services.memory.topics import is_blocked_topic as _is_blocked_topic
 from app.services.memory.topics import looks_like_noise as _looks_like_noise
 
+_DEFAULT_GAME_ID = "aesir"
+
 # 淘汰序：重要性越低越先淘汰；同级别按时间越旧越先淘汰（FR-008）
 _IMPORTANCE_ORDER = {"critical": 0, "high": 1, "normal": 2, "low": 3}
 
@@ -60,20 +62,29 @@ class MemoryStore:
         self,
         npc_id: str,
         *,
+        game_id: str = _DEFAULT_GAME_ID,
         root: str | None = None,
         short_term_limit: int | None = None,
         summary_limit: int | None = None,
         archive_limit: int | None = None,
         impression_limit: int | None = None,
+        self_reference_blacklist: frozenset[str] | None = None,
     ) -> None:
         settings = get_settings()
         self.npc_id = npc_id
-        self._dir = Path(root or settings.memory_root) / npc_id
+        self.game_id = game_id
+        # 多游戏隔离：路径为 <memory_root>/<game_id>/<npc_id>（B-01）
+        self._dir = Path(root or settings.memory_root) / game_id / npc_id
         self._path = self._dir / "memory.json"
         self._short_term_limit = short_term_limit if short_term_limit is not None else settings.memory_short_term_limit
         self._summary_limit = summary_limit if summary_limit is not None else settings.memory_summary_limit
         self._archive_limit = archive_limit if archive_limit is not None else settings.memory_archive_limit
         self._impression_limit = impression_limit if impression_limit is not None else settings.memory_impression_limit
+        self._self_reference_blacklist = (
+            self_reference_blacklist
+            if self_reference_blacklist is not None
+            else _load_self_reference_blacklist(npc_id)
+        )
         self._lock = threading.Lock()
         self._snapshot = MemorySnapshot()
 
@@ -147,7 +158,10 @@ class MemoryStore:
                 entry for entry in self._snapshot.short_term if entry not in dialogue
             ]
             for entry in dialogue:
-                topics = _extract_topics(entry.content)
+                topics = _extract_topics(
+                    entry.content,
+                    self_reference_blacklist=self._self_reference_blacklist,
+                )
                 if topics:
                     self._merge_mentions_locked(
                         topics, now=entry.real_time or _utc_now_iso()
@@ -180,7 +194,10 @@ class MemoryStore:
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
         for topic in topics:
-            if _is_blocked_topic(topic) or _looks_like_noise(topic):
+            if (
+                _is_blocked_topic(topic, self_reference_blacklist=self._self_reference_blacklist)
+                or _looks_like_noise(topic)
+            ):
                 continue
             effective_boost = salience_boost if salient else None
             prior = existing.get(topic)
@@ -379,20 +396,48 @@ _stores: dict[str, MemoryStore] = {}
 _stores_lock = threading.Lock()
 
 
-def get_memory_store(npc_id: str, *, root: str | None = None) -> MemoryStore:
-    """获取（并惰性加载）该角色的记忆存储；测试可传 root 隔离目录。
+def get_memory_store(
+    npc_id: str, *, game_id: str = _DEFAULT_GAME_ID, root: str | None = None
+) -> MemoryStore:
+    """获取（并惰性加载）该角色在指定游戏命名空间下的记忆存储。
 
-    缓存按「角色 + 实际根目录」失效：配置的根目录变化（如测试切换
-    AESIR_MEMORY_ROOT）时重建实例，避免读写到旧目录。
+    缓存按「角色 + 游戏 + 实际根目录」失效：配置的根目录变化（如测试切换
+    AESIR_MEMORY_ROOT）或 game_id 变化时重建实例，避免读写到旧目录。
     """
-    effective_root = str(Path(root if root is not None else get_settings().memory_root) / npc_id)
+    effective_root = str(
+        Path(root if root is not None else get_settings().memory_root)
+        / game_id
+        / npc_id
+    )
+    cache_key = (npc_id, game_id, root)
+    # 读取对应人格包的角色自指黑名单，未找到角色时降级为空（B-05）
+    self_reference_blacklist = _load_self_reference_blacklist(npc_id)
     with _stores_lock:
-        store = _stores.get(npc_id)
+        store = _stores.get(cache_key)
         if store is None or str(store._dir) != effective_root:
-            store = MemoryStore(npc_id, root=root)
+            store = MemoryStore(
+                npc_id,
+                game_id=game_id,
+                root=root,
+                self_reference_blacklist=self_reference_blacklist,
+            )
             store.load()
-            _stores[npc_id] = store
+            _stores[cache_key] = store
         return store
+
+
+def _load_self_reference_blacklist(npc_id: str) -> frozenset[str] | None:
+    """按角色 ID 加载人格包中的自指黑名单；角色未知时返回 None（走代码默认）。"""
+    try:
+        from app.services.companion.profile_repository import (
+            CompanionProfileError,
+            get_registered_profile,
+        )
+
+        profile = get_registered_profile(npc_id)
+        return profile.self_reference_blacklist
+    except (CompanionProfileError, ImportError):
+        return None
 
 
 def reset_memory_stores() -> None:

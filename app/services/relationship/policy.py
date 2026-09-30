@@ -23,6 +23,7 @@ class StagePolicy:
     name: str
     low: int              # 数值区间下界（含）
     high: int             # 数值区间上界（含）
+    display_name: str     # 通用中文展示名（FIX-05）
     address: str          # 阶段化称呼
     autonomy: str         # 主动度
     resource_willingness: str  # 资源投入意愿
@@ -50,6 +51,7 @@ def load_policy(path: Path = _POLICY_PATH) -> RelationshipPolicy:
             name=s["name"],
             low=s["range"][0],
             high=s["range"][1],
+            display_name=s.get("display_name", ""),
             address=s["address"],
             autonomy=s["autonomy"],
             resource_willingness=s["resource_willingness"],
@@ -73,6 +75,14 @@ def get_policy() -> RelationshipPolicy:
         if _cached is None:
             _cached = load_policy()
         return _cached
+
+
+def get_stage_display_name(stage_name: str) -> str:
+    """按英文阶段名返回通用中文展示名；找不到时返回空字符串（降级）。"""
+    for stage in get_policy().stages:
+        if stage.name == stage_name:
+            return stage.display_name
+    return ""
 
 
 def reset_policy_cache() -> None:

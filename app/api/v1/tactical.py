@@ -5,7 +5,6 @@
 """
 
 from fastapi import APIRouter
-from pydantic import BaseModel
 
 from app.config import get_settings
 from app.schemas.tactical_decision import (
@@ -16,11 +15,11 @@ from app.schemas.tactical_decision import (
     TacticalCommandRequest,
     TacticalDecision,
 )
-from app.schemas.tactical_execution import ExecutionReceipt
+from app.schemas.tactical_execution import ExecutionReceiptRequest
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
 from app.services.tactical.llm_intent import parse_intent_with_source
 from app.services.tactical.policy import get_policy
-from app.services.tactical.receipt_store import append_receipt
+from app.services.tactical.receipt_store import append_receipt, append_receipts
 from app.services.tactical.resolver import resolve_intent
 
 router = APIRouter(prefix="/v1/tactical", tags=["tactical"])
@@ -47,12 +46,13 @@ def _resolve_response(
     US2 关系调制（T039）不在此接入：v0.2 契约端点保持字节级行为不变，
     关系阶段化决策编排统一走 /v1/agent/step 主入口（Phase 5 T054）。
     """
+    companion_id = combat_context.companion.id
     decision: TacticalDecision = resolve_intent(intent, combat_context)
     policy_backend = get_settings().tactical_policy
     # rl 后端尚未接入：按「规则系统始终保留」原则降级走规则，仅保留标记。
     # 人设回复从 data/companions YAML 读取（与 v0.1 命令路径同源），
     # 缺失时回退到状态决定的表情与兜底文案，保证路由不承载人设文案。
-    ack = create_tactical_acknowledgement(intent.intent_id)
+    ack = create_tactical_acknowledgement(intent.intent_id, companion_id=companion_id)
     return ResolveResponse(
         protocol_version=PROTOCOL_VERSION_V02,
         request_id=request_id,
@@ -70,7 +70,7 @@ def _resolve_response(
         observability=Observability(
             normalized_text=intent.normalized_text,
             # US7（T076）：人设版本（读取失败降级为空字符串）
-            persona_revision=_persona_revision_or_empty(combat_context.companion.id),
+            persona_revision=_persona_revision_or_empty(companion_id),
             # rl 后端请求但未接入时保留标记，便于在回执数据中区分；
             # 规则路径的版本号来自 data/policy/tactical_policy.yaml
             policy_revision=(
@@ -96,7 +96,9 @@ def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
     规则 / LLM，LLM 失败自动回退规则），再走 resolve 的上下文策略；
     不可识别时按策划书 §5.2 回复澄清——不猜测、不施放。
     """
-    intent, source = parse_intent_with_source(request.text)
+    intent, source = parse_intent_with_source(
+        request.text, companion_id=request.combat_context.companion.id
+    )
     if intent is None:
         return ResolveResponse(
             protocol_version=PROTOCOL_VERSION_V02,
@@ -119,14 +121,20 @@ def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
     )
 
 
-class ExecutionReceiptRequest(BaseModel):
-    """executions 回执请求信封；首版单条，批量待 v0.2 定稿再扩展。"""
-
-    receipt: ExecutionReceipt
-
-
 @router.post("/executions", status_code=202)
 def record_execution(request: ExecutionReceiptRequest) -> dict:
-    """UE 对 order 的执行回执（v0.2 草案 §7）：落 JSONL，202 表示受理。"""
-    path = append_receipt(request.receipt)
-    return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}
+    """UE 对 order 的执行回执（v0.2/v0.3）：落 JSONL，202 表示受理。
+
+    兼容单条 ``{"receipt": {...}}`` 与批量 ``{"receipts": [...]}``。
+    """
+    if request.receipt is not None:
+        path = append_receipt(request.receipt, game_id=request.game_id)
+        return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}
+
+    path = append_receipts(request.receipts, game_id=request.game_id)
+    return {
+        "stored": True,
+        "count": len(request.receipts),
+        "order_ids": [r.order_id for r in request.receipts],
+        "path": str(path),
+    }

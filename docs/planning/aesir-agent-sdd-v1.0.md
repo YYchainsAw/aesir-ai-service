@@ -738,7 +738,7 @@ scripts/
 - [x] T001 按 plan.md 建立新增子包骨架：`app/services/memory/`、`app/services/relationship/`、`app/services/agency/`、`app/services/skills/`、`app/schemas/directives/`，各含 `__init__.py`
 - [x] T002 [P] 扩展运行时配置：`app/config.py` 增加记忆根目录、心跳最小间隔、关系数值范围与初值、记忆容量上限、工具轮次上限等配置项（全部带安全默认值）
 - [x] T003 [P] 建立运行期数据目录约定与忽略规则：`data/memory/`（不入版本库）与 `data/world/`；确认 `.gitignore` 覆盖
-- [x] T004 [P] 扩展配置文件骨架：`data/policy/relationship_policy.yaml`（关系事件与增减）、`data/policy/agency_policy.yaml`（活动域、行为目录、节流）、`data/world/lore.yaml`（世界观知识库占位）
+- [x] T004 [P] 扩展配置文件骨架：`data/policy/relationship_policy.yaml`（关系事件与增减）、`data/policy/agency_policy.yaml`（活动域、行为目录、节流）、`data/lore/aesir/lore.yaml`（世界观知识库占位）
 - [x] T005 [P] 更新 `docs/README.md` 文档索引，登记本次新增文档与规格目录
 
 **Checkpoint**: 骨架与配置就绪，可进入基础阶段
@@ -900,7 +900,7 @@ scripts/
 - [x] T067 [P] [US6] 能力注册表：`app/services/skills/registry.py`（统一登记战斗行为、生活行为、信息工具）
 - [x] T068 [US6] 只读查证工具：`app/services/skills/tools.py`（世界观知识库、战况快照、环境可交互物、自身状态、记忆检索；全部只读 + 输出裁剪）
 - [x] T069 [US6] 模型侧两轮调用：改造 `app/services/companion/llm_dialogue_service.py`（发出查证请求 → 回填 → 再生成；上限 2 轮）
-- [x] T070 [US6] 知识库资产：填充 `data/world/lore.yaml` 首版条目并登记来源
+- [x] T070 [US6] 知识库资产：填充 `data/lore/aesir/lore.yaml` 首版条目并登记来源
 - [x] T071 [US6] 战斗链路禁用查证（保延迟），仅在非战斗对话链路启用
 
 **Checkpoint**: US6 独立可验（2026-09-17 完成，462 用例全绿）。注册表是既有配置源的

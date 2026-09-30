@@ -225,3 +225,55 @@ def test_text_commands_are_not_throttled() -> None:
     """文本指令不受心跳限流约束（限流仅针对无产出的心跳，FR-022）。"""
     assert client.post("/v1/agent/step", json=_step_payload(text="艾莉，跟上")).status_code == 200
     assert client.post("/v1/agent/step", json=_step_payload(text="艾莉，等等我")).status_code == 200
+
+
+def test_autonomous_directive_expires_come_from_policy() -> None:
+    """CODE-03：自主行为指令的 expires 从 agency_policy.yaml 读取，不再硬编码。"""
+    response = client.post("/v1/agent/step", json=_step_payload())
+    assert response.status_code == 200
+    directive = response.json()["directive"]
+    assert directive["expires"]["type"] == "before_seconds"
+    assert directive["expires"]["remaining_seconds"] == 10.0
+
+
+def test_combat_directive_has_expires_from_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CODE-07：战斗指令统一携带来自策略的 expires。"""
+    monkeypatch.setattr(agent_module, "_relationship_stage_or_empty", lambda _cid: "close")
+    payload = _step_payload(text="艾莉，给我开个护盾")
+    payload["world_context"]["scene"] = "combat"
+    payload["world_context"]["combat"] = {
+        "snapshot_id": "22222222-2222-4222-8222-222222222222",
+        "captured_at": "2026-09-13T12:00:00Z",
+        "encounter_id": "encounter.demo.001",
+        "mode": "combat",
+        "player": {"id": "party.player", "hp_percent": 80, "distance_to_boss_m": 12.0},
+        "companion": {
+            "id": "companion.alice",
+            "hp_percent": 90,
+            "mp_percent": 5,
+            "ability_states": {"ability.alice.shield": "ready"},
+        },
+        "boss": {"id": "encounter.primary_hostile", "hp_percent": 100, "state_tags": []},
+    }
+    response = client.post("/v1/agent/step", json=payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"] == "directive"
+    directive = body["directive"]
+    assert directive["domain"] == "combat"
+    assert directive["expires"]["type"] == "before_seconds"
+    assert directive["expires"]["remaining_seconds"] == 10.0
+
+
+def test_unmapped_non_combat_intent_returns_empty_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CODE-04：非战斗意图若不在行为映射表中，不得 KeyError/500，须降级为空动作。"""
+    monkeypatch.setattr(agent_module, "_NON_COMBAT_BEHAVIOR", {})
+    response = client.post("/v1/agent/step", json=_step_payload(text="艾莉，看看那个篝火"))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"] == "none"
+    assert "BEHAVIOR_UNMAPPED" in body["observability"]["reason_codes"]

@@ -31,7 +31,14 @@ from app.config import get_settings
 from app.schemas.world_context import WorldContext
 from app.services.memory.store import MemoryStoreError, get_memory_store
 
-_LORE_PATH = Path(__file__).resolve().parents[3] / "data" / "world" / "lore.yaml"
+_LORE_DIR = Path(__file__).resolve().parents[3] / "data" / "lore"
+_DEFAULT_GAME_ID = "aesir"
+
+
+def _lore_path(game_id: str) -> Path:
+    """按游戏命名空间定位世界观知识库文件（B-06）。"""
+    return _LORE_DIR / game_id / "lore.yaml"
+
 
 # 查证工具只服务非战斗链路（T071）：战斗路径要保延迟，注册表层面就不放行。
 _NON_COMBAT_SCENES = frozenset({"exploration", "camp", "conversation", "idle"})
@@ -52,7 +59,7 @@ class LoreError(RuntimeError):
 
 
 # ---------------------------------------------------------------------------
-# 世界观知识库（data/world/lore.yaml）
+# 世界观知识库（data/lore/<game_id>/lore.yaml）
 # ---------------------------------------------------------------------------
 
 
@@ -112,23 +119,25 @@ def _build_lore(path: Path) -> LoreBase:
     return LoreBase(revision=revision, entries=tuple(entries))
 
 
-_lore_cache: LoreBase | None = None
+_lore_cache: dict[str, LoreBase] = {}
 
 
-def get_lore() -> LoreBase:
-    """进程内缓存的知识库；测试需要重新加载时调用 ``reset_lore_cache()``。"""
+def get_lore(game_id: str = _DEFAULT_GAME_ID) -> LoreBase:
+    """按游戏命名空间读取进程内缓存的知识库；测试需要重新加载时调用 ``reset_lore_cache()``。"""
     global _lore_cache
-    if _lore_cache is None:
-        _lore_cache = _build_lore(_LORE_PATH)
-    return _lore_cache
+    cached = _lore_cache.get(game_id)
+    if cached is None:
+        cached = _build_lore(_lore_path(game_id))
+        _lore_cache[game_id] = cached
+    return cached
 
 
 def reset_lore_cache() -> None:
     global _lore_cache
-    _lore_cache = None
+    _lore_cache = {}
 
 
-def search_lore(query: str) -> LoreEntry | None:
+def search_lore(query: str, *, game_id: str = _DEFAULT_GAME_ID) -> LoreEntry | None:
     """按关键词命中条目；命中多条时取命中数最多者，同分取先登记的那条。
 
     刻意不做模糊相似度：宁可查不到（走明确的「不确定」路径），也不要
@@ -139,7 +148,7 @@ def search_lore(query: str) -> LoreEntry | None:
         return None
     best: LoreEntry | None = None
     best_hits = 0
-    for entry in get_lore().entries:
+    for entry in get_lore(game_id).entries:
         hits = sum(1 for keyword in entry.keywords if keyword and keyword in normalized)
         if hits > best_hits:
             best, best_hits = entry, hits
@@ -157,6 +166,7 @@ class ToolRequest:
 
     query: str = ""
     companion_id: str = "companion.alice"
+    game_id: str = _DEFAULT_GAME_ID
     world_context: WorldContext | None = None
 
 
@@ -188,7 +198,7 @@ def _miss(tool: str, text: str, reason: str = NO_RESULT) -> ToolResult:
 
 
 def _lore_query(request: ToolRequest) -> ToolResult:
-    entry = search_lore(request.query)
+    entry = search_lore(request.query, game_id=request.game_id)
     if entry is None:
         return _miss("tool.lore.query", "知识库里没有记载这件事。")
     return ToolResult(
@@ -272,7 +282,7 @@ def _memory_recall(request: ToolRequest) -> ToolResult:
     if not query:
         return _miss("tool.memory.recall", "不知道该回想什么。")
     try:
-        snapshot = get_memory_store(request.companion_id).snapshot()
+        snapshot = get_memory_store(request.companion_id, game_id=request.game_id).snapshot()
     except MemoryStoreError:
         return _miss("tool.memory.recall", "这会儿想不起来什么。", reason=ERROR)
 
@@ -377,6 +387,7 @@ def run_lookup(
     raw: Any,
     *,
     companion_id: str,
+    game_id: str = _DEFAULT_GAME_ID,
     world_context: WorldContext | None = None,
     deadline: float | None = None,
 ) -> ToolResult:
@@ -394,7 +405,7 @@ def run_lookup(
     return run_tool(
         tool.strip(),
         request=ToolRequest(
-            query=query, companion_id=companion_id, world_context=world_context
+            query=query, companion_id=companion_id, game_id=game_id, world_context=world_context
         ),
         deadline=deadline,
     )

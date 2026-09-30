@@ -18,6 +18,7 @@ from app.schemas.tactical_order import (
 )
 from app.services.llm.client import LLMClientError
 from app.services.llm.factory import create_llm_client
+from app.services.llm.untrusted_input import untrusted_input_notice, wrap_untrusted_input
 from app.services.parsers.base import CommandParser
 
 if TYPE_CHECKING:
@@ -53,6 +54,7 @@ def _build_system_prompt(context: ParseCommandContext) -> str:
         ex_agent = ex_ability = ex_selector = ex_player = ex_state = "<目录中的ID>"
 
     return (
+        untrusted_input_notice() + "\n\n"
         "你是一名游戏《Aesir》的战术指令解析器。玩家指令都发给队友。"
         "请把中文自然语言指令解析为受限 JSON，只输出 JSON，不要任何解释、代码块或说明。\n\n"
         "能力目录（只许使用这里的 ID，禁止发明、禁止用中文显示名）：\n"
@@ -134,7 +136,7 @@ class LLMCommandParser(CommandParser):
     ) -> ParseCommandResponse:
         payload = self._client.generate_json(
             system_prompt=_build_system_prompt(context),
-            user_prompt=f"玩家指令：{text}",
+            user_prompt=wrap_untrusted_input(text, role="玩家指令"),
             temperature=0.0,
         )
         try:

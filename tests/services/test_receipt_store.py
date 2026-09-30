@@ -4,8 +4,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from app.schemas.tactical_execution import ExecutionReceipt
-from app.services.tactical.receipt_store import append_receipt, read_receipts
+from app.services.tactical.receipt_store import append_receipt, append_receipts, read_receipts
 
 
 def _receipt(order_id: str = "ord-1", result: str = "accepted") -> ExecutionReceipt:
@@ -55,3 +57,37 @@ def test_creates_parent_dirs(tmp_path) -> None:
     deep = tmp_path / "a" / "b" / "c"
     path = append_receipt(_receipt(), directory=str(deep))
     assert isinstance(path, Path) and path.exists()
+
+
+def test_append_receipts_multiple_records(tmp_path) -> None:
+    receipts = [_receipt(order_id=f"ord-{i}") for i in range(3)]
+    path = append_receipts(receipts, directory=str(tmp_path))
+    got = list(read_receipts(path))
+    assert len(got) == 3
+    assert [r.order_id for r in got] == ["ord-0", "ord-1", "ord-2"]
+    assert all(r.received_at for r in got)
+
+
+def test_append_receipts_then_single_mixed(tmp_path) -> None:
+    batch = [_receipt(order_id="ord-batch")]
+    path1 = append_receipts(batch, directory=str(tmp_path))
+    path2 = append_receipt(_receipt(order_id="ord-single"), directory=str(tmp_path))
+    assert path1 == path2
+    got = list(read_receipts(path1))
+    assert [r.order_id for r in got] == ["ord-batch", "ord-single"]
+
+
+def test_append_receipts_empty_list_raises(tmp_path) -> None:
+    with pytest.raises(ValueError, match="不能为空列表"):
+        append_receipts([], directory=str(tmp_path))
+
+
+def test_game_id_partitions_receipt_files(monkeypatch, tmp_path) -> None:
+    """不同 game_id 的回执写入不同子目录（S1）。"""
+    monkeypatch.setenv("AESIR_RECEIPTS_DIR", str(tmp_path))
+    path1 = append_receipt(_receipt(order_id="ord-aesir"), game_id="aesir")
+    path2 = append_receipt(_receipt(order_id="ord-other"), game_id="other")
+    assert path1.parent.name == "aesir"
+    assert path2.parent.name == "other"
+    assert list(read_receipts(path1))[0].order_id == "ord-aesir"
+    assert list(read_receipts(path2))[0].order_id == "ord-other"

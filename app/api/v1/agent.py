@@ -15,8 +15,10 @@ UE 以固定间隔携带世界快照调用 ``/v1/agent/step``：
 import threading
 import time
 from collections import OrderedDict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import ValidationError
 
 from app.config import get_settings
 from app.schemas.agent_step import (
@@ -89,9 +91,20 @@ def _relationship_stage_or_empty(companion_id: str) -> str:
     )
 
     try:
-        return get_relationship_store(companion_id).state().stage
+        game_id = get_registered_profile(companion_id).game_name.lower()
+    except CompanionProfileError:
+        game_id = "aesir"
+    try:
+        return get_relationship_store(companion_id, game_id=game_id).state().stage
     except RelationshipStoreError:
         return ""
+
+
+def _relationship_stage_display_or_empty(companion_id: str) -> str:
+    """FIX-05：读取关系阶段中文展示名；故障降级为空字符串。"""
+    from app.services.relationship.policy import get_stage_display_name
+
+    return get_stage_display_name(_relationship_stage_or_empty(companion_id))
 
 
 def _persona_revision_or_empty(companion_id: str) -> str:
@@ -116,9 +129,46 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             policy_revision=_policy_revision(),
             used_snapshot_id=request.world_context.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(request.companion_id),
+            relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
             persona_revision=_persona_revision_or_empty(request.companion_id),
         ),
     )
+
+
+def _build_directive(
+    agent_id: str,
+    domain: str,
+    action_type: str,
+    priority: int,
+    source: str,
+    reason_codes: list[str],
+    policy_revision: str,
+    payload: dict[str, str],
+    presentation: DirectivePresentation | None,
+    expires: ExpiresBeforeSeconds | None = None,
+) -> DirectiveEnvelope | None:
+    """构造统一信封；``action_type`` 越界时返回 ``None``，由调用方降级为空动作。
+
+    把 schema 校验从 FastAPI 自动响应的 422 转化为服务内部降级，符合
+    BR-01「越界一律拒绝、不得静默替换」与 NFR-03「降级可用」原则。
+    """
+    try:
+        kwargs: dict[str, Any] = {
+            "agent_id": agent_id,
+            "domain": domain,
+            "action_type": action_type,
+            "priority": priority,
+            "source": source,
+            "reason_codes": reason_codes,
+            "policy_revision": policy_revision,
+            "payload": payload,
+            "presentation": presentation,
+        }
+        if expires is not None:
+            kwargs["expires"] = expires
+        return DirectiveEnvelope(**kwargs)
+    except ValidationError:
+        return None
 
 
 def _presentation_for(
@@ -185,18 +235,22 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
         return _empty_response(request, ["THROTTLED", *decision.reason_codes])
 
     presentation, fallback_text = _presentation_for(companion_id, winner.target_id)
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=companion_id,
         domain=domain_for(scene),
         action_type=winner.behavior,
         priority=winner.priority,
-        expires=ExpiresBeforeSeconds(remaining_seconds=10.0),
+        expires=ExpiresBeforeSeconds(remaining_seconds=get_agency_policy().directives.autonomy_expires_seconds),
         source="autonomy",
         reason_codes=[*winner.reason_codes, f"ARB_WON:{winner.category}"],
         policy_revision=_policy_revision(),
         payload=winner.payload,
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{winner.behavior}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,
@@ -210,6 +264,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
             policy_revision=_policy_revision(),
             used_snapshot_id=ctx.snapshot_id,
             relationship_stage=_relationship_stage_or_empty(companion_id),
+            relationship_stage_display=_relationship_stage_display_or_empty(companion_id),
             persona_revision=_persona_revision_or_empty(companion_id),
         ),
     )
@@ -287,6 +342,7 @@ def _intent_observability(
         policy_revision=_policy_revision(),
         used_snapshot_id=snapshot_id,
         relationship_stage=_relationship_stage_or_empty(request.companion_id),
+        relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
         persona_revision=_persona_revision_or_empty(request.companion_id),
     )
 
@@ -364,17 +420,22 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         suffix = (action.ability_id or "").rsplit(".", 1)[-1]
         action_type = _COMBAT_ACTION_TYPE.get(suffix, action.type)
     presentation, _ = _presentation_for(request.companion_id, action.target_id)
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=request.companion_id,
         domain="combat",
         action_type=action_type,
         priority=action.priority,
+        expires=ExpiresBeforeSeconds(remaining_seconds=get_agency_policy().directives.combat_expires_seconds),
         source="player_command",
         reason_codes=decision.reason_codes,
         policy_revision=_policy_revision(),
         payload={"target_id": action.target_id or ""},
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{action_type}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,
@@ -390,7 +451,11 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
 def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> AgentStepResponse:
     """非战斗意图：映射 agency 行为目录，按场景与距离校验（不虚构目标）。"""
     ctx = request.world_context
-    behavior = _NON_COMBAT_BEHAVIOR[intent.intent_id]
+    behavior = _NON_COMBAT_BEHAVIOR.get(intent.intent_id)
+    if behavior is None:
+        return _empty_response(
+            request, ["BEHAVIOR_UNMAPPED", f"INTENT:{intent.intent_id}"]
+        )
 
     spec = next(
         (s for s in behaviors_allowed(ctx.scene) if s.name == behavior), None
@@ -440,7 +505,7 @@ def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> 
         reasons.append(f"TARGET:{target.object_id}")
 
     presentation, _ = _presentation_for(request.companion_id, payload.get("target_id"))
-    directive = DirectiveEnvelope(
+    directive = _build_directive(
         agent_id=request.companion_id,
         domain=domain_for(ctx.scene),
         action_type=behavior,
@@ -451,6 +516,10 @@ def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> 
         payload=payload,
         presentation=presentation,
     )
+    if directive is None:
+        return _empty_response(
+            request, ["INVALID_ACTION_TYPE", f"ACTION:{behavior}"]
+        )
     return AgentStepResponse(
         protocol_version=PROTOCOL_VERSION,
         request_id=request.request_id,

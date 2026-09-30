@@ -26,7 +26,7 @@ def test_unwritable_directory_raises_memory_error(tmp_path) -> None:
 
 def test_corrupted_file_quarantines_and_starts_empty(tmp_path) -> None:
     """文件损坏：隔离损坏文件并以空记忆继续（回退初值，不卡死）。"""
-    npc_dir = tmp_path / "companion.alice"
+    npc_dir = tmp_path / "aesir" / "companion.alice"
     npc_dir.mkdir(parents=True)
     (npc_dir / "memory.json").write_text("{ not valid json !!", encoding="utf-8")
 

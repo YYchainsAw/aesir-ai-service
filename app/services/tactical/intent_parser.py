@@ -6,11 +6,16 @@ resolver 结合战斗快照决定——这是 v0.2「指令理解与上下文战
 
 多意图冲突按意图优先级降序判序（撤退 > 等眩晕爆发 > 治疗 > 保护 > 爆发 >
 集火 > 跟随），保证「快撤退保命」不会误判成治疗/爆发。
+
+唤醒词与人设相关措辞已外置：规则解析器接受 ``wake_words`` 参数，默认保留
+旧版唤醒词以保持向后兼容。
 """
+
+from collections.abc import Iterable
 
 from app.schemas.tactical_intent import TacticalIntent
 
-_WAKE_WORDS = ("艾莉", "艾琳", "alice", "eirin")
+_DEFAULT_WAKE_WORDS = ("艾莉", "艾琳", "alice", "eirin")
 
 _BURST_WORDS = ("爆裂", "大招", "爆发", "开大", "explosion", "burst")
 _STUN_WORDS = ("眩晕", "晕了", "出破绽", "破绽", "stun")
@@ -50,14 +55,17 @@ def _intent(
     )
 
 
-def parse_text_to_intent(text: str) -> TacticalIntent | None:
+def parse_text_to_intent(
+    text: str, *, wake_words: Iterable[str] | None = None
+) -> TacticalIntent | None:
     """识别文本中的语义意图；无法识别时返回 ``None``（调用方回复澄清）。
 
-    wake 词（艾莉/艾琳/alice/eirin）与 v0.1 规则解析器保持一致，
-    旧名 eirin 仅作向后兼容。
+    ``wake_words`` 未提供时使用内置默认值（艾莉/艾琳/alice/eirin），保证
+    直接调用本函数的既有代码与测试行为不变。
     """
+    words = tuple(wake_words if wake_words is not None else _DEFAULT_WAKE_WORDS)
     t = _normalize(text)
-    if not t or not _has_any(t, *_WAKE_WORDS):
+    if not t or not _has_any(t, *words):
         return None
 
     # 1. 撤退（最高优先级）：别把「保命」误判成护盾/治疗。

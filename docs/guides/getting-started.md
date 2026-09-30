@@ -62,7 +62,11 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 ## 3. 启动服务
 
 ```powershell
-.\.venv\Scripts\python -m uvicorn app.main:app --reload
+# 方式一：按 .env / 环境变量中的 AESIR_SERVICE_HOST/AESIR_SERVICE_PORT 启动
+.\.venv\Scripts\python -m scripts.run_server --reload
+
+# 方式二：直接指定端口（覆盖配置）
+.\.venv\Scripts\python -m scripts.run_server --port 8001 --reload
 ```
 
 或直接双击项目根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
@@ -70,7 +74,8 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 **终端对话模式（人设质量检查）**：`start.bat chat [端口]` —— 服务已在运行则直接复用，否则后台最小化启动；随后进入终端 REPL 直接与艾莉对话（详见 5.7 节）。等价命令：`.venv\Scripts\python -m scripts.chat_console`。
 
 - `--reload`：代码改动后自动重启，仅开发环境使用。
-- 默认监听 `127.0.0.1:8000`。
+- 默认监听 `127.0.0.1:8000`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
+- 当前为单一服务架构，UE 的 `UCompanionChatSubsystem` 与 `UCommandServiceSubsystem` 应指向同一地址（见 [UML 基线](../design/uml/baseline.md) GAP-001/002 处理）。
 
 启动成功后访问：
 
@@ -271,6 +276,6 @@ start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console --p
 
 ## 6. 常见问题
 
-- **端口被占用**：`--reload` 启动失败时，可用 `--port 8001` 指定其他端口。
+- **端口被占用**：启动失败时，可用 `python -m scripts.run_server --port 8001` 或 `start.bat 8001` 指定其他端口；持久化修改请编辑 `.env` 中的 `AESIR_SERVICE_PORT` 并同步 UE 侧配置。
 - **PowerShell 激活失败**：按 2.2 节调整执行策略，或改用 `cmd` 执行 `.\\.venv\\Scripts\\activate.bat`。
 - **依赖安装缓慢**：可临时使用国内镜像 `-i https://pypi.tuna.tsinghua.edu.cn/simple`。

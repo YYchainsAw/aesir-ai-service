@@ -13,23 +13,46 @@ from pathlib import Path
 from app.schemas.tactical_execution import ExecutionReceipt
 
 
+_DEFAULT_GAME_ID = "aesir"
+
+
 def _day_file(directory: str | Path, day: datetime) -> Path:
     return Path(directory) / f"{day:%Y%m%d}.jsonl"
 
 
-def append_receipt(receipt: ExecutionReceipt, *, directory: str | None = None) -> Path:
+def append_receipt(
+    receipt: ExecutionReceipt, *, game_id: str = _DEFAULT_GAME_ID, directory: str | None = None
+) -> Path:
     """追加一条回执并返回写入的文件路径。父目录不存在时自动创建。"""
+    return append_receipts([receipt], game_id=game_id, directory=directory)
+
+
+def append_receipts(
+    receipts: list[ExecutionReceipt],
+    *,
+    game_id: str = _DEFAULT_GAME_ID,
+    directory: str | None = None,
+) -> Path:
+    """批量追加回执并返回写入的文件路径。
+
+    一次性打开当天 JSONL 文件，循环写入全部回执，减少 I/O 次数。
+    同一批次使用统一的 UTC 时间补齐 ``received_at``。
+    """
     from app.config import get_settings
 
-    target_dir = Path(directory) if directory is not None else Path(get_settings().receipts_dir)
+    if not receipts:
+        raise ValueError("receipts 不能为空列表")
+
+    target_dir = Path(directory) if directory is not None else Path(get_settings().receipts_dir) / game_id
     now = datetime.now(timezone.utc)
     path = _day_file(target_dir, now)
     path.parent.mkdir(parents=True, exist_ok=True)
-    record = receipt.model_dump()
-    if not record["received_at"]:
-        record["received_at"] = now.isoformat()
     with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        for receipt in receipts:
+            record = receipt.model_dump()
+            if not record["received_at"]:
+                record["received_at"] = now.isoformat()
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
     return path
 
 

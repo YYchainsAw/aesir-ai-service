@@ -2,7 +2,17 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-24，**669 通过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-28，**678 通过 + 2 跳过**）。
+
+## 2026-09-28 — 规划文档落地：批量回执 + 调试台 Web UI + 关系阶段中文名
+
+根据 `docs/planning/todo.md`（2026-09-28 新建）与 `docs/planning/game-design-doc-v0.1.md` 阶段 5，完成三项 Python 侧可独立交付的改进。
+
+- **EXT-04 批量执行回执**：`/v1/tactical/executions` 现在同时兼容单条 `{"receipt": {...}}` 与批量 `{"receipts": [...]}`，使用 Pydantic `model_validator` 实现二选一校验；新增 `app/services/tactical/receipt_store.py::append_receipts` 批量追加 JSONL，单条函数保持兼容。
+- **EXT-06 调试台 Web UI**：新增 `GET /v1/console/ui`，返回内联单页 HTML/CSS/JS，实时展示角色选择、运行场景/情绪/最近观测、关系阶段与数值进度条、四层记忆计数与明细、近期记忆、策略版本等；无外部前端依赖。
+- **FIX-05 关系阶段中文命名口径**：`data/policy/relationship_policy.yaml` 各 stage 新增通用中文 `display_name`（疏远/平常/友好/亲密）；`AgentStepObservability`、`ConsoleStateResponse`、`CompanionDialogueResponse`、`WorldEventObservability` 均新增 `relationship_stage_display` 字段，保留原 `relationship_stage` 机器名不变。
+- **文档同步**：`docs/planning/todo.md` 勾选 EXT-04/06 与 FIX-05；`docs/protocols/combat-tactical-protocol-v0.2.md` 第 7 节补充批量回执请求/响应示例。
+- **测试**：新增 9 例，覆盖批量回执校验与落盘、`append_receipts`、调试台 UI 返回、中文阶段名映射与各 API 字段暴露。测试数：669 → **678 通过 + 2 跳过**。
 
 ## 2026-09-24 — SDD Phase 11（T084）：熔断与限流加固
 

@@ -201,7 +201,9 @@ def test_drop_impressions_removes_topics_and_persists(store: MemoryStore) -> Non
     assert store.drop_impressions({"不过", "人机味", "不存在的主题"}) == 2
     assert [i.topic for i in store.snapshot().impressions] == ["钓鱼"]
 
-    reloaded = MemoryStore("companion.alice", root=str(store._dir.parent))
+    reloaded = MemoryStore(
+        "companion.alice", game_id=store.game_id, root=str(store._dir.parent.parent)
+    )
     reloaded.load()
     assert [i.topic for i in reloaded.snapshot().impressions] == ["钓鱼"]
 

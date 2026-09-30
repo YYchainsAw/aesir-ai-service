@@ -62,7 +62,7 @@ def test_voice_chat_full_chain(monkeypatch, tmp_path) -> None:
     # 信号埋点生效：本轮落了 JSONL 记录（conftest 已把目录指到 tmp_path）。
     records = [
         json.loads(line)
-        for line in (tmp_path / "signals" / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / "signals" / "aesir" / "companion.alice.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert any(r["player_text"] == "钓鱼吗" for r in records)
 

@@ -33,13 +33,14 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     """
     # 按 companion_id 路由到已登记角色；未登记抛 UnknownCompanionError → 404（FR-044）。
     profile = get_registered_profile(request.companion_id)
+    game_id = profile.game_name.lower()
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
 
-    memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id, history)
-    stage = _relationship_stage(request.companion_id)
+    memories = _recall(request.companion_id, game_id=game_id)
+    impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
+    stage = _relationship_stage(request.companion_id, game_id=game_id)
 
     if get_settings().companion_backend == "llm":
         service = LLMCompanionDialogueService(profile=profile)
@@ -72,6 +73,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         reply_topics = None
         relationship_signal = None
     response.relationship_stage = stage
+    response.relationship_stage_display = _relationship_stage_display(stage)
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
     response.relationship_delta = _record_turn(
         request,
@@ -83,6 +85,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         relationship_signal=relationship_signal,
         injected_topics=[i.topic for i in impressions],
         style_violations=getattr(service, "last_style_violations", None) if get_settings().companion_backend == "llm" else None,
+        game_id=game_id,
     )
     return response
 
@@ -98,18 +101,19 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     未知名伴的 404 得以在 SSE 响应头发出之前抛出。
     """
     profile = get_registered_profile(request.companion_id)
+    game_id = profile.game_name.lower()
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id) if request.session_id else ()
 
-    memories = _recall(request.companion_id)
-    impressions = _recall_impressions(request.companion_id, history)
-    stage = _relationship_stage(request.companion_id)
+    memories = _recall(request.companion_id, game_id=game_id)
+    impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
+    stage = _relationship_stage(request.companion_id, game_id=game_id)
 
     if get_settings().companion_backend != "llm":
         return _stream_mock_reply(
             request, profile=profile, source="mock", stage=stage,
-            memories=memories, impressions=impressions,
+            memories=memories, impressions=impressions, game_id=game_id,
         )
 
     return _stream_llm_reply(
@@ -119,6 +123,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
         memories=memories,
         impressions=impressions,
         stage=stage,
+        game_id=game_id,
     )
 
 
@@ -132,6 +137,7 @@ def _stream_llm_reply(
     stage: str,
 ) -> Iterator[StreamEvent]:
     service = LLMCompanionDialogueService(profile=profile)
+    game_id = profile.game_name.lower()
     emitted_delta = False
     try:
         for event in service.stream_reply(
@@ -156,6 +162,7 @@ def _stream_llm_reply(
                 relationship_signal=service.last_relationship_signal,
                 injected_topics=[i.topic for i in impressions],
                 style_violations=service.last_style_violations,
+                game_id=game_id,
             )
             _annotate_observability(
                 event.response, profile, memories=memories, impressions=impressions
@@ -168,7 +175,7 @@ def _stream_llm_reply(
             return
         yield from _stream_mock_reply(
             request, profile=profile, source="fallback", stage=stage,
-            memories=memories, impressions=impressions,
+            memories=memories, impressions=impressions, game_id=profile.game_name.lower(),
         )
 
 
@@ -180,10 +187,11 @@ def _stream_mock_reply(
     stage: str,
     memories: list[MemoryEntry],
     impressions: list,
+    game_id: str,
 ) -> Iterator[StreamEvent]:
     """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
     response = _create_mock_dialogue_reply(request, profile=profile, source=source)
-    _record_turn(request, response)
+    _record_turn(request, response, game_id=game_id)
     _annotate_observability(response, profile, memories=memories, impressions=impressions)
     if response.reply_text:
         yield StreamEvent(kind="delta", text=response.reply_text)
@@ -193,7 +201,15 @@ def _stream_mock_reply(
 def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
     if event.response is not None:
         event.response.relationship_stage = stage
+        event.response.relationship_stage_display = _relationship_stage_display(stage)
     return event
+
+
+def _relationship_stage_display(stage: str) -> str:
+    """FIX-05：关系阶段中文展示名；空 stage 或故障时返回空字符串。"""
+    from app.services.relationship.policy import get_stage_display_name
+
+    return get_stage_display_name(stage)
 
 
 def _note_runtime(request: CompanionDialogueRequest, response: CompanionDialogueResponse) -> None:
@@ -236,6 +252,7 @@ def _record_turn(
     relationship_signal: str | None = None,
     injected_topics: list[str] | None = None,
     style_violations: list[str] | None = None,
+    game_id: str,
 ) -> int:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
 
@@ -270,17 +287,18 @@ def _record_turn(
     if salient is None:
         salient = looks_salient(request.text)
     if salient:
-        _remember_fact(request.companion_id, request.text)
+        _remember_fact(request.companion_id, request.text, game_id=game_id)
     _remember_facts(
         request.companion_id,
         facts or [],
         # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
         # 也能落地，但凭空捏造的仍会被拦下）。
         sources=[request.text, *(t.user_text for t in prior_history)],
+        game_id=game_id,
     )
-    salience_boost = _care_scaled_boost(request.companion_id) if salient else None
+    salience_boost = _care_scaled_boost(request.companion_id, game_id=game_id) if salient else None
     _remember_turn(
-        request.companion_id, topics, salient=salient, salience_boost=salience_boost
+        request.companion_id, topics, salient=salient, salience_boost=salience_boost, game_id=game_id
     )
     if reply_topics is None:
         # mock/回退路径没有 LLM 自述主题，规则提取兜底（玩家侧规则路径维持现状）。
@@ -288,7 +306,7 @@ def _record_turn(
     if reply_topics:
         # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
-        _remember_turn(request.companion_id, reply_topics, origin="companion")
+        _remember_turn(request.companion_id, reply_topics, origin="companion", game_id=game_id)
 
     # 信号埋点（RL 前置）：先用记录前的会话历史算复读度/话题延续，再落 JSONL；
     # 任何故障静默（绝不阻塞对话）。
@@ -306,8 +324,9 @@ def _record_turn(
         previous_player_texts=[t.user_text for t in prior_history],
         previous_reply_texts=[t.reply_text for t in prior_history],
         style_violations=style_violations,
+        game_id=game_id,
     )
-    return _apply_relationship_signal(request.companion_id, relationship_signal)
+    return _apply_relationship_signal(request.companion_id, relationship_signal, game_id=game_id)
 
 
 # 对话推动关系（2026-09-22）：LLM 判定的玩家发言情感质量 → 关系事件类型。
@@ -320,7 +339,7 @@ _DIALOGUE_RELATIONSHIP_EVENTS = {
 }
 
 
-def _apply_relationship_signal(companion_id: str, signal: str | None) -> int:
+def _apply_relationship_signal(companion_id: str, signal: str | None, *, game_id: str) -> int:
     """把情感质量信号计进关系层；返回本轮实际 delta，故障静默返回 0。
 
     复用关系规则层全套（同类冷却/日上限/持久化/损坏降级）——对话信号用
@@ -336,7 +355,7 @@ def _apply_relationship_signal(companion_id: str, signal: str | None) -> int:
     )
 
     try:
-        _, delta = get_relationship_store(companion_id).apply_event(
+        _, delta = get_relationship_store(companion_id, game_id=game_id).apply_event(
             event_type,
             cooldown_seconds=get_settings().relationship_dialogue_cooldown_seconds,
         )
@@ -345,15 +364,15 @@ def _apply_relationship_signal(companion_id: str, signal: str | None) -> int:
         return 0
 
 
-def _recall(companion_id: str) -> list[MemoryEntry]:
+def _recall(companion_id: str, *, game_id: str) -> list[MemoryEntry]:
     """检索长期记忆（预算内）；故障降级为空列表（FR-011）。"""
     try:
-        return retrieve(get_memory_store(companion_id))
+        return retrieve(get_memory_store(companion_id, game_id=game_id))
     except MemoryStoreError:
         return []
 
 
-def _recall_impressions(companion_id: str, history: tuple = ()) -> list:
+def _recall_impressions(companion_id: str, history: tuple = (), *, game_id: str) -> list:
     """检索模糊印象（份额内）；故障降级为空列表（FR-011 同语义）。
 
     ``history`` 为近期会话原文：已经聊过的话题本轮冷却不注入（防话题
@@ -362,13 +381,13 @@ def _recall_impressions(companion_id: str, history: tuple = ()) -> list:
     try:
         recent_texts = [t.user_text for t in history] + [t.reply_text for t in history]
         return retrieve_impressions(
-            get_memory_store(companion_id), recent_texts=recent_texts or None
+            get_memory_store(companion_id, game_id=game_id), recent_texts=recent_texts or None
         )
     except MemoryStoreError:
         return []
 
 
-def _relationship_stage(companion_id: str) -> str:
+def _relationship_stage(companion_id: str, *, game_id: str) -> str:
     """当前关系阶段（US2 / T040）；故障降级为空字符串（对话不中断）。"""
     from app.services.relationship.state import (
         RelationshipStoreError,
@@ -376,7 +395,7 @@ def _relationship_stage(companion_id: str) -> str:
     )
 
     try:
-        return get_relationship_store(companion_id).state().stage
+        return get_relationship_store(companion_id, game_id=game_id).state().stage
     except RelationshipStoreError:
         return ""
 
@@ -388,17 +407,18 @@ def _remember_turn(
     salient: bool = False,
     salience_boost: float | None = None,
     origin: str = "player",
+    game_id: str,
 ) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
-        get_memory_store(companion_id).record_mention(
+        get_memory_store(companion_id, game_id=game_id).record_mention(
             topics, salient=salient, salience_boost=salience_boost, origin=origin
         )
     except MemoryStoreError:
         pass
 
 
-def _care_scaled_boost(companion_id: str) -> float | None:
+def _care_scaled_boost(companion_id: str, *, game_id: str) -> float | None:
     """郑重声明的等效提及加成，按当前在意值缩放。
 
     在意 = 偏离无感的程度（极爱与极厌都最在意）。关系数值读取失败时
@@ -411,14 +431,14 @@ def _care_scaled_boost(companion_id: str) -> float | None:
     )
 
     try:
-        value = get_relationship_store(companion_id).state().value
+        value = get_relationship_store(companion_id, game_id=game_id).state().value
     except RelationshipStoreError:
         return None
     settings = get_settings()
     return settings.memory_impression_salience_boost * care_scale(value)
 
 
-def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str]) -> int:
+def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str], game_id: str) -> int:
     """把本轮抽出的事实写进长期档案（过接地校验），返回落档条数。
 
     接地校验（``memory.facts.is_grounded``）是这条通道的**安全阀**：档案里的
@@ -430,7 +450,7 @@ def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str]) 
     if not grounded:
         return 0
     try:
-        return get_memory_store(companion_id).record_facts(
+        return get_memory_store(companion_id, game_id=game_id).record_facts(
             [
                 MemoryEntry(
                     content=fact,
@@ -445,10 +465,10 @@ def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str]) 
         return 0
 
 
-def _remember_fact(companion_id: str, player_text: str) -> None:
+def _remember_fact(companion_id: str, player_text: str, *, game_id: str) -> None:
     """郑重声明逐字入档案（双通道之一：精确复述用）；写失败静默降级。"""
     try:
-        get_memory_store(companion_id).record_fact(
+        get_memory_store(companion_id, game_id=game_id).record_fact(
             MemoryEntry(
                 content=player_text,
                 importance="high",

@@ -18,6 +18,8 @@ from __future__ import annotations
 from app.schemas.memory import MemoryEntry
 from app.services.memory.store import MemoryStoreError, get_memory_store
 
+_DEFAULT_GAME_ID = "aesir"
+
 # 事件类型 → (带细节的文案模板, 无细节时的兜底文案)。``{detail}`` 由
 # _DETAIL_KEYS 指定的字段填充；取不到就整句回退到兜底，不拼半截话。
 _EXPERIENCE_TEMPLATES: dict[str, tuple[str, str]] = {
@@ -82,6 +84,7 @@ def record_world_event_experience(
     companion_id: str,
     event_type: str,
     *,
+    game_id: str = _DEFAULT_GAME_ID,
     details: dict[str, str] | None = None,
     occurred_at: str = "",
     region_id: str = "",
@@ -97,7 +100,7 @@ def record_world_event_experience(
     if entry is None:
         return False
     try:
-        get_memory_store(companion_id).record_experience([entry])
+        get_memory_store(companion_id, game_id=game_id).record_experience([entry])
     except MemoryStoreError:
         return False
     return True

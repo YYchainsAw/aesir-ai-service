@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="AESIR_", extra="ignore")
 
+    # -- 服务监听 -----------------------------------------------------------
+    service_host: str = "127.0.0.1"             # uvicorn 监听地址
+    service_port: int = 8000                    # 默认监听端口；与 UE 联调前请统一为此端口
+
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm
     companion_backend: str = "mock"             # mock | llm

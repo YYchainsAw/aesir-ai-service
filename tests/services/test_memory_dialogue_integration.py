@@ -113,7 +113,7 @@ def test_companion_own_reply_topics_recorded(_fresh_memory) -> None:
         gesture_id="idle",
         facial_expression_id="default",
     )
-    _record_turn(request, response)  # 玩家侧无主题，回复侧主题入印象
+    _record_turn(request, response, game_id="aesir")  # 玩家侧无主题，回复侧主题入印象
 
     impressions = get_memory_store("companion.alice").snapshot().impressions
     assert "钓鱼" in [i.topic for i in impressions]
