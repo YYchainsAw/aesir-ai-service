@@ -9,10 +9,17 @@ from typing import Any
 import yaml
 
 from app.services.companion.persona_pack_loader import PersonaPackLoadError, PersonaPackLoader
+from app.services.companion.persona_pack_validator import (
+    Capability,
+    PersonaPackValidationError,
+    PersonaPackValidator,
+)
 
 _PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
 _COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
 _PERSONAS_DIR = Path(__file__).resolve().parents[3] / "data" / "personas"
+_CAPABILITY_PATH = Path(__file__).resolve().parents[3] / "data" / "games" / "aesir" / "capability.yaml"
+_capability_cache: Capability | None = None
 
 
 class CompanionProfileError(RuntimeError):
@@ -84,6 +91,7 @@ class CompanionProfileRepository:
         return yaml.safe_load(source.read_text(encoding="utf-8"))
 
     def load_primary(self) -> CompanionProfile:
+        source = getattr(self, "_profile_source", None) or getattr(self, "_profile_path", None)
         try:
             raw_profile = self._load_raw()
         except PersonaPackLoadError as error:
@@ -93,6 +101,14 @@ class CompanionProfileRepository:
 
         if not isinstance(raw_profile, dict):
             raise CompanionProfileError("Primary companion profile must be a YAML mapping.")
+
+        # 人格包目录在加载后进行归属校验；旧单文件 YAML 兼容期跳过。
+        if source is not None and source.is_dir():
+            validator = PersonaPackValidator(_get_capability())
+            try:
+                validator.validate(source, raw_profile)
+            except PersonaPackValidationError as error:
+                raise CompanionProfileError(str(error)) from error
 
         identity = _required_mapping(raw_profile, "identity")
         companion_id = _required_string(identity, "id")
@@ -189,6 +205,14 @@ class CompanionProfileRepository:
         if not sources:
             return [_PRIMARY_PROFILE_PATH]
         return sources
+
+
+def _get_capability() -> Capability:
+    """读取当前游戏档案；进程内缓存。"""
+    global _capability_cache  # noqa: PLW0603
+    if _capability_cache is None:
+        _capability_cache = Capability.from_yaml(_CAPABILITY_PATH)
+    return _capability_cache
 
 
 # ---------------------------------------------------------------------------

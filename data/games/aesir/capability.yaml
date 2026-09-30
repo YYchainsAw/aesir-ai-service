@@ -1,0 +1,81 @@
+game_id: aesir
+revision: capability-001
+
+provides:
+  capability_level: L3
+
+  scenes:
+    - combat
+    - exploration
+    - camp
+    - conversation
+    - idle
+
+  events:
+    combat:
+      - player_hp_critical
+      - boss_stun_near
+      - boss_stunned
+      - boss_enraged
+      - companion_mp_low
+      - boss_defeated
+    world:
+      - region_first_entered
+      - weather_changed
+      - gift_given
+      - companion_recovered
+      - player_protected_companion
+      - promise_kept
+
+  presentation_ids:
+    # 情绪
+    - emotion.bright
+    - emotion.excited
+    - emotion.pleased
+    - emotion.concerned
+    - emotion.shy
+    - emotion.playfully_annoyed
+    - emotion.serious
+    - emotion.thoughtful
+    - emotion.neutral
+    # 动作
+    - gesture.cheerful_idle
+    - gesture.small_wave
+    - gesture.enthusiastic_nod
+    - gesture.think
+    - gesture.look_away
+    - gesture.fold_arms
+    - gesture.step_closer
+    - gesture.nod
+    - gesture.look_around
+    - gesture.ready_weapon
+    # 表情
+    - face.bright_smile
+    - face.excited
+    - face.gentle_smile
+    - face.concerned
+    - face.shy
+    - face.playfully_annoyed
+    - face.serious
+    - face.thoughtful
+    - face.neutral
+
+  abilities:
+    - ability.alice.basic_attack
+    - ability.alice.explosion
+    - ability.alice.quick_heal
+    - ability.alice.major_heal
+    - ability.alice.shield
+
+  behaviors:
+    - follow
+    - move_to
+    - observe
+    - inspect
+    - interact
+    - pickup
+    - rest
+    - wait
+    - express
+    - self_talk
+    - alert_player
