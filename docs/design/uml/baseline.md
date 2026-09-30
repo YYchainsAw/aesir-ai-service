@@ -73,8 +73,8 @@ Python 服务侧的主要参考文档：
 
 | 编号 | 现象 | 当前处理 |
 | --- | --- | --- |
-| GAP-001 | Python 文档默认监听 `127.0.0.1:8000`，`UCompanionChatSubsystem` 固定使用端口 `8001` | As-Is 部署图分别展示，联调前确认实际启动方式 |
-| GAP-002 | `UCommandServiceSubsystem` 固定使用端口 `8011`，与 Python 文档默认端口不同 | As-Is 部署图分别展示，联调前确认实际启动方式 |
+| GAP-001 | Python 文档默认监听 `127.0.0.1:8000`，`UCompanionChatSubsystem` 固定使用端口 `8001` | **已解决（FIX-01）**：Python 侧端口外置到 `AESIR_SERVICE_PORT`（默认 8000）；当前单一服务架构，UE 两侧应统一指向同一端口 |
+| GAP-002 | `UCommandServiceSubsystem` 固定使用端口 `8011`，与 Python 文档默认端口不同 | **已解决（FIX-01）**：同上，UE 侧需将指令子系统端口同步为 `AESIR_SERVICE_PORT` |
 | GAP-003 | Python README 标注运行时 Python 3.12，当前项目虚拟环境为 Python 3.11.9 | 基线记录实际环境，不擅自修改运行要求 |
 | GAP-004 | 后端功能范围大于当前可由 UE C++ 证明的接入范围 | 未接入部分不画入 As-Is 闭环，等待蓝图证据 |
 | GAP-005 | `.uasset` 为二进制，文件名无法证明 Event Graph、节点和连线 | 使用 Unreal Editor 导出器采集 Graph/Node/Pin 证据 |

@@ -21,6 +21,8 @@ from uuid import uuid4
 
 import httpx
 
+from app.config import get_settings
+
 # Windows 终端默认 GBK，中文 JSON 输出会乱码
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -332,7 +334,12 @@ def main(url: str) -> int:
 
 
 if __name__ == "__main__":
+    defaults = get_settings()
     parser = argparse.ArgumentParser(description="mock UE 全链路演示")
-    parser.add_argument("--url", default="http://127.0.0.1:8000", help="服务地址")
+    parser.add_argument(
+        "--url",
+        default=f"http://{defaults.service_host}:{defaults.service_port}",
+        help="服务地址（默认从 AESIR_SERVICE_HOST/AESIR_SERVICE_PORT 读取）",
+    )
     args = parser.parse_args()
     raise SystemExit(main(args.url))

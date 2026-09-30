@@ -36,7 +36,7 @@
 
 ## 二、可修改（改进现有，不动架构）
 
-- [ ] **FIX-01 端口不一致收口**（GAP-001/002）：文档默认 8000 vs UE 两个 Subsystem 固定 8001/8011，联调前统一口径。
+- [x] **FIX-01 端口不一致收口**（GAP-001/002）：`app/config.py` 增加 `service_host`/`service_port`，默认 `127.0.0.1:8000`；新增 `scripts/run_server.py` 按配置启动；`start.bat` / `chat_console` / `mock_ue_flow` 默认从配置读取；文档与 UML 基线 GAP-001/002 同步更新。UE 两侧应统一指向 `AESIR_SERVICE_PORT`。
 - [ ] **FIX-02 敌人血条防御保护**（GAP-UI-001）：`SetEnemyHealth` 补 `Max(MaxHealth, 1.0)`，与玩家 HUD 一致。
 - [ ] **FIX-03 Alice 跟随目标语义**（GAP-BP-004）：PIE 实测 `BTS_AliceUpdateTarget` 写 PlayerController 与 Player Pawn 的位置语义差异，必要时修正。
 - [ ] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2）：定义采样方法与硬指标，替代「人工评估 ≥95%」软口径。

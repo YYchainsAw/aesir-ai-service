@@ -51,7 +51,7 @@ echo [INFO] 启动 Aesir AI Service(http://127.0.0.1:%PORT%)
 echo [INFO] 接口文档:http://127.0.0.1:%PORT%/docs
 echo [INFO] 按 Ctrl+C 停止服务
 echo.
-".venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT% --reload
+".venv\Scripts\python.exe" -m scripts.run_server --host 127.0.0.1 --port %PORT% --reload
 
 :end
 endlocal

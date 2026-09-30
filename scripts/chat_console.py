@@ -28,6 +28,8 @@ import uuid
 
 import httpx
 
+from app.config import get_settings
+
 DEFAULT_COMPANION = "companion.alice"
 _WAIT_TIMEOUT_SECONDS = 60.0
 _TYPEWRITER_STEP_SECONDS = 0.02  # 每个 delta 间的步进停顿，让打字机节奏可读
@@ -207,9 +209,10 @@ def main(base_url: str, companion_id: str, *, no_stream: bool = False) -> int:
 
 
 if __name__ == "__main__":
+    defaults = get_settings()
     parser = argparse.ArgumentParser(description="Aesir 终端对话 REPL")
-    parser.add_argument("--port", default="8000", help="服务端口（默认 8000）")
-    parser.add_argument("--host", default="127.0.0.1", help="服务地址（默认 127.0.0.1）")
+    parser.add_argument("--port", default=str(defaults.service_port), help="服务端口（默认从 AESIR_SERVICE_PORT 读取）")
+    parser.add_argument("--host", default=defaults.service_host, help="服务地址（默认从 AESIR_SERVICE_HOST 读取）")
     parser.add_argument("--companion", default=DEFAULT_COMPANION, help="对话角色 ID")
     parser.add_argument("--no-stream", action="store_true", help="禁用流式，回退非流式 /chat")
     args = parser.parse_args()
