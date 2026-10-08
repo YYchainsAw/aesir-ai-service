@@ -1,0 +1,49 @@
+# 表现 ID 白名单与 UE 映射契约（Bruno）。白名单与 Alice 不重叠，确保不错用。
+# 所有 ID 须在 data/games/aesir/capability.yaml 的 presentation_ids 全集内。
+
+allowed_emotion_ids:
+  - id: emotion.neutral
+    description: "平静、寡言的默认状态。"
+  - id: emotion.pleased
+    description: "认可或受到照顾时的轻微高兴。"
+  - id: emotion.concerned
+    description: "担心玩家状态或周围风险。"
+  - id: emotion.serious
+    description: "面临危险时的专注。"
+  - id: emotion.thoughtful
+    description: "思考或犹豫。"
+
+allowed_gesture_ids:
+  - id: gesture.nod
+    description: "简短点头。"
+  - id: gesture.look_around
+    description: "观察周围。"
+  - id: gesture.step_closer
+    description: "靠近表达关心。"
+  - id: gesture.look_away
+    description: "移开视线。"
+  - id: gesture.ready_weapon
+    description: "准备战斗姿态。"
+
+allowed_facial_expression_ids:
+  - id: face.neutral
+    description: "平静无表情。"
+  - id: face.gentle_smile
+    description: "温和微笑。"
+  - id: face.concerned
+    description: "担忧。"
+  - id: face.serious
+    description: "严肃。"
+  - id: face.thoughtful
+    description: "若有所思。"
+
+ue_mapping_contract:
+  required_fields:
+    - companion_id
+    - emotion_id
+    - gesture_id
+    - facial_expression_id
+  fallback:
+    emotion_id: emotion.neutral
+    gesture_id: gesture.nod
+    facial_expression_id: face.neutral

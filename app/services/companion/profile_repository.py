@@ -15,8 +15,11 @@ from app.services.companion.persona_pack_validator import (
     PersonaPackValidator,
 )
 
-_PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
-_COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
+# 默认主队友人设源（S2 迁移后为人格包目录；旧单文件 YAML 仍可通过显式路径加载）。
+_PRIMARY_PROFILE_PATH = (
+    Path(__file__).resolve().parents[3] / "data" / "personas" / "aesir" / "companion.alice"
+)
+_COMPANIONS_DIR = Path(__file__).resolve().parents[3] / "data" / "companions"
 _PERSONAS_DIR = Path(__file__).resolve().parents[3] / "data" / "personas"
 _CAPABILITY_PATH = Path(__file__).resolve().parents[3] / "data" / "games" / "aesir" / "capability.yaml"
 _capability_cache: Capability | None = None
@@ -196,9 +199,12 @@ class CompanionProfileRepository:
                         sources.extend(sorted(d for d in game_dir.iterdir() if d.is_dir()))
         except OSError:
             pass
-        # 2) 旧单文件 YAML：data/companions/*.yaml（兼容期）
+        # 2) 旧单文件 YAML：data/companions/*.yaml（兼容期）。
+        # 共存语义：人格包目录优先扫描；若同一 companion_id 同时存在目录包与旧 YAML，
+        # load_registered 命中先扫描到的目录包，旧 YAML 不生效（不视为冲突，便于灰度迁移）。
         try:
-            sources.extend(sorted(_COMPANIONS_DIR.glob("*.yaml")))
+            if _COMPANIONS_DIR.is_dir():
+                sources.extend(sorted(_COMPANIONS_DIR.glob("*.yaml")))
         except OSError:
             pass
         # 3) 兜底主队友

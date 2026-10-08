@@ -2,7 +2,7 @@
 
 按 ``session_id`` 维护最近 N 轮（用户输入 + 艾莉回复）的滚动窗口，注入 LLM
 prompt 作为对话历史。进程内存、不持久化：服务重启即清空，刻意不做跨会话
-玩家画像或长期记忆（见 primary_companion.yaml 的 runtime_state_policy）。
+玩家画像或长期记忆（见 data/personas/aesir/companion.alice/rules.yaml 的 runtime_state_policy）。
 """
 
 from __future__ import annotations

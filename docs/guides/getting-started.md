@@ -268,7 +268,7 @@ curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/j
 start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console --port 8000
 ```
 
-- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/companions/primary_companion.yaml` 白名单核对。
+- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/personas/aesir/companion.alice/presentation.yaml` 白名单核对。
 - 同一次 REPL 使用固定 `session_id`，可验证短期会话记忆（接续上文）与长期记忆（重启服务后 `/memory` 仍能看到之前说过的内容）。
 - 内置命令：`/help` 帮助、`/memory` 查看三级长期记忆、`/reset` 清空会话+长期记忆、`/scene exploration|conversation` 切换对话场景、`/quit` 退出（服务留在后台）。
 

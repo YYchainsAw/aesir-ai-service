@@ -176,7 +176,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 ### 多角色隔离（US8）
 
-`/v1/companion/chat`、`/v1/companion/chat/stream` 与 `/v1/agent/step` 均按请求中的 `companion_id` 路由到已登记角色。当前已登记角色见 `data/companions/`（Alice 主角色 + Bruno 第二角色验证骨架）。不同角色拥有独立的记忆目录、关系目录与表现 ID 白名单；未登记的 `companion_id` 返回 `404`，不会静默回退默认角色。
+`/v1/companion/chat`、`/v1/companion/chat/stream` 与 `/v1/agent/step` 均按请求中的 `companion_id` 路由到已登记角色。当前已登记角色见 `data/personas/aesir/`（S2 人格包目录化：Alice 主角色 + Bruno 第二角色验证骨架）。不同角色拥有独立的记忆目录、关系目录与表现 ID 白名单；未登记的 `companion_id` 返回 `404`，不会静默回退默认角色。
 
 ### 表达一致性校验（T083）
 

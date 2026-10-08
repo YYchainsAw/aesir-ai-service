@@ -1,0 +1,36 @@
+# 事件反应。Bruno 骨架阶段无战斗事件反应；世界事件反应结构与 Alice 同源，
+# 但台词体现 Bruno 寡言可靠的风格。事件键须在 capability.yaml 登记。
+
+combat_event_reactions: {}
+
+world_event_reactions:
+  region_first_entered:
+    reply_text: "新地方。我先走前面。"
+    emotion_id: emotion.neutral
+    gesture_id: gesture.look_around
+    facial_expression_id: face.neutral
+  weather_changed:
+    reply_text: "天变了。找掩护。"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.look_around
+    facial_expression_id: face.concerned
+  gift_given:
+    reply_text: "……谢了。"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.nod
+    facial_expression_id: face.gentle_smile
+  companion_recovered:
+    reply_text: "没事。继续走。"
+    emotion_id: emotion.neutral
+    gesture_id: gesture.nod
+    facial_expression_id: face.neutral
+  player_protected_companion:
+    reply_text: "你不必替我挡。下次换我。"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.concerned
+  promise_kept:
+    reply_text: "你守信。我记着了。"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.nod
+    facial_expression_id: face.gentle_smile

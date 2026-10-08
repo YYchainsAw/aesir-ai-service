@@ -2,7 +2,16 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-09-28，**678 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**730 通过 + 2 跳过**）。
+
+## 2026-10-08 — S2 人格包目录化完成（Issue #36 / T27）
+
+Alice/Bruno 从 `data/companions/*.yaml` 单文件迁移为 `data/personas/aesir/<companion_id>/` 目录化人格包（manifest + persona + rules + examples + reactions + fallbacks + presentation + abilities 共 8 文件），迁移前后逐字段深比对确认数据等价（仅 `profile_version` 0.1→0.2、`game_name` 上移 manifest 两处预期差异），旧单文件 YAML 删除。
+
+- **默认人设源切换**：`profile_repository._PRIMARY_PROFILE_PATH` 指向 Alice 人格包目录；注册表扫描顺序为人格包目录优先、旧 `data/companions/*.yaml` 兼容兜底（共存期同一 `companion_id` 以目录包为准）。
+- **归属校验生效**：目录包加载后强制过 `PersonaPackValidator` 8 项校验（game_id / requires_capability / scene / event / presentation / ability / behavior / checksum 占位），两包均通过。
+- **测试**：新增 `tests/services/test_persona_pack_migration.py` 4 例（两包加载、默认源指向、注册表无重复）；修复 2 例受迁移影响的旧测试。测试数：726 → **730 通过 + 2 跳过**。
+- **文档同步**：README、getting-started、command-execution、协议 v0.1/v0.2、架构图表集、SDD 引用路径全部更新为 `data/personas/`。
 
 ## 2026-09-28 — 规划文档落地：批量回执 + 调试台 Web UI + 关系阶段中文名
 

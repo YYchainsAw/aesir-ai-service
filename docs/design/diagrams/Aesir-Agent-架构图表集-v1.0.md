@@ -9,7 +9,7 @@
 > **制图工具**：Mermaid（GitHub 技能 `diagram-creator`，MIT）。
 >
 > **事实来源与约束**：本图表集所有字段名、枚举值、阶段划分、阈值均取自仓库当前真实代码与配置
-> （`app/schemas/*`、`app/api/v1/*`、`data/policy/*.yaml`、`data/companions/*.yaml`），
+> （`app/schemas/*`、`app/api/v1/*`、`data/policy/*.yaml`、`data/personas/**`），
 > **不含任何虚构内容**；"待实现/占位"部分已明确标注。
 
 ## 目录
@@ -73,7 +73,7 @@ flowchart TB
     end
 
     subgraph DATA["本地数据资产（无数据库 / 无中间件）"]
-        F1["data/companions/*.yaml<br/>人格 + 表现 ID 白名单"]
+        F1["data/personas/**/*.yaml<br/>人格包 + 表现 ID 白名单"]
         F2["data/policy/*.yaml<br/>关系 / 活动域 / 战斗策略"]
         F3["data/lore/aesir/lore.yaml<br/>世界观知识库"]
         F4["data/memory/ 按 npc_id 分区<br/>持久化记忆与关系（运行期生成）"]
@@ -643,7 +643,7 @@ flowchart LR
             S2["本地文件持久化<br/>JSON / JSONL"]
         end
         subgraph FSR["本地文件系统"]
-            F1["data/companions · data/policy · data/world"]
+            F1["data/personas · data/policy · data/world"]
             F2["data/memory（运行期生成）"]
             F3["data/rl/executions（回执）"]
         end

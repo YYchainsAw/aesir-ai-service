@@ -1,7 +1,7 @@
 # 人格训练语料（B1 路线）
 
 NPC 人格训练采用**语料 + few-shot 优先**（B1）路线：先把高质量对话语料攒起来，
-直接注入 LLM prompt（`data/companions/primary_companion.yaml` 的 `dialogue_examples`，
+直接注入 LLM prompt（`data/personas/aesir/companion.alice/examples.yaml` 的 `dialogue_examples`，
 当前 60+ 组）；语料攒到 500+ 组后再评估上微调（B2 火山方舟 / B3 本地 LoRA）。
 
 ## 目录约定
@@ -46,6 +46,6 @@ comfort / tactical_redirect / battle_chat / memory_recall / promise / boundary /
 
 1. 批量生成：用 DeepSeek 等按分类批量生成候选 → 存 `corpus_raw/<日期>_<分类>.yaml`。
 2. 人工过滤：逐条对照红线 → 合格移入 `corpus_checked/`（可按 `filter_checklist.md` 打勾）。
-3. 入库：定期把 `corpus_checked` 精选进 `primary_companion.yaml` 的 `dialogue_examples`
+3. 入库：定期把 `corpus_checked` 精选进 `data/personas/aesir/companion.alice/examples.yaml` 的 `dialogue_examples`
    （注意 prompt 全量注入，条数过多时需评估 token 预算）。
 4. 评测：`start.bat chat` 终端对话人工过一遍；语料 500+ 后评估 B2 微调。

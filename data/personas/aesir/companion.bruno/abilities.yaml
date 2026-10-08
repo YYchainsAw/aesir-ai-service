@@ -1,0 +1,13 @@
+# 能力声明（Bruno 骨架阶段）：暂不声明战斗能力，仅声明通用行为。
+# 所有 ID 须在 data/games/aesir/capability.yaml 的 abilities / behaviors 全集内。
+
+ability_ids: []
+
+behavior_ids:
+  - follow
+  - move_to
+  - observe
+  - rest
+  - wait
+  - express
+  - alert_player

@@ -1,0 +1,67 @@
+# 表现 ID 白名单与 UE 映射契约。
+# 模型只能返回本文件登记的 emotion / gesture / facial expression 稳定 ID；
+# UE 负责将这些 ID 映射为实际表情、Montage、音效与镜头表现。
+# 所有 ID 须在 data/games/aesir/capability.yaml 的 presentation_ids 全集内（归属校验）。
+
+allowed_emotion_ids:
+  - id: emotion.bright
+    description: "默认的开朗、积极状态。"
+  - id: emotion.excited
+    description: "发现新事物、获得胜利或期待行动时的兴奋。"
+  - id: emotion.pleased
+    description: "认可玩家表现或受到照顾时的高兴。"
+  - id: emotion.concerned
+    description: "担心玩家状态或周围风险。"
+  - id: emotion.shy
+    description: "被直接夸奖或被关心时的短暂害羞。"
+  - id: emotion.playfully_annoyed
+    description: "轻微嘴硬或调侃，不代表真正敌意。"
+  - id: emotion.serious
+    description: "面临危险、需要认真提醒时的专注状态。"
+  - id: emotion.thoughtful
+    description: "观察线索、思考问题时的状态。"
+
+allowed_gesture_ids:
+  - id: gesture.cheerful_idle
+    description: "轻松自然的默认待机，面向玩家。"
+  - id: gesture.small_wave
+    description: "轻快地挥手招呼或回应。"
+  - id: gesture.enthusiastic_nod
+    description: "积极点头，表示赞同或准备行动。"
+  - id: gesture.think
+    description: "短暂思考或观察。"
+  - id: gesture.look_away
+    description: "害羞、嘴硬或被夸奖后的短暂移开视线。"
+  - id: gesture.fold_arms
+    description: "轻微不满或认真提醒，不可表现为敌对。"
+  - id: gesture.step_closer
+    description: "非战斗状态下小幅靠近，表达关心；必须可中断。"
+
+allowed_facial_expression_ids:
+  - id: face.bright_smile
+    description: "开朗自然的微笑。"
+  - id: face.excited
+    description: "充满期待或兴奋。"
+  - id: face.gentle_smile
+    description: "温和、真诚的微笑。"
+  - id: face.concerned
+    description: "担忧。"
+  - id: face.shy
+    description: "短暂害羞。"
+  - id: face.playfully_annoyed
+    description: "轻微嘴硬或调侃。"
+  - id: face.serious
+    description: "严肃、警觉。"
+  - id: face.thoughtful
+    description: "若有所思。"
+
+ue_mapping_contract:
+  required_fields:
+    - companion_id
+    - emotion_id
+    - gesture_id
+    - facial_expression_id
+  fallback:
+    emotion_id: emotion.bright
+    gesture_id: gesture.cheerful_idle
+    facial_expression_id: face.gentle_smile
