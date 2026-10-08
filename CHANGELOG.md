@@ -4,6 +4,17 @@
 
 > 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**745 通过 + 2 跳过**）。
 
+## 2026-10-08 — T18 NPC 协议与联调配置收口（Issue #31 / EXT-04）
+
+纯文档收口任务，无代码变更（测试数不变：745 通过 + 2 跳过）。
+
+- **独立 v0.3 契约**：新增 `docs/protocols/npc-contract-v0.3.md`，把散落的 v0.3 内容（`/v1/agent/step`、`/v1/world/events`、`/v1/console/*`、批量执行回执）集中定义，给出与 v0.1/v0.2 的兼容边界、共同规范（ID/时间/终态/错误）与实测错误样例；全部样例为对运行中实例（端口 8000）的实测抓取。
+- **联调对齐表**：新增 `docs/protocols/integration-alignment-v0.3.md`——固定两仓版本（aesir-ai-service@75ac7a3 / AesirWarden@facba39）、端口矩阵（NPC 8000 / Boss 8012 分开，UE 两 Subsystem 默认 8011 需统一改指 8000）、ID 与聊天/指令分流口径、启动命令与 health 实测记录。
+- **能力对照与演示目标**：Python 声明 5 项 vs UE 实现 2 项（basic_attack/explosion）；演示能力目标定为 `ability.alice.explosion`；quick_heal/major_heal/shield 标记未制作，由 UE `ValidateOrder` 拒绝并回报 `rejected` 回执，声明与实现差异以对照表为准。
+- **验收矩阵**：12 条链路逐项区分已实现/启用/未制作/拒绝，附实测状态码与耗时（chat 200/2328.8ms、tactical/command 200/19.3ms、agent/step 200/31.8ms、world/events 200/27.5ms、回执 202、404/422 错误样例）。
+- **SC-011 口径先定义**：采样点（UE 输入发出 → 回调且 Alice 开始表现）、样本（同场遭遇战 ≥30 次混合指令）、临时通过口径（规则链路 p95 ≤ 300ms，LLM 链路单列）；硬指标量化由 T33（FIX-04）定稿。
+- **文档同步**：game-design-doc v0.2 §6.5 勾选 EXT-04；todo.md EXT-04 此前已随批量回执落地勾选，本次补齐契约与对齐表两项交付物。
+
 ## 2026-10-08 — S4 L0/L3 能力门控（Issue #38 / T29）
 
 - **新增 `app/services/games/capability_gate.py`**：按当前游戏档案 `capability_level` 做端点链路门控。L0 只开放对话/记忆/关系；`/v1/commands/parse`、`/parse-command`、`/v1/tactical/resolve|command|executions`、`/v1/combat/events`、`/v1/agent/step` 在 L0 下一律 403 显式拒绝，响应体带结构化原因（`CAPABILITY_LEVEL_INSUFFICIENT` + feature/game_id/level/required），不静默降级、不产生越界下发；未知等级按 -1 处理同样拒绝。
