@@ -41,6 +41,7 @@ from app.services.agency.behavior_catalog import (
 )
 from app.services.agency.domain import domain_for, no_interrupt_reason, resolve_scene
 from app.services.agency.throttle import get_throttle
+from app.services.games.capability_gate import FEATURE_AGENT_STEP, require_l3
 from app.services.companion.profile_repository import (
     CompanionProfileError,
     UnknownCompanionError,
@@ -272,6 +273,8 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
 
 @router.post("/step", response_model=AgentStepResponse)
 def agent_step(request: AgentStepRequest) -> AgentStepResponse:
+    # S4/T029：自主行为主入口属完整链路，L0 游戏显式拒绝（不产生越界下发）。
+    require_l3(FEATURE_AGENT_STEP)
     try:
         get_registered_profile(request.companion_id)
     except UnknownCompanionError as error:

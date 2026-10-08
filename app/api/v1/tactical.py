@@ -16,6 +16,12 @@ from app.schemas.tactical_decision import (
     TacticalDecision,
 )
 from app.schemas.tactical_execution import ExecutionReceiptRequest
+from app.services.games.capability_gate import (
+    FEATURE_TACTICAL_COMMAND,
+    FEATURE_TACTICAL_EXECUTIONS,
+    FEATURE_TACTICAL_RESOLVE,
+    require_l3,
+)
 from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
 from app.services.tactical.llm_intent import parse_intent_with_source
 from app.services.tactical.policy import get_policy
@@ -85,6 +91,7 @@ def _resolve_response(
 
 @router.post("/resolve", response_model=ResolveResponse)
 def resolve_tactical(request: ResolveRequest) -> ResolveResponse:
+    require_l3(FEATURE_TACTICAL_RESOLVE)
     return _resolve_response(request.request_id, request.intent, request.combat_context)
 
 
@@ -96,6 +103,7 @@ def command_tactical(request: TacticalCommandRequest) -> ResolveResponse:
     规则 / LLM，LLM 失败自动回退规则），再走 resolve 的上下文策略；
     不可识别时按策划书 §5.2 回复澄清——不猜测、不施放。
     """
+    require_l3(FEATURE_TACTICAL_COMMAND)
     intent, source = parse_intent_with_source(
         request.text, companion_id=request.combat_context.companion.id
     )
@@ -127,6 +135,7 @@ def record_execution(request: ExecutionReceiptRequest) -> dict:
 
     兼容单条 ``{"receipt": {...}}`` 与批量 ``{"receipts": [...]}``。
     """
+    require_l3(FEATURE_TACTICAL_EXECUTIONS)
     if request.receipt is not None:
         path = append_receipt(request.receipt, game_id=request.game_id)
         return {"stored": True, "order_id": request.receipt.order_id, "path": str(path)}

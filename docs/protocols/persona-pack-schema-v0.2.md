@@ -108,7 +108,23 @@ domains:
 ```
 
 - 取值是 `app/schemas/directives/` 各域 Literal 白名单的**子集**（固定枚举 + 每游戏子集）。
-- S4（T029）将按本档案做 L0/L3 下发门控与显式降级；当前为契约登记。
+
+## 5.1 L0/L3 运行后门控（S4/T029，已落地）
+
+路由层按当前游戏档案 `capability_level` 门控（`app/services/games/capability_gate.py`）：
+
+| 链路 | L0 | L3 |
+|------|----|----|
+| 对话（`/v1/companion/*`）、记忆、关系、调试台 | ✅ 可用 | ✅ 可用 |
+| 世界事件 `/v1/world/events` | 仅放行档案 `events` 声明的事件类型 | ✅ 全量 |
+| `/v1/commands/parse`、`/parse-command` | ⛔ 403 | ✅ |
+| `/v1/tactical/resolve` / `/command` / `/executions` | ⛔ 403 | ✅ |
+| `/v1/combat/events`、`/v1/agent/step` | ⛔ 403 | ✅ |
+
+- 拒绝为显式 403，响应体带结构化原因：`reason_code`（`CAPABILITY_LEVEL_INSUFFICIENT` /
+  `EVENT_NOT_DECLARED`）、`feature`、`game_id`、`capability_level`、`required`/`event_type`；
+  不静默降级、不产生越界下发。未知能力等级按 -1 处理，门控功能同样拒绝。
+- 行为级（directives.yaml 逐 action_type）门控仍在后续迭代；当前门控粒度为端点链路。
 
 ## 6. 现有档案实例
 

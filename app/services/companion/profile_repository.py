@@ -251,6 +251,11 @@ def _get_capability() -> Capability:
     return _capability_cache[game_id]
 
 
+def get_current_capability() -> Capability:
+    """当前游戏档案的公开入口（S4/T029 能力门控使用）。"""
+    return _get_capability()
+
+
 # ---------------------------------------------------------------------------
 # mtime 缓存 provider：YAML 是静态配置，文件未变时不必每请求重读重解析。
 # 文件变更（mtime 变化）自动失效重读，保留「YAML 是唯一静态来源」语义；

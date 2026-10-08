@@ -2,7 +2,14 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**736 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**745 通过 + 2 跳过**）。
+
+## 2026-10-08 — S4 L0/L3 能力门控（Issue #38 / T29）
+
+- **新增 `app/services/games/capability_gate.py`**：按当前游戏档案 `capability_level` 做端点链路门控。L0 只开放对话/记忆/关系；`/v1/commands/parse`、`/parse-command`、`/v1/tactical/resolve|command|executions`、`/v1/combat/events`、`/v1/agent/step` 在 L0 下一律 403 显式拒绝，响应体带结构化原因（`CAPABILITY_LEVEL_INSUFFICIENT` + feature/game_id/level/required），不静默降级、不产生越界下发；未知等级按 -1 处理同样拒绝。
+- **事件声明门禁**：`/v1/world/events` 的 `event_type` 必须落在当前游戏档案 `events` 声明内，未声明 403（`EVENT_NOT_DECLARED`）；demo-vn（L0）仅声明 `gift_given`。
+- **测试**：新增 `test_capability_gate.py` 9 例（L0 对话/已声明事件可用、未声明事件拒绝、五类完整链路 403 带原因、跨游戏角色 404）。测试数：736 → **745 通过 + 2 跳过**。
+- **文档**：persona-pack-schema v0.2 新增 §5.1 运行后门控矩阵；行为级（逐 action_type）门控留后续迭代。
 
 ## 2026-10-08 — S3 游戏档案 + canonical schema（Issue #37 / T28）
 
