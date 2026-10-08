@@ -15,11 +15,39 @@ from app.services.companion.persona_pack_validator import (
     PersonaPackValidator,
 )
 
-_PRIMARY_PROFILE_PATH = Path(__file__).resolve().parents[3] / "data" / "companions" / "primary_companion.yaml"
-_COMPANIONS_DIR = _PRIMARY_PROFILE_PATH.parent
+# 默认主队友人设源（S2 迁移后为人格包目录；旧单文件 YAML 仍可通过显式路径加载）。
+_PRIMARY_PROFILE_PATH = (
+    Path(__file__).resolve().parents[3] / "data" / "personas" / "aesir" / "companion.alice"
+)
+_COMPANIONS_DIR = Path(__file__).resolve().parents[3] / "data" / "companions"
 _PERSONAS_DIR = Path(__file__).resolve().parents[3] / "data" / "personas"
-_CAPABILITY_PATH = Path(__file__).resolve().parents[3] / "data" / "games" / "aesir" / "capability.yaml"
-_capability_cache: Capability | None = None
+_GAMES_DIR = Path(__file__).resolve().parents[3] / "data" / "games"
+_CAPABILITY_PATH = _GAMES_DIR / "aesir" / "capability.yaml"  # 保留：默认游戏档案路径（兼容旧测试）
+_capability_cache: dict[str, Capability] = {}
+
+
+def _current_game_id() -> str:
+    """当前进程服务的游戏（一进程一游戏，S3/T028）。"""
+    from app.config import get_settings
+
+    return get_settings().game_id
+
+
+def _capability_path(game_id: str) -> Path:
+    return _GAMES_DIR / game_id / "capability.yaml"
+
+
+def _default_profile_source() -> Path:
+    """默认主队友人设源：当前游戏人格目录下按名称排序的第一个人格包。"""
+    game_id = _current_game_id()
+    if game_id == "aesir":
+        return _PRIMARY_PROFILE_PATH
+    game_personas = _PERSONAS_DIR / game_id
+    if game_personas.is_dir():
+        packs = sorted(d for d in game_personas.iterdir() if d.is_dir())
+        if packs:
+            return packs[0]
+    return _PRIMARY_PROFILE_PATH
 
 
 class CompanionProfileError(RuntimeError):
@@ -78,8 +106,9 @@ class CompanionProfile:
 class CompanionProfileRepository:
     """人设 YAML / 人格包目录的读取与校验；调用方一般走 ``get_profile()`` 的 mtime 缓存。"""
 
-    def __init__(self, profile_source: Path = _PRIMARY_PROFILE_PATH) -> None:
-        self._profile_source = profile_source
+    def __init__(self, profile_source: Path | None = None) -> None:
+        # 缺省按当前游戏解析主队友（一进程一游戏）；显式传路径可加载任意来源。
+        self._profile_source = profile_source if profile_source is not None else _default_profile_source()
 
     def _load_raw(self) -> dict[str, Any]:
         """从单文件或人格包目录读取原始 YAML 数据。"""
@@ -186,33 +215,40 @@ class CompanionProfileRepository:
             ) from error
 
     def _profile_sources(self) -> list[Path]:
-        """返回所有可加载的人设源：人格包目录优先，旧单文件 YAML 兼容。"""
+        """返回所有可加载的人设源：人格包目录优先，旧单文件 YAML 兼容。
+
+        一进程一游戏（S3/T028）：只扫描当前游戏 ``data/personas/<game_id>/`` 下的
+        人格包；其他游戏的人格包不进入注册表，跨游戏 ``companion_id`` 命中不到，
+        由 ``load_registered`` 抛 ``UnknownCompanionError``（404 语义），不回退默认角色。
+        """
         sources: list[Path] = []
-        # 1) 人格包目录：data/personas/<game_id>/<companion_id>/
+        # 1) 人格包目录：data/personas/<game_id>/<companion_id>/（仅当前游戏）
+        game_personas = _PERSONAS_DIR / _current_game_id()
         try:
-            if _PERSONAS_DIR.is_dir():
-                for game_dir in sorted(_PERSONAS_DIR.iterdir()):
-                    if game_dir.is_dir():
-                        sources.extend(sorted(d for d in game_dir.iterdir() if d.is_dir()))
+            if game_personas.is_dir():
+                sources.extend(sorted(d for d in game_personas.iterdir() if d.is_dir()))
         except OSError:
             pass
-        # 2) 旧单文件 YAML：data/companions/*.yaml（兼容期）
+        # 2) 旧单文件 YAML：data/companions/*.yaml（兼容期）。
+        # 共存语义：人格包目录优先扫描；若同一 companion_id 同时存在目录包与旧 YAML，
+        # load_registered 命中先扫描到的目录包，旧 YAML 不生效（不视为冲突，便于灰度迁移）。
         try:
-            sources.extend(sorted(_COMPANIONS_DIR.glob("*.yaml")))
+            if _COMPANIONS_DIR.is_dir():
+                sources.extend(sorted(_COMPANIONS_DIR.glob("*.yaml")))
         except OSError:
             pass
-        # 3) 兜底主队友
+        # 3) 兜底主队友（当前游戏默认源）
         if not sources:
-            return [_PRIMARY_PROFILE_PATH]
+            return [_default_profile_source()]
         return sources
 
 
 def _get_capability() -> Capability:
-    """读取当前游戏档案；进程内缓存。"""
-    global _capability_cache  # noqa: PLW0603
-    if _capability_cache is None:
-        _capability_cache = Capability.from_yaml(_CAPABILITY_PATH)
-    return _capability_cache
+    """读取当前游戏档案；按 game_id 进程内缓存。"""
+    game_id = _current_game_id()
+    if game_id not in _capability_cache:
+        _capability_cache[game_id] = Capability.from_yaml(_capability_path(game_id))
+    return _capability_cache[game_id]
 
 
 # ---------------------------------------------------------------------------

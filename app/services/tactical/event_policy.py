@@ -5,7 +5,7 @@
   返回 ``null``，反应与建议照常返回）。
 - 艾莉蓝量过低时倾向保守。
 - 治疗阈值等常量复用 resolver，保证事件策略与命令策略同源。
-- 人设反应从 data/companions YAML 读取（战斗类 ``combat_event_reactions``、
+- 人设反应从 data/personas 人格包读取（战斗类 ``combat_event_reactions``、
   生活类 ``world_event_reactions``），ID 不在白名单或配置缺失时回退默认表现。
 
 两个通道共享同一张幂等表（T061）：缓存的是与响应 schema 无关的

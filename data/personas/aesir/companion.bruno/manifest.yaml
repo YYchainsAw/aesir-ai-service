@@ -1,0 +1,9 @@
+# 人格包清单（S2 目录化）。
+# 2026-10-08 自 data/companions/secondary_companion.yaml 迁移，内容不变，仅拆分目录化。
+
+manifest_version: "0.1"
+profile_version: "0.2"
+companion_id: companion.bruno
+game_id: aesir
+requires_capability: L3
+checksum: null  # S5 资产守卫落地前占位；非 null 时必须是字符串

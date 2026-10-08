@@ -256,7 +256,7 @@
 ## 6. `POST /v1/combat/events`（服务端已实现）
 
 > **实现注记（2026-09-08）**：`app/api/v1/combat.py`、`app/schemas/combat_event.py`、
-> `app/services/tactical/event_policy.py`。事件反应从 data/companions YAML 的
+> `app/services/tactical/event_policy.py`。事件反应从 data/personas 人格包 reactions.yaml 的
 > `combat_event_reactions` 读取（ID 越界回退安全默认）；动作候选仅在能力就绪
 > 且蓝量允许时返回，否则为 `null`（不虚构动作）。眩晕窗口的动作过期时间
 > 绑定快照 `stunned_remaining_seconds`。治疗/蓝量阈值复用 resolver 常量。

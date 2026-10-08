@@ -1,0 +1,17 @@
+# 对话规则（demo-vn 旁白，L0：无战斗表达与战术应答）。
+
+conversation_rules:
+  allowed_game_states:
+    - conversation
+    - idle
+  response_rules:
+    - "回复简短，一至两句。"
+    - "未明确的世界事实应承认不确定，不得编造。"
+    - "任何回复中都不出现「指令」「接口」「频道」「协议」「系统」等出戏术语。"
+  runtime_state_policy:
+    - "按 session_id 维护短期记忆。"
+    - "关系数值与阶段、四级长期记忆为跨会话状态；请求未携带 session_id 时完全无状态。"
+
+combat_expression_rules: {}
+
+tactical_acknowledgements: {}

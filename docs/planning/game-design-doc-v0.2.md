@@ -15,7 +15,7 @@
 > - 当前已实现的格式基线：[ue-protocol-contract-v0.1.md](../protocols/ue-protocol-contract-v0.1.md)
 > - 下一阶段战斗事件与状态决策协议：[combat-tactical-protocol-v0.2.md](../protocols/combat-tactical-protocol-v0.2.md)
 > - 待完成 / 待优化追踪：[todo.md](todo.md)
-> - 人物唯一配置源（当前）：`data/companions/primary_companion.yaml`
+> - 人物唯一配置源（当前，S2 起）：`data/personas/aesir/companion.alice/` 人格包目录
 >
 > **定位升级（2026-09-13 起）**：项目要求已从「语音识别转 JSON 命令」升级为「塑造 Aesir 的完整人格（agent/skill），并负责整个 NPC 的活动塑造」。新范围（持久化记忆、关系状态、非战斗自主行为、只读查证工具、多角色、单一指令体系）以 [SDD v1.0](aesir-agent-sdd-v1.0.md) 为准；本文的战斗链路、协议边界与验收基线仍然有效，其中与新范围冲突的「非目标」与「下一步优先级」已在本文内标注修订。
 
@@ -237,7 +237,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 | Schema   | Pydantic v2                                                | 请求/响应、判别联合、白名单校验                                                                           |
 | HTTP 客户端 | httpx                                                      | 调用 OpenAI-compatible LLM API                                                               |
 | 配置       | `.env` + `python-dotenv`                                   | 密钥、模型、后端开关；密钥不入库                                                                           |
-| 人设数据     | YAML + PyYAML                                              | 当前：`data/companions/primary_companion.yaml` 是唯一人设来源；**演进目标见 §8 阶段 6：人格包（persona pack）目录化** |
+| 人设数据     | YAML + PyYAML                                              | 当前：`data/personas/aesir/` 人格包目录是唯一人设来源（S2 已完成目录化，2026-10-08） |
 | ASR      | 当前 mock；阶段 3 使用 faster-whisper                             | 音频转写；可本地运行以保护实时性                                                                           |
 | 规则策略     | 纯 Python + YAML policy（`data/policy/tactical_policy.yaml`） | 可测试的阈值、优先级、安全回退；试玩调参只改 YAML                                                                |
 | 测试       | pytest + FastAPI TestClient                                | Schema、规则、API、golden JSON 回归                                                               |
@@ -443,8 +443,8 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 | --- | --- | --- | --- |
 | **S0 前置小修包** | 修 B-01~B-06、闭合 CODE-01/CODE-02 | 2~2.5 | ★ 是 |
 | **S1 游戏级隔离** | `game_id` 命名空间、数据路径、运行时键、~~端口外置~~（已拆至 FIX-01 完成） | 1~1.5 | ★ 是 |
-| **S2 人格包目录化** | 单 YAML 拆目录化包 + manifest + 归属校验 | 2~2.5 | ★ 是 |
-| **S3 游戏档案 + canonical schema** | 发布 canonical schema、 capability.yaml、directives.yaml | 1 | ★ 是 |
+| **S2 人格包目录化** | 单 YAML 拆目录化包 + manifest + 归属校验（✅ 2026-10-08：Alice/Bruno 已迁移 `data/personas/aesir/`，归属校验 8 项全接线） | 2~2.5 | ★ 是 |
+| **S3 游戏档案 + canonical schema** | 发布 canonical schema、 capability.yaml、directives.yaml（✅ 2026-10-08：schema v0.2 成文、`AESIR_GAME_ID` 一进程一游戏、demo-vn 样例） | 1 | ★ 是 |
 | **S4 按能力接入** | L0/L3 两档 + 显式降级日志 | 0.5~1 | ★ 是 |
 | **S5 资产守卫** | lint、配额、注入检测、人工审核流程 | 2~3 | 否（第三方接入前必须） |
 

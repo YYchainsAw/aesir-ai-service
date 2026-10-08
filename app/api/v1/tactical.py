@@ -50,7 +50,7 @@ def _resolve_response(
     decision: TacticalDecision = resolve_intent(intent, combat_context)
     policy_backend = get_settings().tactical_policy
     # rl 后端尚未接入：按「规则系统始终保留」原则降级走规则，仅保留标记。
-    # 人设回复从 data/companions YAML 读取（与 v0.1 命令路径同源），
+    # 人设回复从 data/personas 人格包读取（与 v0.1 命令路径同源），
     # 缺失时回退到状态决定的表情与兜底文案，保证路由不承载人设文案。
     ack = create_tactical_acknowledgement(intent.intent_id, companion_id=companion_id)
     return ResolveResponse(

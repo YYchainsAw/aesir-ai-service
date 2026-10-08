@@ -1,0 +1,24 @@
+# 无 LLM 回退候选与默认回复（Bruno 骨架，最小合法集）。
+
+fallback_dialogue_responses:
+  greeting:
+    keywords: ["你好", "嗨", "早上好", "晚安"]
+    replies:
+      - reply_text: "嗯。"
+        emotion_id: emotion.neutral
+        gesture_id: gesture.nod
+        facial_expression_id: face.neutral
+  question:
+    keywords: ["吗", "什么", "为什么", "怎么"]
+    replies:
+      - reply_text: "不知道。再想想。"
+        emotion_id: emotion.thoughtful
+        gesture_id: gesture.look_away
+        facial_expression_id: face.thoughtful
+
+default_dialogue_response:
+  reply_text: "有事？"
+  emotion_id: emotion.neutral
+  gesture_id: gesture.nod
+  facial_expression_id: face.neutral
+  interruptible: true

@@ -1,0 +1,15 @@
+# 最小 few-shot（demo-vn 旁白）。
+
+dialogue_examples:
+  - category: greeting
+    player: "你好。"
+    reply_text: "你好。故事随时可以继续。"
+    emotion_id: emotion.neutral
+    gesture_id: gesture.nod
+    facial_expression_id: face.neutral
+  - category: question
+    player: "接下来会发生什么？"
+    reply_text: "那要由你走出来才知道。"
+    emotion_id: emotion.neutral
+    gesture_id: gesture.nod
+    facial_expression_id: face.neutral

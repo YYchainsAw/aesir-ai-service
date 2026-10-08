@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from app.services.companion.dialogue_service import create_dialogue_reply
 from app.services.companion.profile_repository import (
@@ -67,9 +68,12 @@ def test_get_profile_caches_until_mtime_changes(tmp_path, monkeypatch) -> None:
     # mtime 缓存：文件未变不重读（load 计数不增）；修改后自动失效重读。
     from app.services.companion import profile_repository as pr
 
-    src = Path("data/companions/primary_companion.yaml").read_text(encoding="utf-8")
+    # S2 迁移后仓库内无单文件人设 YAML；用 Alice 人格包合并结果 dump 出等价单文件。
+    from app.services.companion.persona_pack_loader import PersonaPackLoader
+
+    merged = PersonaPackLoader(Path("data/personas/aesir/companion.alice")).load()
     yaml_file = tmp_path / "profile.yaml"
-    yaml_file.write_text(src, encoding="utf-8")
+    yaml_file.write_text(yaml.safe_dump(merged, allow_unicode=True), encoding="utf-8")
     monkeypatch.setattr(
         pr.CompanionProfileRepository, "__init__", lambda self: setattr(self, "_profile_path", yaml_file)
     )
@@ -89,6 +93,7 @@ def test_get_profile_caches_until_mtime_changes(tmp_path, monkeypatch) -> None:
     assert calls["n"] == 1
 
     # 触碰内容（mtime 变化）→ 重新解析
+    src = yaml_file.read_text(encoding="utf-8")
     yaml_file.write_text(src.replace("display_name: Alice", "display_name: Alice2"), encoding="utf-8")
     third = pr.get_profile()
     assert third is not first

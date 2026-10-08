@@ -24,7 +24,7 @@ client = TestClient(app)
 
 _GOLDEN_DIR = Path(__file__).resolve().parents[2] / "data" / "golden"
 
-# 与 data/companions/primary_companion.yaml 的 world_event_reactions 一一对应
+# 与 data/personas/aesir/companion.alice/reactions.yaml 的 world_event_reactions 一一对应
 _LIFESTYLE_REPLIES = {
     "region_first_entered": "这地方我还没来过……别走太快，我先看看周围。",
     "weather_changed": "天色不太对，等下要是下起来，我们找个地方躲一躲。",

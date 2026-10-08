@@ -77,6 +77,21 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 - 默认监听 `127.0.0.1:8000`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
 - 当前为单一服务架构，UE 的 `UCompanionChatSubsystem` 与 `UCommandServiceSubsystem` 应指向同一地址（见 [UML 基线](../design/uml/baseline.md) GAP-001/002 处理）。
 
+### 3.1 按游戏启动独立实例（一进程一游戏，S3）
+
+进程通过 `AESIR_GAME_ID` 选择服务的游戏（默认 `aesir`），只加载 `data/games/<game_id>/` 游戏档案与 `data/personas/<game_id>/` 下的人格包；跨游戏 `companion_id` 返回 404，不回退默认角色。多游戏并存时每游戏各起一个实例、配不同端口：
+
+```powershell
+# 实例一：Aesir（默认），端口 8000
+.\.venv\Scripts\python -m scripts.run_server --port 8000
+
+# 实例二：demo-vn（自有第二游戏样例，L0 仅对话/记忆/关系），端口 8002
+$env:AESIR_GAME_ID = "demo-vn"
+.\.venv\Scripts\python -m scripts.run_server --port 8002
+```
+
+游戏档案与人格包的字段契约见 [人格包与游戏档案 Canonical Schema](../protocols/persona-pack-schema-v0.2.md)。
+
 启动成功后访问：
 
 | 地址 | 说明 |
@@ -268,7 +283,7 @@ curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/j
 start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console --port 8000
 ```
 
-- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/companions/primary_companion.yaml` 白名单核对。
+- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/personas/aesir/companion.alice/presentation.yaml` 白名单核对。
 - 同一次 REPL 使用固定 `session_id`，可验证短期会话记忆（接续上文）与长期记忆（重启服务后 `/memory` 仍能看到之前说过的内容）。
 - 内置命令：`/help` 帮助、`/memory` 查看三级长期记忆、`/reset` 清空会话+长期记忆、`/scene exploration|conversation` 切换对话场景、`/quit` 退出（服务留在后台）。
 

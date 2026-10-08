@@ -1,0 +1,7 @@
+# 能力声明（demo-vn，L0）：无战斗能力，仅最小行为集。
+
+ability_ids: []
+
+behavior_ids:
+  - express
+  - wait

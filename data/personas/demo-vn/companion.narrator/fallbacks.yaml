@@ -1,0 +1,17 @@
+# 无 LLM 回退与默认回复（demo-vn 旁白，最小合法集）。
+
+fallback_dialogue_responses:
+  greeting:
+    keywords: ["你好", "嗨", "早上好", "晚安"]
+    replies:
+      - reply_text: "你好。"
+        emotion_id: emotion.neutral
+        gesture_id: gesture.nod
+        facial_expression_id: face.neutral
+
+default_dialogue_response:
+  reply_text: "我在听。"
+  emotion_id: emotion.neutral
+  gesture_id: gesture.nod
+  facial_expression_id: face.neutral
+  interruptible: true

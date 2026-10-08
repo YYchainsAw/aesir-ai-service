@@ -1,0 +1,28 @@
+# 表现 ID 白名单（demo-vn 旁白）。所有 ID 须在 demo-vn capability 全集内。
+
+allowed_emotion_ids:
+  - id: emotion.neutral
+    description: "克制的默认状态。"
+  - id: emotion.pleased
+    description: "轻微认可。"
+
+allowed_gesture_ids:
+  - id: gesture.nod
+    description: "简短点头。"
+
+allowed_facial_expression_ids:
+  - id: face.neutral
+    description: "平静无表情。"
+  - id: face.gentle_smile
+    description: "温和微笑。"
+
+ue_mapping_contract:
+  required_fields:
+    - companion_id
+    - emotion_id
+    - gesture_id
+    - facial_expression_id
+  fallback:
+    emotion_id: emotion.neutral
+    gesture_id: gesture.nod
+    facial_expression_id: face.neutral

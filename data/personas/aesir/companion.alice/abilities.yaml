@@ -1,0 +1,22 @@
+# 能力声明（可选文件）：人格包引用哪些游戏能力与行为。
+# 所有 ID 须在 data/games/aesir/capability.yaml 的 abilities / behaviors 全集内（归属校验）。
+
+ability_ids:
+  - ability.alice.basic_attack
+  - ability.alice.explosion
+  - ability.alice.quick_heal
+  - ability.alice.major_heal
+  - ability.alice.shield
+
+behavior_ids:
+  - follow
+  - move_to
+  - observe
+  - inspect
+  - interact
+  - pickup
+  - rest
+  - wait
+  - express
+  - self_talk
+  - alert_player

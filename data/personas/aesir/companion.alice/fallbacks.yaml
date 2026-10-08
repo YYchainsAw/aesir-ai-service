@@ -1,0 +1,94 @@
+# 无 LLM（mock/回退）时的分类回复候选：按 keywords 命中的类别选一组，
+# 组内按玩家输入的稳定哈希轮换（同输入恒同回复，不同输入自然分散）。
+# 类别判序固定为下方出现顺序（tactical_redirect 优先级最高）；
+# 全部未命中时退回 default_dialogue_response。
+
+fallback_dialogue_responses:
+  tactical_redirect:
+    keywords: ["boss", "技能", "攻击", "放招", "打它", "打他", "帮我打", "施法", "治疗", "回血"]
+    replies:
+      - reply_text: "等真打起来的时候喊我一声就行，我手早就痒了。"
+        emotion_id: emotion.playfully_annoyed
+        gesture_id: gesture.fold_arms
+        facial_expression_id: face.playfully_annoyed
+      - reply_text: "现在还不是动手的时候——等它露面，我第一个冲上去。"
+        emotion_id: emotion.serious
+        gesture_id: gesture.enthusiastic_nod
+        facial_expression_id: face.serious
+  praise:
+    keywords: ["厉害", "漂亮", "夸", "最棒", "了不起", "谢谢你", "多亏"]
+    replies:
+      - reply_text: "哼，那当然，也不看看是谁出的手。……你刚才说什么？再来一遍？"
+        emotion_id: emotion.shy
+        gesture_id: gesture.look_away
+        facial_expression_id: face.shy
+      - reply_text: "咳，正常发挥而已。……好吧，被你这么一说还挺开心的。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.look_away
+        facial_expression_id: face.gentle_smile
+  concern:
+    keywords: ["受伤", "没事吧", "辛苦了", "累不累", "小心点", "注意安全"]
+    replies:
+      - reply_text: "就一点小伤，至于这么紧张嘛。……谢谢你啦，我心里有数。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.look_away
+        facial_expression_id: face.gentle_smile
+      - reply_text: "我没事！倒是你，别光顾着担心我，自己也当心点。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+  comfort:
+    keywords: ["难过", "伤心", "丧", "想家", "没用", "后悔", "压力", "不开心", "累了", "烦"]
+    replies:
+      - reply_text: "那就先歇一歇，我陪你坐一会儿。硬撑最没意思了。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+      - reply_text: "先别急着怪自己。把事情讲给我听听？也许没那么糟。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+  greeting:
+    keywords: ["你好", "嗨", "早上好", "早安", "下午好", "晚上好", "晚安", "哈喽", "hello"]
+    replies:
+      - reply_text: "嗨！来得正好，我正想找人说说话呢。"
+        emotion_id: emotion.bright
+        gesture_id: gesture.small_wave
+        facial_expression_id: face.bright_smile
+      - reply_text: "你来啦！今天打算去哪儿转转？"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.small_wave
+        facial_expression_id: face.gentle_smile
+  farewell:
+    keywords: ["再见", "拜拜", "明天见", "回见", "先走了", "下线", "告辞"]
+    replies:
+      - reply_text: "好，去忙吧。我就在这儿，回来记得找我。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.small_wave
+        facial_expression_id: face.gentle_smile
+      - reply_text: "路上小心！别让我等太久哦。"
+        emotion_id: emotion.bright
+        gesture_id: gesture.small_wave
+        facial_expression_id: face.bright_smile
+  question:
+    keywords: ["吗", "什么", "为什么", "怎么", "哪", "谁", "多少", "是不是", "好不好", "呢？"]
+    replies:
+      - reply_text: "这个嘛……让我想想。你先说说你的看法？"
+        emotion_id: emotion.thoughtful
+        gesture_id: gesture.think
+        facial_expression_id: face.thoughtful
+      - reply_text: "问得好！不过这个我可得先琢磨琢磨，晚点告诉你。"
+        emotion_id: emotion.bright
+        gesture_id: gesture.cheerful_idle
+        facial_expression_id: face.bright_smile
+      - reply_text: "嗯——说不好，但我们可以一起弄明白呀。"
+        emotion_id: emotion.thoughtful
+        gesture_id: gesture.think
+        facial_expression_id: face.thoughtful
+
+default_dialogue_response:
+  reply_text: "我在呢。想聊什么？"
+  emotion_id: emotion.bright
+  gesture_id: gesture.cheerful_idle
+  facial_expression_id: face.bright_smile
+  interruptible: true

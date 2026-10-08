@@ -138,6 +138,9 @@ def test_corrupt_profile_yaml_returns_503_not_500(monkeypatch, tmp_path) -> None
     companions_dir.mkdir()
     bad = companions_dir / "primary_companion.yaml"
     bad.write_text("identity: {id: [unclosed", encoding="utf-8")
+    # S2 迁移后注册表优先扫描 _PERSONAS_DIR 的人格包目录；须同时指向空目录，
+    # 扫描才会落到损坏的旧单文件 YAML。
+    monkeypatch.setattr(pr, "_PERSONAS_DIR", tmp_path / "personas_empty")
     monkeypatch.setattr(pr, "_COMPANIONS_DIR", companions_dir)
     monkeypatch.setattr(pr, "_PRIMARY_PROFILE_PATH", bad)
     # 清除 mtime 缓存，避免旧缓存命中
