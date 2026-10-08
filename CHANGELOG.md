@@ -2,7 +2,15 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**730 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-08，**736 通过 + 2 跳过**）。
+
+## 2026-10-08 — S3 游戏档案 + canonical schema（Issue #37 / T28）
+
+- **Canonical schema v0.2 发布**：`docs/protocols/persona-pack-schema-v0.2.md` 定稿人格包 8 文件契约、capability/directives 游戏档案格式、归属校验 8 项与版本纪律（破坏性变更升级版本号）。
+- **一进程一游戏**：`AESIR_GAME_ID` 配置化选择当前游戏（默认 `aesir`）；`profile_repository` 按游戏加载 `data/games/<game_id>/capability.yaml`（按 game_id 缓存），注册表只扫描 `data/personas/<当前游戏>/`；跨游戏 `companion_id` 抛 404 语义，不回退默认角色、不混用他游戏能力。
+- **档案落地**：新增 `data/games/aesir/directives.yaml`（按域指令白名单，S4 门控依据）；新增自有第二游戏样例 `data/games/demo-vn/`（L0）+ `data/personas/demo-vn/companion.narrator/` 最小人格包。
+- **测试**：新增 `test_game_selection.py` 6 例（默认游戏、注册表隔离、跨游戏拒绝、默认源解析、L0 校验、档案缓存独立）。测试数：730 → **736 通过 + 2 跳过**。
+- **文档**：`.env.example` 新增 `AESIR_GAME_ID`；getting-started 新增「按游戏启动独立实例」一节。
 
 ## 2026-10-08 — S2 人格包目录化完成（Issue #36 / T27）
 

@@ -1,0 +1,8 @@
+# demo-vn 旁白人格包清单（自有第二游戏样例，L0 档）。
+
+manifest_version: "0.1"
+profile_version: "0.2"
+companion_id: companion.narrator
+game_id: demo-vn
+requires_capability: L0
+checksum: null  # S5 资产守卫落地前占位

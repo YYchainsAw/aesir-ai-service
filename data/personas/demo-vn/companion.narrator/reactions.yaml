@@ -1,0 +1,10 @@
+# 事件反应（demo-vn：L0 无战斗事件；世界事件仅 gift_given）。
+
+combat_event_reactions: {}
+
+world_event_reactions:
+  gift_given:
+    reply_text: "礼物被收下了。"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.nod
+    facial_expression_id: face.gentle_smile

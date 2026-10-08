@@ -444,7 +444,7 @@ LLM 擅长理解“奶我一口”“我顶不住了”“它快晕了，准备�
 | **S0 前置小修包** | 修 B-01~B-06、闭合 CODE-01/CODE-02 | 2~2.5 | ★ 是 |
 | **S1 游戏级隔离** | `game_id` 命名空间、数据路径、运行时键、~~端口外置~~（已拆至 FIX-01 完成） | 1~1.5 | ★ 是 |
 | **S2 人格包目录化** | 单 YAML 拆目录化包 + manifest + 归属校验（✅ 2026-10-08：Alice/Bruno 已迁移 `data/personas/aesir/`，归属校验 8 项全接线） | 2~2.5 | ★ 是 |
-| **S3 游戏档案 + canonical schema** | 发布 canonical schema、 capability.yaml、directives.yaml | 1 | ★ 是 |
+| **S3 游戏档案 + canonical schema** | 发布 canonical schema、 capability.yaml、directives.yaml（✅ 2026-10-08：schema v0.2 成文、`AESIR_GAME_ID` 一进程一游戏、demo-vn 样例） | 1 | ★ 是 |
 | **S4 按能力接入** | L0/L3 两档 + 显式降级日志 | 0.5~1 | ★ 是 |
 | **S5 资产守卫** | lint、配额、注入检测、人工审核流程 | 2~3 | 否（第三方接入前必须） |
 

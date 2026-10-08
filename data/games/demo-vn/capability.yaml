@@ -1,0 +1,31 @@
+# demo-vn 游戏档案（自有第二游戏样例，S3/T028）。
+# 一个极简视觉小说式 demo：L0 档，仅对话/记忆/关系，无战斗与自主行为链路。
+# 用于验证「配置化选择当前游戏 + 跨游戏隔离 + L0 降级语义」。
+
+game_id: demo-vn
+revision: capability-001
+
+provides:
+  capability_level: L0
+
+  scenes:
+    - conversation
+    - idle
+
+  events:
+    combat: []
+    world:
+      - gift_given
+
+  presentation_ids:
+    - emotion.neutral
+    - emotion.pleased
+    - gesture.nod
+    - face.neutral
+    - face.gentle_smile
+
+  abilities: []
+
+  behaviors:
+    - express
+    - wait

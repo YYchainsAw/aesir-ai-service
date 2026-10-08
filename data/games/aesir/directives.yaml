@@ -1,0 +1,33 @@
+# Aesir 指令档案（S3/T028）：声明本游戏支持的统一指令行为类型（按活动域分组）。
+# 取值与 app/schemas/directives/ 各域 Literal 白名单一致；破坏性变更须升级 revision。
+# 未在本档案登记的 action_type 不得下发给 UE（S4 门控将按此档案执行）。
+
+game_id: aesir
+revision: directives-001
+schema_version: "0.3"
+
+domains:
+  combat:
+    - major_heal
+    - quick_heal
+    - shield
+    - burst
+    - retreat
+  movement:
+    - follow
+    - move_to
+    - wait
+    - retreat_move
+  interaction:
+    - inspect
+    - interact
+    - pickup
+    - observe
+    - alert_player
+  social:
+    - express
+    - self_talk
+  routine:
+    - rest
+    - eat
+    - repair_gear

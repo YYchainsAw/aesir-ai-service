@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     service_host: str = "127.0.0.1"             # uvicorn 监听地址
     service_port: int = 8000                    # 默认监听端口；与 UE 联调前请统一为此端口
 
+    # -- 游戏档案（S3 / T028：一进程一游戏）-----------------------------------
+    # 当前进程服务的游戏：决定加载 data/games/<game_id>/capability.yaml 游戏档案，
+    # 并把人格注册表限制在 data/personas/<game_id>/ 之下。跨游戏角色请求返回 404，
+    # 不回退默认角色、不混用另一游戏能力。多游戏并存时按游戏各起一个实例（独立端口）。
+    game_id: str = "aesir"
+
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm
     companion_backend: str = "mock"             # mock | llm

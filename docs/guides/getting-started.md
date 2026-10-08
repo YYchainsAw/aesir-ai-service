@@ -77,6 +77,21 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 - 默认监听 `127.0.0.1:8000`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
 - 当前为单一服务架构，UE 的 `UCompanionChatSubsystem` 与 `UCommandServiceSubsystem` 应指向同一地址（见 [UML 基线](../design/uml/baseline.md) GAP-001/002 处理）。
 
+### 3.1 按游戏启动独立实例（一进程一游戏，S3）
+
+进程通过 `AESIR_GAME_ID` 选择服务的游戏（默认 `aesir`），只加载 `data/games/<game_id>/` 游戏档案与 `data/personas/<game_id>/` 下的人格包；跨游戏 `companion_id` 返回 404，不回退默认角色。多游戏并存时每游戏各起一个实例、配不同端口：
+
+```powershell
+# 实例一：Aesir（默认），端口 8000
+.\.venv\Scripts\python -m scripts.run_server --port 8000
+
+# 实例二：demo-vn（自有第二游戏样例，L0 仅对话/记忆/关系），端口 8002
+$env:AESIR_GAME_ID = "demo-vn"
+.\.venv\Scripts\python -m scripts.run_server --port 8002
+```
+
+游戏档案与人格包的字段契约见 [人格包与游戏档案 Canonical Schema](../protocols/persona-pack-schema-v0.2.md)。
+
 启动成功后访问：
 
 | 地址 | 说明 |
