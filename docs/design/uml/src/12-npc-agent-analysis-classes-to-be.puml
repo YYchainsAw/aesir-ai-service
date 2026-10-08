@@ -1,0 +1,97 @@
+@startuml npc-agent-analysis-classes-spec-v1_1
+' Diagram: UML-12; Model: To-Be / requirements Spec v1.1
+' Purpose: standalone source extracted from the NPC requirements specification
+' Spec baseline: 2026-09-25; source split checked: 2026-10-08
+' UE reference: AesirWarden develop ea4c8052f5df319c2d3b7b8c8dfcf2f684efb408
+' AI reference: main 1678dd6a467bc2fd9c077124ede527a82958e332
+' Evidence: docs/planning/aesir-agent-sdd-v1.1.md; Spec v1.1 sections 3.1..3.4; REQ/BR traceability
+' This is a requirements model, not proof of a verified UE execution path.
+skinparam defaultFontName Microsoft YaHei
+title Aesir NPC 代理 — 分析类图（Spec v1.1）
+skinparam shadowing false
+hide empty members
+
+class CompanionProfile <<entity>> {
+  - companionId: String
+  - profileVersion: String
+  - taboos: String[*]
+  - expressionWhitelist: String[*]
+}
+
+class MemoryEntry <<entity>> {
+  - entryId: String
+  - tier: MemoryTier
+  - content: String
+  - importance: Integer
+  - source: String
+  - gameTime: String
+  - realTime: String
+}
+
+class RelationshipState <<entity>> {
+  - value: Integer
+  - stage: RelationshipStage
+  - dailyNetPositive: Integer
+  + applyEvent(type, at): Integer
+}
+
+class WorldSnapshot <<value object>> {
+  - scene: ActivityDomain
+  - worldTime: String [0..1]
+  - player: PlayerState
+  - companion: CompanionState
+  - interactables: Interactable[*]
+}
+
+class WorldEvent <<value object>> {
+  - eventId: String
+  - type: WorldEventType
+  - occurredAt: String
+  - seq: Integer
+}
+
+class Directive <<value object>> {
+  - directiveId: String
+  - priority: Integer
+  - expiresAt: String [0..1]
+  - rationale: String
+}
+class CombatDirective
+class MovementDirective
+class InteractionDirective
+class SocialDirective
+class RoutineDirective
+
+class AbilitySpec <<registry>> {
+  - abilityId: String
+  - scenes: ActivityDomain[*]
+  - maxDistanceM: Float [0..1]
+}
+
+enum ActivityDomain {
+  combat
+  exploration
+  camp
+  conversation
+  idle
+}
+
+CompanionProfile "1" *-- "0..*" MemoryEntry : 拥有（重置时级联清空）
+CompanionProfile "1" *-- "0..1" RelationshipState : 每玩家一份（本项目单玩家→1）
+RelationshipState ..> WorldEvent : 由事件驱动增减
+WorldEvent ..> Directive : 产生 0..* 反应指令
+WorldSnapshot ..> Directive : 心跳判定产生 0..1
+Directive "0..*" --> "1..*" AbilitySpec : 白名单校验（BR-01）
+Directive <|-- CombatDirective
+Directive <|-- MovementDirective
+Directive <|-- InteractionDirective
+Directive <|-- SocialDirective
+Directive <|-- RoutineDirective
+Directive ..> ActivityDomain
+
+note bottom of RelationshipState
+  业务操作 applyEvent 保护 BR-04：阶段边界、
+  冷却窗口、日上限、损坏回退。
+  禁止 public setValue 绕过规则（第 4 课 p.23/24）。
+end note
+@enduml

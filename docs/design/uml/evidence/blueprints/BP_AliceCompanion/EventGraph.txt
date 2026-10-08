@@ -1,5 +1,0 @@
-EMPTY_GRAPH_VERIFIED
-Asset=/Game/Aesir/Characters/Companions/BP_AliceCompanion
-Graph=EventGraph
-VerifiedAt=2026-09-11
-Evidence=User inspected the Blueprint and confirmed that EventGraph contains no nodes.

@@ -1,0 +1,52 @@
+@startuml npc-agent-use-cases-spec-v1_1
+' Diagram: UML-11; Model: To-Be / requirements Spec v1.1
+' Purpose: standalone source extracted from the NPC requirements specification
+' Spec baseline: 2026-09-25; source split checked: 2026-10-08
+' UE reference: AesirWarden develop ea4c8052f5df319c2d3b7b8c8dfcf2f684efb408
+' AI reference: main 1678dd6a467bc2fd9c077124ede527a82958e332
+' Evidence: docs/planning/aesir-agent-sdd-v1.1.md; REQ-01..08; UC-01..07; BR-01..10
+' This is a requirements model, not proof of a verified UE execution path.
+skinparam defaultFontName Microsoft YaHei
+title Aesir NPC 人格与行为代理 — 用例图（Spec v1.1）
+left to right direction
+skinparam shadowing false
+
+actor "玩家\nA-01" as Player
+actor "UE 客户端（唯一权威端）\nA-02" as UE
+actor "大模型服务（可选协作方）\nA-03" as LLM <<actor>>
+
+rectangle "Aesir AI 服务（系统边界）" {
+  usecase "UC-01 与 NPC 陪伴对话" as UC1
+  usecase "UC-02 下达战术指令" as UC2
+  usecase "UC-03 以语音下达指令" as UC3
+  usecase "UC-04 接收 NPC 自主行为" as UC4
+  usecase "UC-05 上报世界事件并获得反应" as UC5
+  usecase "UC-06 查询状态与决策解释" as UC6
+  usecase "UC-07 重置 NPC 记忆" as UC7
+}
+
+Player --> UC1
+Player --> UC2
+Player --> UC3
+Player --> UC4
+UE --> UC1
+UE --> UC2
+UE --> UC3
+UE --> UC4
+UE --> UC5
+UE --> UC6
+UE --> UC7
+UC1 --> LLM : 可选协作（失败降级）
+UC2 --> LLM : 可选协作（失败降级）
+UC3 --> LLM : 可选协作（失败降级）
+
+note bottom of UC4
+  服务不主动向客户端推送（FR-021）：
+  自主行为只在 UE 心跳请求（/v1/agent/step）中判定并返回。
+end note
+
+note bottom of UC1
+  UC-01 与 UC-02 是两个独立用户目标；
+  对话不自动产生战术执行，指令不自动产生闲聊。
+end note
+@enduml

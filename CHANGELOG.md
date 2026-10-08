@@ -39,6 +39,15 @@ Alice/Bruno 从 `data/companions/*.yaml` 单文件迁移为 `data/personas/aesir
 - **测试**：新增 `tests/services/test_persona_pack_migration.py` 4 例（两包加载、默认源指向、注册表无重复）；修复 2 例受迁移影响的旧测试。测试数：726 → **730 通过 + 2 跳过**。
 - **文档同步**：README、getting-started、command-execution、协议 v0.1/v0.2、架构图表集、SDD 引用路径全部更新为 `data/personas/`。
 
+## 2026-10-08 — 课程需求图源拆分与整组资料索引
+
+- 保留用户最新的 AI 目录安排：13 张 PNG 在 `docs/design/uml/png/`，原图源仍在 `src/`，同步索引与 Spec 嵌图；不移动用户的预览。
+- 保留用户删除 UE SRS 和本地旧 UML 证据资料的结果，清理失效入口；不重建 NPC 素材副本或生成课程 ZIP。13 张预览与原 `.puml` 同名，原模型脚本保持不变。
+- 本地 main 从 `7caf4d9` 快进到 `1678dd6`；不新增提交或推送。
+- 将 NPC Spec v1.1 的用例图、分析类图、对象图拆为 `docs/design/uml/src/11～13` 独立 PlantUML，正文与索引引用唯一图源，保留旧实现图。
+- 校正 RelationshipState 的需求映射和 UC-04 的 Python 服务后置边界；记忆重置、关系生命周期与能力关联假设保留明确差异记录。
+- 新增课程资料索引，关联两仓职责与现存文档、图源位置。验证范围为文档链接、图源语法与排版；没有运行服务、训练或 UE 验收，历史测试数锚点保持原记录。
+
 ## 2026-09-28 — 规划文档落地：批量回执 + 调试台 Web UI + 关系阶段中文名
 
 根据 `docs/planning/todo.md`（2026-09-28 新建）与 `docs/planning/game-design-doc-v0.1.md` 阶段 5，完成三项 Python 侧可独立交付的改进。

@@ -81,8 +81,8 @@ Python 服务侧的主要参考文档：
 
 ## 5. PlantUML 文件约定
 
-- 仓库只维护 `docs/design/uml/src/*.puml` 源文件。
-- SVG/PNG 的预览与导出不属于本仓库 UML 编写流程。
+- 权威源为 `docs/design/uml/src/*.puml`；同名 PNG 按 2026-10-08 用户调整位于 `docs/design/uml/png/`。
+- 修改脚本后同步导出 PNG；预览不独立修改，不改变原图的 As-Is/To-Be 或历史证据基线。
 - `.puml` 应保持自包含，不依赖在线主题或远程 include。
 
 ## 6. 基线变更规则
@@ -91,3 +91,13 @@ Python 服务侧的主要参考文档：
 - 任一仓库更新后，先重新导出证据并查看差异，再更新 UML。
 - 设计目标必须使用 `to-be` 文件名；当前实现必须使用 `as-is` 文件名。
 - 发现文档与实现冲突时，在本文件登记 `GAP-*`，不静默选择其中一方。
+
+## 7. 2026-10-08 课程需求图源基线
+
+本节只适用于 UML-11～13，不改写 UML-01～10 的历史基线。
+
+- 需求来源：`docs/planning/aesir-agent-sdd-v1.1.md`（Spec 日期 2026-09-25）；三张内嵌 PlantUML 已拆到 `src/`，脚本内容沿用原模型，补充元数据和中文字体。
+- 当前 AI 工作区：`C:/Users/YYchainsaw/PycharmProjects/aesir-ai-service`，main 已快进到 `1678dd6a467bc2fd9c077124ede527a82958e332`。
+- 整组 UE 参考：`YYchainsAw/AesirWarden`，本地 develop `ea4c8052f5df319c2d3b7b8c8dfcf2f684efb408`；不继续将旧 `UE_AesirCombatPrototype` 当作整组当前工程。
+- 模型为 To-Be / 需求规格，不证明真实 UE 对话、同伴战斗、回执或 Boss PPO 已验收；原 Spec 中待确认的业务假设仍保留。
+- 图源一图一文件；UML-01～13 的 PNG 按用户安排保存在 `png/`，原脚本仍在 `src/`。语法与排版验证不作为运行测试；本次整理不修改原模型内容。

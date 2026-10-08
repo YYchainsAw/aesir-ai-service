@@ -144,52 +144,9 @@
 
 ## 2.2 用例图（PlantUML 源）
 
-```plantuml
-@startuml npc-agent-use-cases-spec-v1_1
-title Aesir NPC 人格与行为代理 — 用例图（Spec v1.1）
-left to right direction
-skinparam shadowing false
+可编辑图源：[11-npc-agent-use-cases-to-be.puml](../design/uml/src/11-npc-agent-use-cases-to-be.puml)（UML-11，一图一文件；本节不再维护第二份内嵌脚本）。
 
-actor "玩家\nA-01" as Player
-actor "UE 客户端（唯一权威端）\nA-02" as UE
-actor "大模型服务（可选协作方）\nA-03" as LLM <<actor>>
-
-rectangle "Aesir AI 服务（系统边界）" {
-  usecase "UC-01 与 NPC 陪伴对话" as UC1
-  usecase "UC-02 下达战术指令" as UC2
-  usecase "UC-03 以语音下达指令" as UC3
-  usecase "UC-04 接收 NPC 自主行为" as UC4
-  usecase "UC-05 上报世界事件并获得反应" as UC5
-  usecase "UC-06 查询状态与决策解释" as UC6
-  usecase "UC-07 重置 NPC 记忆" as UC7
-}
-
-Player --> UC1
-Player --> UC2
-Player --> UC3
-Player --> UC4
-UE --> UC1
-UE --> UC2
-UE --> UC3
-UE --> UC4
-UE --> UC5
-UE --> UC6
-UE --> UC7
-UC1 --> LLM : 可选协作（失败降级）
-UC2 --> LLM : 可选协作（失败降级）
-UC3 --> LLM : 可选协作（失败降级）
-
-note bottom of UC4
-  服务不主动向客户端推送（FR-021）：
-  自主行为只在 UE 心跳请求（/v1/agent/step）中判定并返回。
-end note
-
-note bottom of UC1
-  UC-01 与 UC-02 是两个独立用户目标；
-  对话不自动产生战术执行，指令不自动产生闲聊。
-end note
-@enduml
-```
+![NPC 服务用例图](../design/uml/png/11-npc-agent-use-cases-to-be.png)
 
 ## 2.3 关系决策（为何没有 include/extend/泛化）
 
@@ -243,7 +200,7 @@ end note
 | 前置条件 | 快照含活动场景；时间/区域缺失时对应行为不启用（Assumptions） |
 | 基本流 | ① UE 心跳上报快照；② 判定活动场景（战斗/探索/营地/对话/待机）；③ 禁打断检查（BR-06 四情形）；④ 生成候选行为并按六级优先级仲裁；⑤ 白名单与可执行性校验（目标类型/距离）；⑥ 节流去重后返回至多一条受限行为指令（或空动作轻量返回） |
 | 备选 / 异常 | 3a 处于禁打断情形：返回空，不发起。5a 无可执行候选：返回空与原因，不虚构（BR-01/06）。6a 同触发源 300 秒内重复：不产出（AT-06）。战斗域：排除生活类行为 |
-| 成功 / 失败后置 | 成功：NPC 做出合理且不重复的自主行为；玩家指令始终优先。失败：无越界/不可执行指令 |
+| 成功 / 失败后置 | 成功：服务返回至多一条合法、经仲裁与节流的行为建议；实际执行由 UE 再校验，优先级按 BR-06。失败：无越界/不可执行指令 |
 | 依据 | REQ-04；BR-01/06/08；NFR-02 |
 
 ### UC-05 上报世界事件并获得反应
@@ -291,7 +248,7 @@ end note
 | --- | --- | --- |
 | NPC 人格档案（Key Entities） | **实体** CompanionProfile：有身份（`companion_id`）、版本、禁忌与白名单 | REQ-01/08；BR-09/10 |
 | 记忆条目（Key Entities） | **实体** MemoryEntry：内容、重要性、双时间戳、来源；按层级（短期/摘要/档案/印象）管理 | REQ-01/07；BR-05 |
-| 长期关系档案（Key Entities） | **实体** RelationshipState：数值、阶段、当日净变化、近期事件；持久化 | REQ-03（横切）；BR-04 |
+| 长期关系档案（Key Entities） | **实体** RelationshipState：数值、阶段、当日净变化、近期事件；持久化 | REQ-01/02/05；BR-04 |
 | 世界状态快照（Key Entities） | **值对象** WorldSnapshot：只读输入，不承担权威状态 | REQ-04/05；BR-01 |
 | 行为指令（Key Entities） | **值对象** Directive（统一信封）；按域判别出 5 个子类型 | REQ-02/04/05；BR-01；FR-045 |
 | 世界事件（Key Entities） | **值对象** WorldEvent：`event_id`＋类型＋时间＋序号；幂等回放键 | REQ-05；BR-03 |
@@ -313,97 +270,9 @@ end note
 
 ## 3.3 分析类图（PlantUML 源）
 
-```plantuml
-@startuml npc-agent-analysis-classes-spec-v1_1
-title Aesir NPC 代理 — 分析类图（Spec v1.1）
-skinparam shadowing false
-hide empty members
+可编辑图源：[12-npc-agent-analysis-classes-to-be.puml](../design/uml/src/12-npc-agent-analysis-classes-to-be.puml)（UML-12，一图一文件；本节不再维护第二份内嵌脚本）。
 
-class CompanionProfile <<entity>> {
-  - companionId: String
-  - profileVersion: String
-  - taboos: String[*]
-  - expressionWhitelist: String[*]
-}
-
-class MemoryEntry <<entity>> {
-  - entryId: String
-  - tier: MemoryTier
-  - content: String
-  - importance: Integer
-  - source: String
-  - gameTime: String
-  - realTime: String
-}
-
-class RelationshipState <<entity>> {
-  - value: Integer
-  - stage: RelationshipStage
-  - dailyNetPositive: Integer
-  + applyEvent(type, at): Integer
-}
-
-class WorldSnapshot <<value object>> {
-  - scene: ActivityDomain
-  - worldTime: String [0..1]
-  - player: PlayerState
-  - companion: CompanionState
-  - interactables: Interactable[*]
-}
-
-class WorldEvent <<value object>> {
-  - eventId: String
-  - type: WorldEventType
-  - occurredAt: String
-  - seq: Integer
-}
-
-class Directive <<value object>> {
-  - directiveId: String
-  - priority: Integer
-  - expiresAt: String [0..1]
-  - rationale: String
-}
-class CombatDirective
-class MovementDirective
-class InteractionDirective
-class SocialDirective
-class RoutineDirective
-
-class AbilitySpec <<registry>> {
-  - abilityId: String
-  - scenes: ActivityDomain[*]
-  - maxDistanceM: Float [0..1]
-}
-
-enum ActivityDomain {
-  combat
-  exploration
-  camp
-  conversation
-  idle
-}
-
-CompanionProfile "1" *-- "0..*" MemoryEntry : 拥有（重置时级联清空）
-CompanionProfile "1" *-- "0..1" RelationshipState : 每玩家一份（本项目单玩家→1）
-RelationshipState ..> WorldEvent : 由事件驱动增减
-WorldEvent ..> Directive : 产生 0..* 反应指令
-WorldSnapshot ..> Directive : 心跳判定产生 0..1
-Directive "0..*" --> "1..*" AbilitySpec : 白名单校验（BR-01）
-Directive <|-- CombatDirective
-Directive <|-- MovementDirective
-Directive <|-- InteractionDirective
-Directive <|-- SocialDirective
-Directive <|-- RoutineDirective
-Directive ..> ActivityDomain
-
-note bottom of RelationshipState
-  业务操作 applyEvent 保护 BR-04：阶段边界、
-  冷却窗口、日上限、损坏回退。
-  禁止 public setValue 绕过规则（第 4 课 p.23/24）。
-end note
-@enduml
-```
+![NPC 服务分析类图](../design/uml/png/12-npc-agent-analysis-classes-to-be.png)
 
 ## 3.4 关联、多重性与组合的业务解释
 
@@ -422,27 +291,9 @@ end note
 
 **正例**（一次心跳后的现场）：
 
-```plantuml
-@startuml npc-agent-object-example-v1_1
-title 对象图正例：心跳产出一条自主行为指令
-object "alice:CompanionProfile" as P {
-  companionId = "companion.alice"
-}
-object "rel:RelationshipState" as R {
-  value = 26
-  stage = neutral
-}
-object "snap:WorldSnapshot" as S {
-  scene = exploration
-}
-object "d1:RoutineDirective" as D {
-  directiveId = "dir-20260925-0001"
-  priority = 25
-}
-P *-- R
-S ..> D : 判定产生（observe，目标在快照内且 ≤25m）
-@enduml
-```
+可编辑图源：[13-npc-agent-object-example-to-be.puml](../design/uml/src/13-npc-agent-object-example-to-be.puml)（UML-13，一图一文件；本节不再维护第二份内嵌脚本）。
+
+![NPC 对象图正例](../design/uml/png/13-npc-agent-object-example-to-be.png)
 
 **反例（必须判错）**：
 
@@ -517,6 +368,18 @@ S ..> D : 判定产生（observe，目标在快照内且 ≤25m）
 | CH-06 | 新增 REQ/UC/BR/AT 编号，旧 US/FR/SC 保留并建立映射 | 第 3 课 p.11：编号在两轮中保持稳定 |
 | CH-07 | BR-01 补 `action_type` 白名单枚举校验与降级口径；BR-02 补 LLM 输入不可信封装口径 | CODE-01/CODE-02 实现；todo.md 2026-09-28 |
 | CH-08 | BR-06 补指令有效期参数外置、战斗指令统一带 expires、行为映射缺失降级口径 | CODE-03/CODE-04/CODE-05/CODE-07 实现；todo.md 2026-09-28 |
+| CH-09 | 2026-10-08：用例图、分析类图、对象图拆为 UML-11～13 独立 `.puml`，正文改为相对链接；图源补版本/目的/日期元数据 | 教师要求一图一文件；模型内容沿用原 Spec |
+| CH-10 | 2026-10-08：三张 PNG 与原 `.puml` 同目录、同名保存，正文恢复对应嵌图；旧 UML-01～10 同步补齐同名预览 | 图与原脚本并排存放；不改模型和运行状态 |
+| CH-11 | 2026-10-08：保留用户将 PNG 移至 `docs/design/uml/png/` 的安排，正文图片链接同步；原图源仍在 `src/` | 保持用户目录改动，不将预览移回源目录 |
+| CH-10 | 2026-10-08：RelationshipState 候选依据从误写的 REQ-03 改为 REQ-01/02/05；UC-04 成功后置改为服务返回建议，按 BR-06 仲裁，实际执行留给 UE | 现有需求映射和 Python 服务边界；不修改程序行为 |
+
+## 2026-10-08 拆分时的待核对记录
+
+本次将图源变成独立文件，不自动将原目标假设升级为实现结论：
+
+- `app/api/v1/console.py::reset_memory` 清会话与长期记忆，**不清关系档案**；长期清理失败时会话可能已清，返回 `reset=false`。UC-07 的“失败原状态不变”和关系组合生命周期假设应在下一次规格评审校对，不能作为现状保证。
+- 分析图 `Directive → AbilitySpec` 的 `1..*` 目标端仍是原 Spec 假设；移动/社交/空动作并非每次施法，应复核各类指令真正引用能力的条件。本次不擅自批准新的业务规则。
+- 系统基线和现存两仓资料位置见 [课程资料索引](course-requirements-index.md)。本服务 Spec 仍排除 Boss RL；UE 的 SRS 目录已由用户删除，游戏与整组模型保留在 UE 图源目录。
 
 ---
 

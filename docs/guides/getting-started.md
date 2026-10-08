@@ -108,7 +108,7 @@ $env:AESIR_GAME_ID = "demo-vn"
 .\.venv\Scripts\python -m pytest
 ```
 
-测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况 × 关系阶段维度）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、US2 关系驱动、US3 自主行为编排、US4 意图域扩展、US7 可解释性、US8 多角色隔离、T083 表达一致性校验、T084 LLM 熔断、语料红线。测试数以 `pytest` 输出为准（2026-09-24：**669 通过 + 2 跳过**，锚点见根目录 [CHANGELOG](../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
+测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况 × 关系阶段维度）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、US2 关系驱动、US3 自主行为编排、US4 意图域扩展、US7 可解释性、US8 多角色隔离、T083 表达一致性校验、T084 LLM 熔断、语料红线。测试数以 `pytest` 输出为准（2026-09-24：**669 通过 + 2 跳过**，锚点见根目录 [CHANGELOG](../../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
 
 另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions → v0.3 主入口心跳/限流/自主行为 → 世界事件幂等 → 调试台 → US7 可解释链路演示。
 

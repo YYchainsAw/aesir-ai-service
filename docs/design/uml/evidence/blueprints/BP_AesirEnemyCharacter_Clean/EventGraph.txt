@@ -1,2 +1,0 @@
-PASTE_BP_AesirEnemyCharacter_Clean_EventGraph_CLIPBOARD_EXPORT_HERE
-

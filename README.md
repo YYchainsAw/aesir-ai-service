@@ -87,7 +87,7 @@ aesir-ai-service/
 | 启动 / 安装 / 接口示例 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
 | LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
 | 当前 Boss RL 代码与运行入口 | [`rl/README.md`](rl/README.md) |
-| 总策划书 v0.1 | [`docs/planning/game-design-doc-v0.1.md`](docs/planning/game-design-doc-v0.1.md) |
+| 总策划书 v0.2 | [`docs/planning/game-design-doc-v0.2.md`](docs/planning/game-design-doc-v0.2.md) |
 | **需求规格说明书 SDD v1.0**（章程 / 用户故事 / 任务分解） | [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md) |
 | 全部文档索引 | [`docs/README.md`](docs/README.md) |
 

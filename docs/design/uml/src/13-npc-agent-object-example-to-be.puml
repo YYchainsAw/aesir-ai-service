@@ -1,0 +1,27 @@
+@startuml npc-agent-object-example-v1_1
+' Diagram: UML-13; Model: To-Be / requirements Spec v1.1
+' Purpose: standalone source extracted from the NPC requirements specification
+' Spec baseline: 2026-09-25; source split checked: 2026-10-08
+' UE reference: AesirWarden develop ea4c8052f5df319c2d3b7b8c8dfcf2f684efb408
+' AI reference: main 1678dd6a467bc2fd9c077124ede527a82958e332
+' Evidence: docs/planning/aesir-agent-sdd-v1.1.md; Spec v1.1 section 3.5; BR-04/06/08
+' This is a requirements model, not proof of a verified UE execution path.
+skinparam defaultFontName Microsoft YaHei
+title 对象图正例：心跳产出一条自主行为指令
+object "alice:CompanionProfile" as P {
+  companionId = "companion.alice"
+}
+object "rel:RelationshipState" as R {
+  value = 26
+  stage = neutral
+}
+object "snap:WorldSnapshot" as S {
+  scene = exploration
+}
+object "d1:RoutineDirective" as D {
+  directiveId = "dir-20260925-0001"
+  priority = 25
+}
+P *-- R
+S ..> D : 判定产生（observe，目标在快照内且 ≤25m）
+@enduml
