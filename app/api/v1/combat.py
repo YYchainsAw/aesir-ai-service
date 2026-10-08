@@ -7,6 +7,7 @@
 from fastapi import APIRouter
 
 from app.schemas.combat_event import CombatEventRequest, CombatEventResponse
+from app.services.games.capability_gate import FEATURE_COMBAT_EVENTS, require_l3
 from app.services.tactical.event_policy import handle_combat_event
 
 router = APIRouter(prefix="/v1/combat", tags=["combat"])
@@ -14,4 +15,5 @@ router = APIRouter(prefix="/v1/combat", tags=["combat"])
 
 @router.post("/events", response_model=CombatEventResponse)
 def report_combat_event(request: CombatEventRequest) -> CombatEventResponse:
+    require_l3(FEATURE_COMBAT_EVENTS)
     return handle_combat_event(request)

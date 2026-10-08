@@ -10,6 +10,7 @@ from app.schemas.tactical_order import (
     ParseCommandRequest,
     ParseCommandResponse,
 )
+from app.services.games.capability_gate import FEATURE_COMMANDS_PARSE, require_l3
 from app.services.parsers.command_parser import parse_command
 
 router = APIRouter(tags=["commands"])
@@ -27,6 +28,7 @@ class _LegacyRequest(BaseModel):
 )
 def parse_tactical_command_legacy(request: _LegacyRequest) -> ParseCommandResponse:
     """把纯文本指令按默认能力目录解析为 UE-safe tactical order。"""
+    require_l3(FEATURE_COMMANDS_PARSE)
     return parse_command(request.text, DEFAULT_CONTEXT, uuid4())
 
 
@@ -37,4 +39,5 @@ def parse_tactical_command_legacy(request: _LegacyRequest) -> ParseCommandRespon
 )
 def parse_command_v1(request: ParseCommandRequest) -> ParseCommandResponse:
     """把玩家文本指令、配合 UE 能力目录解析为受限 TacticalOrder。"""
+    require_l3(FEATURE_COMMANDS_PARSE)
     return parse_command(request.text, request.context, request.request_id)
