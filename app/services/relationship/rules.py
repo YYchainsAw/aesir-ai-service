@@ -64,13 +64,14 @@ def apply_relationship_event(
     # 跨日：重置当日正向额度
     daily_net = state.daily_net if day == state.day else 0
 
-    # 冷却窗口：同类型最近一条在窗口内则不计分
-    for record in reversed(state.recent_events):
-        if record.event_type == event_type:
-            elapsed = (moment - _parse(record.occurred_at)).total_seconds()
-            if 0 <= elapsed < cooldown:
-                return state, 0
-            break  # 只看最近一条同类事件
+    # 冷却窗口：同类型最近一次计分在窗口内则不计分。
+    # 查独立的 last_event_at（不扫 recent_events）——recent_events 只保留最近
+    # 20 条用于可解释性展示，高频交互会挤出旧记录，扫它会导致冷却判定漂移（CODE-08）。
+    last_at = state.last_event_at.get(event_type)
+    if last_at is not None:
+        elapsed = (moment - _parse(last_at)).total_seconds()
+        if 0 <= elapsed < cooldown:
+            return state, 0
 
     delta = policy.events[event_type]
     if delta > 0:
@@ -90,11 +91,16 @@ def apply_relationship_event(
     recent.append(RelationshipEventRecord(event_type=event_type, occurred_at=moment.isoformat(timespec="seconds").replace("+00:00", "Z"), delta=applied))
     recent = recent[-_RECENT_EVENT_LIMIT:]
 
+    # 更新该类事件最近计分时间戳（冷却判定依据）。
+    last_event_at = dict(state.last_event_at)
+    last_event_at[event_type] = moment.isoformat(timespec="seconds").replace("+00:00", "Z")
+
     new_state = RelationshipState(
         value=value,
         stage=stage_of(value, policy),
         day=day,
         daily_net=daily_net,
         recent_events=recent,
+        last_event_at=last_event_at,
     )
     return new_state, applied

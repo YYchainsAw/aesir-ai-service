@@ -77,9 +77,9 @@
 
 ### 🟡 可选（一致性 / 健壮性小项）
 
-- [ ] **CODE-06 `resolve_scene` 与 `ctx.scene` 判定口径可能不一致**：两者各自推导场景，任一侧改口径就会分叉。建议抽单一 `resolve_scene()` 供两处共用。
+- [x] **CODE-06 `resolve_scene` 与 `ctx.scene` 判定口径可能不一致**（T20 核查 2026-10-12）：核查确认分叉前提不成立——`resolve_scene()` 本身即 `return ctx.scene` 单一透传入口，其余消费点（agent.py、behavior_catalog）都读同一只读快照字段，不存在第二套推导口径。现有 `test_agency_domain.py` 已锁定 `resolve_scene(ctx)==ctx.scene`。无需改动。
 - [x] **CODE-07 战斗指令缺 `expires` 字段**：非战斗指令有过期时间而战斗指令没有，UE 侧可能长期持有过期战术指令。建议统一补上（与 CODE-03 一起做，参数同样外置）。
-- [ ] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**：`get_throttle()` 单例在构造时读一次策略，热更新 `data/policy/` 不生效；且关系冷却依赖 `recent_events`（上限 20 条），长时间高频交互会挤出历史事件导致冷却判定漂移。建议：① 节流器支持策略重载（或明确「改配置需重启」写入文档）；② 评估冷却改用独立时间戳字段而非扫 `recent_events`。
+- [x] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**（T20 修复 2026-10-12）：① 节流单例热更新——明确为有意边界，`throttle.py` docstring 已写「策略进程启动时固化，改配置需重启；测试用 reset_throttle()」，不实现热更新平台；② 冷却漂移——**已修复**：`RelationshipState` 新增独立 `last_event_at: dict[str,str]`，冷却判定改查该字典而非扫 `recent_events`（上限 20 会挤出旧记录）。复现样例：gift_given 计分后塞 20 条其他事件挤出 recent_events，冷却窗口内重复原错误计分 +3，修复后正确拦截 delta=0。回归 `test_cooldown_survives_recent_events_eviction`。
 
 ## 四、明确不做（边界提醒，防止方向跑偏）
 

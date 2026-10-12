@@ -7,6 +7,13 @@
 实现模式与 ``app/api/v1/agent.py`` 心跳限流一致：OrderedDict + Lock +
 有界容量。键 = (companion_id, behavior, target_id, trigger_source)——同一
 行为对不同目标、同一目标不同触发原因都不算重复。
+
+## 配置生效口径（CODE-08① / T20）
+
+``get_throttle()`` 模块级单例在**首次调用时**从策略 YAML 读一次参数并固化，
+进程运行期**不做热更新**——改 ``data/policy/`` 下的节流配置后需**重启进程**才生效。
+这是有意的边界（本服务不引入配置热更新平台，见 T20 范围），不是缺陷。
+测试隔离用 ``reset_throttle()`` 清空单例，使下一次 ``get_throttle()`` 重读策略。
 """
 
 from __future__ import annotations
