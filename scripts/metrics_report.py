@@ -1,19 +1,35 @@
-"""验收指标采集脚本（SDD US7 / T079）。
+"""验收指标采集脚本（SDD US7 / T079，T19 修复漏采）。
 
-统计既有落盘数据中可测的验收指标，输出一页报告：
+统计既有落盘数据中可测的验收指标，输出一页报告。
 
-- 执行回执（data/runtime/command_service/executions/*.jsonl）：
-  回执总数、result 分布、越界可疑（rejected/failed 计数）。
-- 对话信号（data/runtime/dialogue_signals/*.jsonl）：
-  轮次总数、后端分布（llm / mock / fallback）、降级次数（fallback）、
+## 落盘布局（T19 起按 game_id 分目录）
+
+- 执行回执（``receipts_dir``）：
+  - 旧布局：``<root>/{YYYYMMDD}.jsonl``（根目录，无 game_id 概念）
+  - 新布局：``<root>/<game_id>/{YYYYMMDD}.jsonl``（``receipt_store.append_receipts``）
+- 对话信号（``dialogue_signals_dir``）：
+  - 旧布局：``<root>/<companion_id>.jsonl``
+  - 新布局：``<root>/<game_id>/<companion_id>.jsonl``（``record_turn_signal``）
+
+旧布局（根目录）数据语义上全部属于 ``aesir``（旧落盘默认 game_id），因此
+按 ``--game aesir`` 筛选时一并包含；按其他游戏筛选时不混入。
+
+## 指标口径（T19：不同事件分开命名，不再混为同一验收项）
+
+- 回执 ``result`` 完整分布 + 各 result 独立计数（accepted/executed/rejected/
+  expired/cancelled）。``rejected/expired/cancelled`` 是**运行期代理指标**；
+  「真实越界下发」（本应被门控拦但仍 executed）运行期无法纯靠回执判定，由战术
+  回归集离线断言为 0——此处只作说明，不伪造数值。
+- 对话信号：轮次总数、后端分布（llm/mock/fallback）、降级次数（fallback）、
   复读轮数（repetitive=true）、负反馈次数、话题延续率。
-- 重复响应：幂等重复在响应内标记（duplicate=true），不落盘——此处以
-  「重复回复检测」（repetitive）作为可测代理指标。
-- 风格违规：统计 ``data/runtime/dialogue_signals/*.jsonl`` 中 ``style_violations`` 字段非空且非 None 的记录数（T083 已实现并落盘）。
+- 风格违规：``style_violations``（违规条数）与 ``llm_checked_turns``（LLM 路径
+  经 style_guard 校验的轮数）分开统计；mock/fallback 路径为 None（未校验）。
+- 损坏行：不再静默跳过——``corrupt`` 按文件记录坏行数，可查处理结果。
 
 用法：
     .venv/Scripts/python -m scripts.metrics_report
-    .venv/Scripts/python -m scripts.metrics_report --json   # 机器可读输出
+    .venv/Scripts/python -m scripts.metrics_report --json
+    .venv/Scripts/python -m scripts.metrics_report --game demo-vn
 """
 
 from __future__ import annotations
@@ -30,40 +46,99 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 旧布局（根目录）数据语义上归属的 game_id（旧落盘默认 game_id = aesir）。
+LEGACY_GAME_ID = "aesir"
+
+# 回执 result 的完整枚举（与 app/schemas/tactical_execution.ReceiptResult 对齐）。
+RECEIPT_RESULTS = ("accepted", "executed", "rejected", "expired", "cancelled")
+
+
+def _resolve_dir(settings_value: str) -> Path:
+    """把 settings 里的目录解析为绝对路径（相对路径相对项目根目录）。"""
+    path = Path(settings_value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def _discover_jsonl(root: Path, game: str | None) -> list[Path]:
+    """按布局发现需采集的 JSONL 文件。
+
+    - ``game is None``（跨游戏汇总）：根目录旧文件 + 各一级子目录新文件。
+    - ``game == LEGACY_GAME_ID``：根目录旧文件 + ``<root>/aesir/`` 新文件。
+    - ``game == 其他``：只取 ``<root>/<game>/`` 新文件，不混入旧根目录。
+    """
+    if not root.exists():
+        return []
+    if game is None:
+        files = set(root.glob("*.jsonl"))
+        files.update(p for sub in root.iterdir() if sub.is_dir() for p in sub.glob("*.jsonl"))
+        return sorted(files)
+    if game == LEGACY_GAME_ID:
+        return sorted(list(root.glob("*.jsonl")) + list((root / game).glob("*.jsonl")))
+    return sorted((root / game).glob("*.jsonl"))
+
 
 def _iter_jsonl(path: Path):
-    if not path.exists():
-        return
+    """逐行产出 JSON 对象；返回值附带损坏行数（通过调用方计数器累加）。
+
+    损坏行（非 JSON）不中断统计，但调用方需累计以便在报告中可查。
+    """
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
         try:
-            yield json.loads(line)
+            yield json.loads(line), False
         except json.JSONDecodeError:
-            continue  # 损坏行跳过：指标统计不因个别坏行中断
+            yield {}, True  # 损坏行：产出空占位并标记，由调用方累计
 
 
-def collect_receipts() -> dict:
-    receipts_dir = ROOT / "data" / "runtime" / "command_service" / "executions"
+def collect_receipts(game: str | None = None) -> dict:
+    from app.config import get_settings
+
+    root = _resolve_dir(get_settings().receipts_dir)
     total = 0
     results: Counter = Counter()
-    for path in sorted(receipts_dir.glob("*.jsonl")):
-        for record in _iter_jsonl(path):
+    corrupt: dict[str, int] = {}
+    # 去重键：(order_id, result, received_at)。
+    # 只识别「同一行被物理写两份」的迁移期重复；同一 order_id 的多条不同
+    # result（状态流转 accepted→executed→rejected）是合法回执，不互相误杀。
+    seen_keys: set[tuple] = set()
+    files = _discover_jsonl(root, game)
+    for path in files:
+        file_bad = 0
+        for record, bad in _iter_jsonl(path):
+            if bad:
+                file_bad += 1
+                continue
+            key = (record.get("order_id"), record.get("result"), record.get("received_at"))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
             total += 1
             results[record.get("result", "unknown")] += 1
+        if file_bad:
+            corrupt[str(path.relative_to(root))] = file_bad
     return {
-        "files": len(list(receipts_dir.glob("*.jsonl"))),
+        "scope": game or "all",
+        "files": len(files),
         "total_receipts": total,
         "result_distribution": dict(results),
-        # 越界/失败的可测代理：rejected + failed 计数（真正「越界下发」
-        # 由战术回归集断言为 0，此处为运行期数据佐证）
-        "suspicious_orders": results.get("rejected", 0) + results.get("failed", 0),
+        # 各 result 独立计数（T19：不再合并成 suspicious_orders）。
+        "accepted": results.get("accepted", 0),
+        "executed": results.get("executed", 0),
+        "rejected": results.get("rejected", 0),
+        "expired": results.get("expired", 0),
+        "cancelled": results.get("cancelled", 0),
+        "proxy_note": "rejected/expired/cancelled 为运行期代理指标；真实越界下发"
+                      "由战术回归集离线断言为 0，运行期无法纯靠回执判定。",
+        "corrupt": corrupt,
     }
 
 
-def collect_signals() -> dict:
-    signals_dir = ROOT / "data" / "runtime" / "dialogue_signals"
+def collect_signals(game: str | None = None) -> dict:
+    from app.config import get_settings
+
+    root = _resolve_dir(get_settings().dialogue_signals_dir)
     total = 0
     sources: Counter = Counter()
     repetitive = 0
@@ -72,8 +147,20 @@ def collect_signals() -> dict:
     topic_continued_known = 0
     style_violations = 0
     llm_checked_turns = 0
-    for path in sorted(signals_dir.glob("*.jsonl")):
-        for record in _iter_jsonl(path):
+    corrupt: dict[str, int] = {}
+    seen_keys: set[tuple] = set()
+    files = _discover_jsonl(root, game)
+    for path in files:
+        file_bad = 0
+        for record, bad in _iter_jsonl(path):
+            if bad:
+                file_bad += 1
+                continue
+            # 去重：同一 (ts, companion_id, reply_text) 只计一次。
+            key = (record.get("ts"), record.get("companion_id"), record.get("reply_text"))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
             total += 1
             sources[record.get("source", "unknown")] += 1
             if record.get("repetitive"):
@@ -91,8 +178,11 @@ def collect_signals() -> dict:
                 llm_checked_turns += 1
                 if violations:
                     style_violations += len(violations)
+        if file_bad:
+            corrupt[str(path.relative_to(root))] = file_bad
     return {
-        "files": len(list(signals_dir.glob("*.jsonl"))),
+        "scope": game or "all",
+        "files": len(files),
         "total_turns": total,
         "source_distribution": dict(sources),
         "degradation_count": sources.get("fallback", 0),
@@ -104,13 +194,34 @@ def collect_signals() -> dict:
         ),
         "style_violations": style_violations,
         "llm_checked_turns": llm_checked_turns,
+        "corrupt": corrupt,
     }
 
 
-def build_report() -> dict:
-    signals = collect_signals()
+def _discovered_games(root: Path) -> list[str]:
+    """汇总本次数据里出现过的 game_id（一级子目录名；旧根目录归入 aesir）。"""
+    if not root.exists():
+        return []
+    games = set()
+    if any(root.glob("*.jsonl")):
+        games.add(LEGACY_GAME_ID)
+    games.update(sorted(p.name for p in root.iterdir() if p.is_dir() and any(p.glob("*.jsonl"))))
+    return sorted(games)
+
+
+def build_report(game: str | None = None) -> dict:
+    from app.config import get_settings
+
+    receipts_root = _resolve_dir(get_settings().receipts_dir)
+    signals_root = _resolve_dir(get_settings().dialogue_signals_dir)
+    signals = collect_signals(game)
+    receipts = collect_receipts(game)
     return {
-        "receipts": collect_receipts(),
+        "scope": game or "all",
+        "games": sorted(
+            set(_discovered_games(receipts_root)) | set(_discovered_games(signals_root))
+        ),
+        "receipts": receipts,
         "dialogue_signals": signals,
         "style_violations": {
             "total": signals["style_violations"],
@@ -125,21 +236,34 @@ def build_report() -> dict:
 def _print_report(report: dict) -> None:
     r, s = report["receipts"], report["dialogue_signals"]
     print("=" * 56)
-    print("Aesir 验收指标报告（US7 / T079）")
+    print("Aesir 验收指标报告（US7 / T079，T19 修复漏采）")
     print("=" * 56)
+    print(f"  采集范围: {report['scope']}（数据游戏: {', '.join(report['games']) or '（无数据）'}）")
     print("\n[执行回执]")
     print(f"  回执总数: {r['total_receipts']}（{r['files']} 个 JSONL 文件）")
-    print(f"  result 分布: {r['result_distribution'] or '（无数据）'}")
-    print(f"  可疑指令（rejected+failed）: {r['suspicious_orders']}")
+    if r["total_receipts"]:
+        for name in RECEIPT_RESULTS:
+            print(f"    {name}: {r.get(name, 0)}")
+        print(f"  result 分布: {r['result_distribution']}")
+        print(f"  代理指标说明: {r['proxy_note']}")
+    else:
+        print("  result 分布: （无数据）")
+    if r["corrupt"]:
+        print(f"  ⚠ 损坏行: {r['corrupt']}")
     print("\n[对话信号]")
-    print(f"  轮次总数: {s['total_turns']}（{s['files']} 个角色文件）")
-    print(f"  后端分布: {s['source_distribution'] or '（无数据）'}")
-    print(f"  降级次数（fallback）: {s['degradation_count']}")
-    print(f"  复读轮数: {s['repetitive_replies']}")
-    print(f"  负反馈次数: {s['negative_feedback']}")
-    print(f"  话题延续率: {s['topic_continuation_rate']}")
-    print(f"  style_guard 校验轮数: {s['llm_checked_turns']}")
-    print(f"  风格违规次数: {s['style_violations']}")
+    print(f"  轮次总数: {s['total_turns']}（{s['files']} 个 JSONL 文件）")
+    if s["total_turns"]:
+        print(f"  后端分布: {s['source_distribution']}")
+        print(f"  降级次数（fallback）: {s['degradation_count']}")
+        print(f"  复读轮数: {s['repetitive_replies']}")
+        print(f"  负反馈次数: {s['negative_feedback']}")
+        print(f"  话题延续率: {s['topic_continuation_rate']}")
+        print(f"  style_guard 校验轮数: {s['llm_checked_turns']}")
+        print(f"  风格违规次数: {s['style_violations']}")
+    else:
+        print("  后端分布: （无数据）")
+    if s["corrupt"]:
+        print(f"  ⚠ 损坏行: {s['corrupt']}")
     print("\n[风格违规]")
     sv = report["style_violations"]
     print(f"  总数: {sv['total']}（LLM 校验轮数 {sv['llm_checked_turns']}）")
@@ -150,10 +274,12 @@ def _print_report(report: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="验收指标采集（US7 / T079）")
+    parser = argparse.ArgumentParser(description="验收指标采集（US7 / T079，T19）")
     parser.add_argument("--json", action="store_true", help="输出 JSON（机器可读）")
+    parser.add_argument("--game", dest="game", default=None,
+                        help="只采集指定 game_id；缺省 = 跨全部游戏汇总")
     args = parser.parse_args()
-    report = build_report()
+    report = build_report(game=args.game)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
