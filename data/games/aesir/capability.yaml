@@ -66,6 +66,9 @@ provides:
     - ability.alice.quick_heal
     - ability.alice.major_heal
     - ability.alice.shield
+    # Bruno 前线守护者（T31 / #40）：UE 行为树节点占位，真正放技能留待 EXT-01 对接。
+    - ability.bruno.shield_wall      # 挡在玩家身前，吸收近战伤害
+    - ability.bruno.shield_bash    # 近战盾击打断，制造硬直窗口
 
   behaviors:
     - follow

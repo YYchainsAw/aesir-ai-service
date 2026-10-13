@@ -1,8 +1,43 @@
-# 事件反应。Bruno 骨架阶段无战斗事件反应；世界事件反应结构与 Alice 同源，
-# 但台词体现 Bruno 寡言可靠的风格。事件键须在 capability.yaml 登记。
+# 事件反应（T31 / #40 扩充）。Bruno 骨架阶段无战斗事件反应；
+# 现按 Alice 同事件键填 Bruno 版短句。事件键须在 capability.yaml 登记，
+# emotion/gesture/facial ID 须在 presentation.yaml 白名单内。
+# 同事件 Alice / Bruno 各自回话（幂等键含 companion_id），互不冲突。
 
-combat_event_reactions: {}
+combat_event_reactions:
+  player_hp_critical:
+    reply_text: "退后！我挡。"
+    emotion_id: emotion.concerned
+    gesture_id: gesture.step_closer
+    facial_expression_id: face.concerned
+  boss_stun_near:
+    reply_text: "它快露破绽了。准备。"
+    emotion_id: emotion.serious
+    gesture_id: gesture.ready_weapon
+    facial_expression_id: face.serious
+  boss_stunned:
+    reply_text: "就是现在。一起上。"
+    emotion_id: emotion.serious
+    gesture_id: gesture.ready_weapon
+    facial_expression_id: face.serious
+  boss_enraged:
+    reply_text: "它狂暴了。别硬拼，稳住。"
+    emotion_id: emotion.serious
+    gesture_id: gesture.look_around
+    facial_expression_id: face.serious
+  companion_mp_low:
+    reply_text: "我蓝不够了。接下来省着用。"
+    emotion_id: emotion.thoughtful
+    gesture_id: gesture.look_away
+    facial_expression_id: face.thoughtful
+  boss_defeated:
+    reply_text: "赢了。走，趁现在撤。"
+    emotion_id: emotion.pleased
+    gesture_id: gesture.nod
+    facial_expression_id: face.gentle_smile
 
+# world_event_reactions 中 gift_given / companion_recovered /
+# player_protected_companion / promise_kept 同时驱动关系数值
+# （幅度见 data/policy/relationship_policy.yaml）。
 world_event_reactions:
   region_first_entered:
     reply_text: "新地方。我先走前面。"

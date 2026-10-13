@@ -1,7 +1,13 @@
-# 能力声明（Bruno 骨架阶段）：暂不声明战斗能力，仅声明通用行为。
-# 所有 ID 须在 data/games/aesir/capability.yaml 的 abilities / behaviors 全集内。
+# 能力声明（T31 / #40 扩充）：Bruno 前线守护者，仅声明防御/打断类技能，
+# 与 Alice 的法师输出定位区分。所有 ID 须在 data/games/aesir/capability.yaml
+# 的 abilities 全集内（归属校验由 PersonaPackValidator 强制执行）。
+# 真正放技能的规则策略接线（tactical_policy.yaml abilities 目录 + resolver.py
+# 常量映射）留待 EXT-01 / UE 行为树对接时落地；当前 companion_action 仍按
+# Alice 路径产出，Bruno 的技能声明用于「能力目录完整性」而非运行时释放。
 
-ability_ids: []
+ability_ids:
+  - ability.bruno.shield_wall
+  - ability.bruno.shield_bash
 
 behavior_ids:
   - follow

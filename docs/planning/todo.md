@@ -23,8 +23,8 @@
 
 - [x] **EXT-04 v0.3 契约独立成文＋回执批量上传**（依据：SDD v1.1 待确认-3；v0.2 §7 遗留）
   把 `protocol_version=0.3`（`/v1/agent/step`、`/v1/world/events`、`/v1/console/*`）从附录提升为独立契约文档；补回执批量上传约定。Python 侧批量回执已落地：`/v1/tactical/executions` 同时支持 `receipt` 与 `receipts`（2026-09-28）。
-- [ ] **EXT-05 第二 NPC（Bruno）完整人格**（依据：US8；SC-012）
-  从路由验证骨架扩充为完整人格：人格配置、能力目录、记忆/关系曲线；目标演示「双 NPC 同屏、记忆互不干扰」。
+- [x] **EXT-05 第二 NPC（Bruno）完整人格**（依据：US8；SC-012）
+  从路由验证骨架扩充为完整人格（2026-10-13，T31 / #40）：能力全集登记 `ability.bruno.shield_wall` / `shield_bash`；few-shot 从 6 条扩到 44 条（覆盖关系阶段/日常/关怀/被夸/边界/战术/记忆/承诺/礼物）；战术 ack 12 键、战斗事件反应 6 键、fallback 7 类关键词全部填上；双 NPC 隔离测试新增 2 条（tactical ack / combat reaction 按 companion_id 各自路由）。目标演示「双 NPC 同屏、记忆互不干扰」已具备服务侧条件，UE 对接留待 EXT-01。
 - [x] **EXT-06 调试台 Web UI**（依据：US7；SC-013）
   单页 HTML 实时展示 `/v1/console/state`：场景/情绪/关系阶段/近期记忆/决策链路，让「每个决策可解释」可视化。`GET /v1/console/ui` 已返回内联单页 HTML（2026-09-28）。
 
