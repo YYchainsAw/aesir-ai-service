@@ -31,12 +31,19 @@
 ./.venv/Scripts/python.exe -m scripts.run_server --port 8002   # 指定端口（如 demo-vn 第二实例）
 ```
 
-**health 实测（2026-10-08，端口 8000）**
+**health 实测（2026-10-08，端口 8000；2026-10-15 起带 service_commit）**
 
 ```json
 // GET /health → 200
-{"status": "ok", "service": "aesir-ai-service", "protocol_version": "0.3"}
+{
+  "status": "ok",
+  "service": "aesir-ai-service",
+  "protocol_version": "0.3",
+  "service_commit": "335acb6"
+}
 ```
+
+> `service_commit` 为运行时 git short SHA（T21 / #34 新增）；UE 侧启动时打一次即可确认当前跑的是哪个 commit。非 git 环境返回 `"unknown"`。
 
 ## 3. ID 与分流约定
 

@@ -25,8 +25,12 @@ def test_health_check() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-    assert response.json()["protocol_version"] == PROTOCOL_VERSION
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["protocol_version"] == PROTOCOL_VERSION
+    # T21 / #34：/health 带 service_commit，UE 侧不读代码也能确认当前 commit
+    assert "service_commit" in body
+    assert body["service_commit"]  # 非空（git 环境下为 short SHA，非 git 环境为 "unknown"）
 
 
 # ---------------------------------------------------------------------------
