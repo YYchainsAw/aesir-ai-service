@@ -1,17 +1,82 @@
-# 无 LLM 回退候选与默认回复（Bruno 骨架，最小合法集）。
+# 无 LLM 回退候选与默认回复（T31 / #40 扩充）。
+# 类别判序同 Alice：tactical_redirect 优先级最高；全部未命中走 default。
+# Bruno 风格：短句、低沉、行动派。emotion/gesture/facial ID 在白名单内。
 
 fallback_dialogue_responses:
-  greeting:
-    keywords: ["你好", "嗨", "早上好", "晚安"]
+  tactical_redirect:
+    keywords: ["boss", "技能", "攻击", "放招", "打它", "打他", "帮我打", "施法", "治疗", "回血"]
     replies:
-      - reply_text: "嗯。"
+      - reply_text: "等真打起来喊我。我先上。"
+        emotion_id: emotion.serious
+        gesture_id: gesture.ready_weapon
+        facial_expression_id: face.serious
+      - reply_text: "现在不动手。时机到了我第一个冲。"
         emotion_id: emotion.neutral
         gesture_id: gesture.nod
         facial_expression_id: face.neutral
-  question:
-    keywords: ["吗", "什么", "为什么", "怎么"]
+  praise:
+    keywords: ["厉害", "漂亮", "夸", "最棒", "了不起", "谢谢你", "多亏"]
     replies:
-      - reply_text: "不知道。再想想。"
+      - reply_text: "分内之事。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.look_away
+        facial_expression_id: face.gentle_smile
+      - reply_text: "……嗯。下次也一样。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.nod
+        facial_expression_id: face.gentle_smile
+  concern:
+    keywords: ["受伤", "没事吧", "辛苦了", "累不累", "小心点", "注意安全"]
+    replies:
+      - reply_text: "擦破点皮。不碍事。"
+        emotion_id: emotion.neutral
+        gesture_id: gesture.nod
+        facial_expression_id: face.neutral
+      - reply_text: "我没事。你自己也当心。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+  comfort:
+    keywords: ["难过", "伤心", "丧", "想家", "没用", "后悔", "压力", "不开心", "累了", "烦"]
+    replies:
+      - reply_text: "先歇会儿。我陪你坐。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+      - reply_text: "讲给我听。也许没那么糟。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+  greeting:
+    keywords: ["你好", "嗨", "早上好", "早安", "下午好", "晚上好", "晚安", "哈喽"]
+    replies:
+      - reply_text: "嗯。来了就跟紧。"
+        emotion_id: emotion.neutral
+        gesture_id: gesture.nod
+        facial_expression_id: face.neutral
+      - reply_text: "早。装备检查过了？"
+        emotion_id: emotion.neutral
+        gesture_id: gesture.look_around
+        facial_expression_id: face.neutral
+  farewell:
+    keywords: ["再见", "拜拜", "明天见", "回见", "先走了", "下线", "告辞"]
+    replies:
+      - reply_text: "好。我守着，你去歇。"
+        emotion_id: emotion.pleased
+        gesture_id: gesture.nod
+        facial_expression_id: face.gentle_smile
+      - reply_text: "路上小心。有事喊我。"
+        emotion_id: emotion.concerned
+        gesture_id: gesture.step_closer
+        facial_expression_id: face.concerned
+  question:
+    keywords: ["吗", "什么", "为什么", "怎么", "哪", "谁", "多少", "是不是", "好不好", "呢？"]
+    replies:
+      - reply_text: "……说不准。我先看看。"
+        emotion_id: emotion.thoughtful
+        gesture_id: gesture.look_around
+        facial_expression_id: face.thoughtful
+      - reply_text: "这个我得琢磨琢磨。晚点告诉你。"
         emotion_id: emotion.thoughtful
         gesture_id: gesture.look_away
         facial_expression_id: face.thoughtful

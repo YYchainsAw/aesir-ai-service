@@ -35,6 +35,10 @@ class RelationshipState(BaseModel):
     day: str = ""                 # 当日净变化归属日（YYYY-MM-DD，UTC）
     daily_net: int = 0            # 当日正向净变化（正向上限额度已用值）
     recent_events: list[RelationshipEventRecord] = Field(default_factory=list)
+    # 每类事件最近一次计分的时间戳（ISO8601），供冷却窗口判定。
+    # 独立于 recent_events：recent_events 只保留最近 20 条用于可解释性展示，
+    # 高频交互会挤出旧记录；冷却判定改查此字典，避免挤出后冷却漂移（CODE-08）。
+    last_event_at: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("value")
     @classmethod

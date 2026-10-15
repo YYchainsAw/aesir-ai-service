@@ -31,12 +31,19 @@
 ./.venv/Scripts/python.exe -m scripts.run_server --port 8002   # 指定端口（如 demo-vn 第二实例）
 ```
 
-**health 实测（2026-10-08，端口 8000）**
+**health 实测（2026-10-08，端口 8000；2026-10-15 起带 service_commit）**
 
 ```json
 // GET /health → 200
-{"status": "ok", "service": "aesir-ai-service", "protocol_version": "0.3"}
+{
+  "status": "ok",
+  "service": "aesir-ai-service",
+  "protocol_version": "0.3",
+  "service_commit": "335acb6"
+}
 ```
+
+> `service_commit` 为运行时 git short SHA（T21 / #34 新增）；UE 侧启动时打一次即可确认当前跑的是哪个 commit。非 git 环境返回 `"unknown"`。
 
 ## 3. ID 与分流约定
 
@@ -93,19 +100,21 @@ UE 实现（`TacticalOrderComponent::SupportedAbilityIds`，AesirWarden@facba39�
 | 治疗/护盾等未制作能力下发 | — | 未制作·UE 拒绝 | UE `ValidateOrder` 失败 → `rejected` 回执（§4 口径） |
 | 调试台 `GET /v1/console/state` `/ui` | 0.3 | 已实现·启用 | 单页 HTML + 状态 JSON |
 
-## 7. 响应时间 / SC-011 采样口径（先定义，T33 定稿）
+## 7. 响应时间 / SC-011 采样口径（T33 定稿 / FIX-04）
 
 > SC-011 原文：战斗场景下从玩家发出指令到 NPC 开始响应的等待时间，玩家可感知为「即时」。
-> 此处先固定**采样点、样本与临时通过口径**；硬指标量化由 T33（FIX-04 / Issue #42）定稿后回写本节。
+> 本节为 T33（FIX-04 / Issue #42）定稿口径，替代原「人工评估 ≥95%」软口径。
 
 - **采样点（两端打戳）**：
   - 起点 `t0`：UE 玩家确认输入（`ParseCommand` 请求发出 / 语音 `ParseVoiceCommand` 请求发出）的本地时间戳；
-  - 终点 `t1`：UE 收到 `OnCommandParsed` / `OnTacticalResolved` 回调且 Alice 开始表现（首个可见动作/语音/动画触发）的本地时间戳；
+  - 终点 `t1`：UE 收到 `OnCommandParsed` / `OnTacticalResolved` 回调且 NPC 开始表现（首个可见动作/语音/动画触发）的本地时间戳；
   - 服务端分段：请求到达 → 响应发出的耗时由日志/`X-Request-Id` 关联核对，用于区分「网络+排队」与「服务决策」。
 - **样本**：同一场 boss 遭遇战内混合采样 **≥ 30 次**玩家指令（文本与语音各半，覆盖普攻/技能/治疗/跟随意图），
   记录每次 `t1 - t0` 与服务端耗时。
-- **临时通过口径（待 T33 确认）**：本地回环规则链路（tactical/command）参考实测 **≈20ms 级**；
-  「即时」感知口径暂定 **p95 ≤ 300ms**（不含 LLM 生成式回复；LLM 链路单独统计，参考实测 chat ≈2.3s）。
+- **硬指标（正式通过口径）**：
+  - **规则链路（tactical/command）p95 ≤ 300ms**：玩家感知「即时」的硬指标。实测基线 ≈20ms 级（本地回环），300ms 为留足网络+UE 表现余量的上限。
+  - **LLM 生成式回复单独统计**：不纳入 SC-011 p95 判定（生成耗时受模型服务波动影响，实测 ≈2.3s），另行按「可接受等待」口径评估。
+  - 采样 **≥ 30 次**且 p95 达标 → SC-011 通过；p95 不达标或样本不足 → 不通过，需定位是「网络+排队」还是「服务决策」段超时。
 - **历史测试数量按 commit 标注**：本仓 CHANGELOG 每个里程碑条目均带「测试锚点 N passed + M skipped @ commit」，验收时按提交号对齐。
 
 ## 8. 同步记录

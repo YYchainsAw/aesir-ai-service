@@ -23,8 +23,8 @@
 
 - [x] **EXT-04 v0.3 契约独立成文＋回执批量上传**（依据：SDD v1.1 待确认-3；v0.2 §7 遗留）
   把 `protocol_version=0.3`（`/v1/agent/step`、`/v1/world/events`、`/v1/console/*`）从附录提升为独立契约文档；补回执批量上传约定。Python 侧批量回执已落地：`/v1/tactical/executions` 同时支持 `receipt` 与 `receipts`（2026-09-28）。
-- [ ] **EXT-05 第二 NPC（Bruno）完整人格**（依据：US8；SC-012）
-  从路由验证骨架扩充为完整人格：人格配置、能力目录、记忆/关系曲线；目标演示「双 NPC 同屏、记忆互不干扰」。
+- [x] **EXT-05 第二 NPC（Bruno）完整人格**（依据：US8；SC-012）
+  从路由验证骨架扩充为完整人格（2026-10-13，T31 / #40）：能力全集登记 `ability.bruno.shield_wall` / `shield_bash`；few-shot 从 6 条扩到 44 条（覆盖关系阶段/日常/关怀/被夸/边界/战术/记忆/承诺/礼物）；战术 ack 12 键、战斗事件反应 6 键、fallback 7 类关键词全部填上；双 NPC 隔离测试新增 2 条（tactical ack / combat reaction 按 companion_id 各自路由）。目标演示「双 NPC 同屏、记忆互不干扰」已具备服务侧条件，UE 对接留待 EXT-01。
 - [x] **EXT-06 调试台 Web UI**（依据：US7；SC-013）
   单页 HTML 实时展示 `/v1/console/state`：场景/情绪/关系阶段/近期记忆/决策链路，让「每个决策可解释」可视化。`GET /v1/console/ui` 已返回内联单页 HTML（2026-09-28）。
 
@@ -32,14 +32,14 @@
 
 - [ ] **EXT-07 语音体验升级**：流式 ASR / VAD 端点检测；空语音、过短、纯噪声的反馈话术定稿（SDD Edge Cases；话术仍【待确认】）。
 - [ ] **EXT-08 记忆与时间鲁棒性**：读档/快进时间跳变、跨存档记忆处理（SDD Edge Cases 已登记未解）。
-- [~] **EXT-09 验收指标采集脚本**（依据：T079）：统计越界下发、重复响应、风格违规、降级次数，把 SC-001～013 人工判定半自动化。**T19（#32）已修复按 game_id 分目录后的漏采**：支持 `--game` 筛选、旧布局兼容、同记录去重、损坏行可查、各 result 独立计数（2026-10-12）。
+- [x] **EXT-09 验收指标采集脚本**（依据：T079）：统计越界下发、重复响应、风格违规、降级次数，把 SC-001～013 人工判定半自动化。**T19（#32）已修复按 game_id 分目录后的漏采**：支持 `--game` 筛选、旧布局兼容、同记录去重、损坏行可查、各 result 独立计数（2026-10-12）。**T32（#41）落地 SC 判定层**（2026-10-15）：`evaluate_sc_verdicts()` 对照 SC-001~013 口径输出 PASS/FAIL/N/A；可自动判定 4 项（SC-009 越界下发代理、SC-010 降级次数、风格违规率、SC-012 双 companion 轮次分布），其余 10 项明确 N/A 并在 note 里写明需补的埋点字段（记忆引用/时延/decision_trace 等），为后续埋点落地提供清单。
 
 ## 二、可修改（改进现有，不动架构）
 
 - [x] **FIX-01 端口不一致收口**（GAP-001/002）：`app/config.py` 增加 `service_host`/`service_port`，默认 `127.0.0.1:8000`；新增 `scripts/run_server.py` 按配置启动；`start.bat` / `chat_console` / `mock_ue_flow` 默认从配置读取；文档与 UML 基线 GAP-001/002 同步更新。UE 两侧应统一指向 `AESIR_SERVICE_PORT`。
 - [ ] **FIX-02 敌人血条防御保护**（GAP-UI-001）：`SetEnemyHealth` 补 `Max(MaxHealth, 1.0)`，与玩家 HUD 一致。
 - [ ] **FIX-03 Alice 跟随目标语义**（GAP-BP-004）：PIE 实测 `BTS_AliceUpdateTarget` 写 PlayerController 与 Player Pawn 的位置语义差异，必要时修正。
-- [ ] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2）：定义采样方法与硬指标，替代「人工评估 ≥95%」软口径。
+- [x] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2；T33 / #42，2026-10-15）：规则链路（tactical/command）**p95 ≤ 300ms** 为硬指标；样本 ≥ 30 次混合采样（文本/语音各半，覆盖普攻/技能/治疗/跟随）；LLM 生成式回复单独统计、不纳入 p95 判定。定稿见 [integration-alignment-v0.3.md §7](../protocols/integration-alignment-v0.3.md)。
 - [x] **FIX-05 关系阶段中文命名口径**（SDD v1.1 待确认-5）：distant/neutral/friendly/close 的对外展示命名。`relationship_policy.yaml` 新增 `display_name`，各对外响应新增 `relationship_stage_display`（2026-09-28）。
 - [ ] **FIX-06 重叠输入 Context 实测**（GAP-INPUT-002）：PIE 验证 Locomotion/Combat 按键重叠是否误触发，决定是否调优先级。
 - [ ] **FIX-07 熔断与节流参数调优回写**：熔断 5 次/60s、行为节流 300s/3 次均为默认值，试玩后把调参结果回写 `data/policy/` 与 CHANGELOG。
@@ -77,9 +77,9 @@
 
 ### 🟡 可选（一致性 / 健壮性小项）
 
-- [ ] **CODE-06 `resolve_scene` 与 `ctx.scene` 判定口径可能不一致**：两者各自推导场景，任一侧改口径就会分叉。建议抽单一 `resolve_scene()` 供两处共用。
+- [x] **CODE-06 `resolve_scene` 与 `ctx.scene` 判定口径可能不一致**（T20 核查 2026-10-12）：核查确认分叉前提不成立——`resolve_scene()` 本身即 `return ctx.scene` 单一透传入口，其余消费点（agent.py、behavior_catalog）都读同一只读快照字段，不存在第二套推导口径。现有 `test_agency_domain.py` 已锁定 `resolve_scene(ctx)==ctx.scene`。无需改动。
 - [x] **CODE-07 战斗指令缺 `expires` 字段**：非战斗指令有过期时间而战斗指令没有，UE 侧可能长期持有过期战术指令。建议统一补上（与 CODE-03 一起做，参数同样外置）。
-- [ ] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**：`get_throttle()` 单例在构造时读一次策略，热更新 `data/policy/` 不生效；且关系冷却依赖 `recent_events`（上限 20 条），长时间高频交互会挤出历史事件导致冷却判定漂移。建议：① 节流器支持策略重载（或明确「改配置需重启」写入文档）；② 评估冷却改用独立时间戳字段而非扫 `recent_events`。
+- [x] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**（T20 修复 2026-10-12）：① 节流单例热更新——明确为有意边界，`throttle.py` docstring 已写「策略进程启动时固化，改配置需重启；测试用 reset_throttle()」，不实现热更新平台；② 冷却漂移——**已修复**：`RelationshipState` 新增独立 `last_event_at: dict[str,str]`，冷却判定改查该字典而非扫 `recent_events`（上限 20 会挤出旧记录）。复现样例：gift_given 计分后塞 20 条其他事件挤出 recent_events，冷却窗口内重复原错误计分 +3，修复后正确拦截 delta=0。回归 `test_cooldown_survives_recent_events_eviction`。
 
 ## 四、明确不做（边界提醒，防止方向跑偏）
 

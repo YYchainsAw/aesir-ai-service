@@ -202,3 +202,83 @@ def test_build_report_structure(isolated_dirs):
     assert set(report["games"]) == {"aesir", "demo-vn"}
     assert "receipts" in report and "dialogue_signals" in report
     assert "style_violations" in report
+    assert "sc_verdicts" in report  # T32 / #41：SC 判定层
+
+
+# ---- SC 判定层（T32 / Issue #41） -----------------------------------------
+
+def _verdict_map(report: dict) -> dict[str, dict]:
+    return {v["sc"]: v for v in report["sc_verdicts"]}
+
+
+def test_sc009_pass_when_no_rejections(isolated_dirs):
+    """回执全 executed → SC-009 PASS（越界下发=0 的运行期代理）。"""
+    receipts_root, _ = isolated_dirs
+    _write(receipts_root / "d.jsonl", [
+        _receipt("o1", "executed"), _receipt("o2", "executed"),
+    ])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-009"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 0
+
+
+def test_sc009_fail_on_rejected_or_expired(isolated_dirs):
+    """出现 rejected/expired/cancelled → SC-009 FAIL。"""
+    receipts_root, _ = isolated_dirs
+    _write(receipts_root / "d.jsonl", [
+        _receipt("o1", "executed"), _receipt("o2", "rejected"),
+        _receipt("o3", "expired"),
+    ])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-009"]
+    assert v["status"] == "FAIL"
+    assert v["metric"] == 2  # rejected 1 + expired 1
+
+
+def test_sc010_pass_when_no_fallback(isolated_dirs):
+    """source 全 llm → SC-010 PASS。"""
+    _, signals_root = isolated_dirs
+    _write(signals_root / "companion.alice.jsonl", [_signal(source="llm")])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-010"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 0
+
+
+def test_sc010_fail_on_fallback(isolated_dirs):
+    """出现 fallback → SC-010 FAIL。"""
+    _, signals_root = isolated_dirs
+    _write(signals_root / "companion.alice.jsonl", [
+        _signal(source="llm"),
+        _signal(source="fallback", ts="2026-10-08T01:00:00+00:00", reply="回退话术"),
+    ])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-010"]
+    assert v["status"] == "FAIL"
+    assert v["metric"] == 1
+
+
+def test_sc012_pass_with_two_companions(isolated_dirs):
+    """两个 companion 各有轮次 → SC-012 PASS。"""
+    _, signals_root = isolated_dirs
+    _write(signals_root / "companion.alice.jsonl", [_signal(companion="companion.alice")])
+    _write(signals_root / "companion.bruno.jsonl", [_signal(companion="companion.bruno")])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-012"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 2
+
+
+def test_sc_verdicts_na_when_no_data(isolated_dirs):
+    """空目录 → 所有 SC 都是 N/A（不误报 PASS/FAIL）。"""
+    report = mr.build_report()
+    vmap = _verdict_map(report)
+    # 四个可测项（SC-009/SC-010/风格违规/SC-012）都因无数据 → N/A
+    for sc in ("SC-009", "SC-010", "风格违规", "SC-012"):
+        assert vmap[sc]["status"] == "N/A", f"{sc} 空目录不应判 PASS/FAIL"
+    # 10 个需新埋点的 SC 也是 N/A
+    for sc in ("SC-001", "SC-002", "SC-003", "SC-004", "SC-005",
+               "SC-006", "SC-007", "SC-008", "SC-011", "SC-013"):
+        assert vmap[sc]["status"] == "N/A"
+        assert vmap[sc]["note"]  # 必须写明要补什么埋点

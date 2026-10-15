@@ -161,3 +161,43 @@ def test_profile_repository_load_registered_uses_directory() -> None:
         "companion.alice": "Alice",
         "companion.bruno": "Bruno",
     }
+
+
+def test_tactical_acknowledgement_routes_by_companion_id() -> None:
+    """T31 / #40：战术确认按 companion_id 读各自包——Bruno 不应返回 Alice 的「交给我！」。"""
+    from app.services.tactical.acknowledgement_service import create_tactical_acknowledgement
+
+    alice_ack = create_tactical_acknowledgement(
+        "support_protect_player", companion_id="companion.alice"
+    )
+    bruno_ack = create_tactical_acknowledgement(
+        "support_protect_player", companion_id="companion.bruno"
+    )
+
+    assert alice_ack is not None and bruno_ack is not None
+    assert alice_ack.reply_text != bruno_ack.reply_text
+    # Bruno 沉稳可靠：盾来了 / 我挡
+    assert "盾" in bruno_ack.reply_text or "挡" in bruno_ack.reply_text
+    # Bruno 情绪白名单无 bright/excited
+    assert bruno_ack.emotion_id in {"emotion.neutral", "emotion.pleased",
+                                   "emotion.concerned", "emotion.serious",
+                                   "emotion.thoughtful"}
+
+
+def test_combat_event_reaction_routes_by_companion_id() -> None:
+    """T31 / #40：战斗事件反应按 companion_id 读各自包——同一事件各自回话。"""
+    from app.services.tactical.event_policy import _load_reaction
+
+    alice_reaction = _load_reaction(
+        "player_hp_critical", companion_id="companion.alice",
+        section="combat_event_reactions",
+    )
+    bruno_reaction = _load_reaction(
+        "player_hp_critical", companion_id="companion.bruno",
+        section="combat_event_reactions",
+    )
+
+    assert alice_reaction is not None and bruno_reaction is not None
+    # Alice「撑住我这就把你拉回来」 vs Bruno「退后！我挡。」
+    assert alice_reaction.reply_text != bruno_reaction.reply_text
+    assert "挡" in bruno_reaction.reply_text

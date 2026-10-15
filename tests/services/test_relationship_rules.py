@@ -128,3 +128,47 @@ def test_recent_events_recorded() -> None:
     assert state.recent_events
     assert state.recent_events[-1].event_type == "gift_given"
     assert state.recent_events[-1].delta == 3
+
+
+# ---- CODE-08：冷却判定不受 recent_events 挤出影响（T20）---------------------
+
+def test_cooldown_survives_recent_events_eviction() -> None:
+    """冷却改查独立 last_event_at；某类事件被挤出最近 20 条后冷却仍生效（CODE-08）。
+
+    复现：先计一次 gift_given，再塞 20 条 dialogue_warm_exchange 把 gift_given
+    挤出 recent_events 窗口；随后在冷却窗口内重复 gift_given——旧实现扫
+    recent_events 找不到原记录会错误计分，新实现查 last_event_at 应正确拦截。
+    """
+    from datetime import datetime, timedelta
+
+    t0 = datetime.fromisoformat(T0.replace("Z", "+00:00"))
+    state = _state()
+    # 第 1 条 gift_given 计分，并记录其冷却时间戳。
+    state, d1 = apply_relationship_event(
+        state, "gift_given", t0.isoformat(), cooldown_seconds=60, daily_cap=100000
+    )
+    assert d1 == 3
+    assert state.last_event_at["gift_given"].startswith("2026-09-14T10:00:00")
+
+    # 塞 20 条其他登记事件，把 gift_given 挤出 recent_events 窗口（上限 20）。
+    for i in range(20):
+        t = (t0 + timedelta(seconds=1 + i)).isoformat()
+        state, _ = apply_relationship_event(
+            state, "dialogue_warm_exchange", t, cooldown_seconds=0, daily_cap=100000
+        )
+    assert len(state.recent_events) == 20
+    assert not any(r.event_type == "gift_given" for r in state.recent_events)
+
+    # 冷却窗口内（第 30 秒 < 60 秒）重复 gift_given → 必须被拦截（delta=0）。
+    t_dup = (t0 + timedelta(seconds=30)).isoformat()
+    state, d_dup = apply_relationship_event(
+        state, "gift_given", t_dup, cooldown_seconds=60, daily_cap=100000
+    )
+    assert d_dup == 0
+
+    # 冷却窗口外（第 70 秒 > 60 秒）→ 再次正确计分。
+    t_after = (t0 + timedelta(seconds=70)).isoformat()
+    state, d2 = apply_relationship_event(
+        state, "gift_given", t_after, cooldown_seconds=60, daily_cap=100000
+    )
+    assert d2 == 3
