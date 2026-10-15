@@ -39,7 +39,7 @@
 - [x] **FIX-01 端口不一致收口**（GAP-001/002）：`app/config.py` 增加 `service_host`/`service_port`，默认 `127.0.0.1:8000`；新增 `scripts/run_server.py` 按配置启动；`start.bat` / `chat_console` / `mock_ue_flow` 默认从配置读取；文档与 UML 基线 GAP-001/002 同步更新。UE 两侧应统一指向 `AESIR_SERVICE_PORT`。
 - [ ] **FIX-02 敌人血条防御保护**（GAP-UI-001）：`SetEnemyHealth` 补 `Max(MaxHealth, 1.0)`，与玩家 HUD 一致。
 - [ ] **FIX-03 Alice 跟随目标语义**（GAP-BP-004）：PIE 实测 `BTS_AliceUpdateTarget` 写 PlayerController 与 Player Pawn 的位置语义差异，必要时修正。
-- [ ] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2）：定义采样方法与硬指标，替代「人工评估 ≥95%」软口径。
+- [x] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2；T33 / #42，2026-10-15）：规则链路（tactical/command）**p95 ≤ 300ms** 为硬指标；样本 ≥ 30 次混合采样（文本/语音各半，覆盖普攻/技能/治疗/跟随）；LLM 生成式回复单独统计、不纳入 p95 判定。定稿见 [integration-alignment-v0.3.md §7](../protocols/integration-alignment-v0.3.md)。
 - [x] **FIX-05 关系阶段中文命名口径**（SDD v1.1 待确认-5）：distant/neutral/friendly/close 的对外展示命名。`relationship_policy.yaml` 新增 `display_name`，各对外响应新增 `relationship_stage_display`（2026-09-28）。
 - [ ] **FIX-06 重叠输入 Context 实测**（GAP-INPUT-002）：PIE 验证 Locomotion/Combat 按键重叠是否误触发，决定是否调优先级。
 - [ ] **FIX-07 熔断与节流参数调优回写**：熔断 5 次/60s、行为节流 300s/3 次均为默认值，试玩后把调参结果回写 `data/policy/` 与 CHANGELOG。
