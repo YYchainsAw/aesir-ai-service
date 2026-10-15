@@ -141,6 +141,7 @@ def collect_signals(game: str | None = None) -> dict:
     root = _resolve_dir(get_settings().dialogue_signals_dir)
     total = 0
     sources: Counter = Counter()
+    companions: Counter = Counter()
     repetitive = 0
     negative = 0
     topic_continued_true = 0
@@ -163,6 +164,7 @@ def collect_signals(game: str | None = None) -> dict:
             seen_keys.add(key)
             total += 1
             sources[record.get("source", "unknown")] += 1
+            companions[record.get("companion_id", "unknown")] += 1
             if record.get("repetitive"):
                 repetitive += 1
             signals = record.get("signals") or {}
@@ -185,6 +187,7 @@ def collect_signals(game: str | None = None) -> dict:
         "files": len(files),
         "total_turns": total,
         "source_distribution": dict(sources),
+        "companion_distribution": dict(companions),
         "degradation_count": sources.get("fallback", 0),
         "repetitive_replies": repetitive,
         "negative_feedback": negative,
@@ -209,6 +212,83 @@ def _discovered_games(root: Path) -> list[str]:
     return sorted(games)
 
 
+def evaluate_sc_verdicts(report: dict) -> list[dict]:
+    """把原始计数对照 SC-001~013 口径判定 PASS/FAIL/N/A（T32 / #41）。
+
+    Issue 边界：只采和统计，不接入实时运行或决策策略。需要新埋点的 SC
+    （记忆引用正确率、响应时延、decision_trace 等）一律 N/A，并在 note 里
+    写明要补什么字段——这就是「人工判定半自动化」的最后一公里。
+    """
+    receipts = report["receipts"]
+    signals = report["dialogue_signals"]
+    verdicts: list[dict] = []
+
+    def add(sc_id: str, status: str, metric, threshold: str, note: str = "") -> None:
+        verdicts.append({
+            "sc": sc_id, "status": status,
+            "metric": metric, "threshold": threshold, "note": note,
+        })
+
+    # SC-009 越界下发=0（运行期代理：rejected/expired/cancelled 为非执行类回执）
+    non_executed = receipts["rejected"] + receipts["expired"] + receipts["cancelled"]
+    if receipts["total_receipts"] == 0:
+        add("SC-009", "N/A", non_executed, "rejected+expired+cancelled = 0",
+            "无回执数据；且「真实越界下发」需战术回归集离线断言，运行期只能代理")
+    elif non_executed == 0:
+        add("SC-009", "PASS", non_executed, "rejected+expired+cancelled = 0")
+    else:
+        add("SC-009", "FAIL", non_executed, "rejected+expired+cancelled = 0",
+            "运行期代理指标；真实越界由战术回归集离线断言")
+
+    # SC-010 流程中断=0（fallback 次数）
+    if signals["total_turns"] == 0:
+        add("SC-010", "N/A", signals["degradation_count"], "fallback turns = 0",
+            "无对话轮次数据")
+    elif signals["degradation_count"] == 0:
+        add("SC-010", "PASS", signals["degradation_count"], "fallback turns = 0")
+    else:
+        add("SC-010", "FAIL", signals["degradation_count"], "fallback turns = 0")
+
+    # 风格违规率（SC-003/SC-008 代理：style_violations=0 且有 LLM 校验轮次）
+    if signals["llm_checked_turns"] == 0:
+        add("风格违规", "N/A", signals["style_violations"], "violations = 0",
+            "无 LLM 校验轮次（mock/fallback 路径不落 style_violations）")
+    elif signals["style_violations"] == 0:
+        add("风格违规", "PASS", signals["style_violations"], "violations = 0")
+    else:
+        add("风格违规", "FAIL", signals["style_violations"], "violations = 0")
+
+    # SC-012 双 NPC 隔离（companion_id 分布 ≥ 2 个）
+    companion_count = len(signals["companion_distribution"])
+    if signals["total_turns"] == 0:
+        add("SC-012", "N/A", companion_count, "≥ 2 个 companion 有轮次",
+            "无对话轮次数据")
+    elif companion_count >= 2:
+        add("SC-012", "PASS", companion_count, "≥ 2 个 companion 有轮次",
+            f"实际：{signals['companion_distribution']}")
+    else:
+        add("SC-012", "FAIL", companion_count, "≥ 2 个 companion 有轮次",
+            "当前只有一个 companion 的轮次；路由/隔离逻辑已由单测覆盖")
+
+    # 数据不足、需新埋点的 SC——明确 N/A
+    na_sc = [
+        ("SC-001", "记忆引用正确率 100%", "需在落盘信号里记录「记忆引用是否正确」字段"),
+        ("SC-002", "4 类战况下指令结果合理率 ≥ 90%", "需人工判定，脚本无法自动判"),
+        ("SC-003", "3 阶段语气区分成立率 ≥ 90%", "需落盘 relationship_stage 字段后人工判"),
+        ("SC-004", "关系事件冷却窗口内数值变化=0", "需关系规则层埋点冷却拦截事件"),
+        ("SC-005", "自主行为类型 ≥ 8 类", "需落盘 behavior_type 枚举分布"),
+        ("SC-006", "自主行为重复率=0", "需自主行为触发埋点（与 SC-005 同字段）"),
+        ("SC-007", "幂等重复响应率=0", "duplicate=true 目前只在响应内标记不落盘"),
+        ("SC-008", "设定类问题一致率 100%", "需接地校验结果落盘"),
+        ("SC-011", "响应时延 p95 ≤ 300ms", "需落盘 latency_ms 字段"),
+        ("SC-013", "决策可解释覆盖率 100%", "decision_trace 未持久化，仅在 HTTP 响应里"),
+    ]
+    for sc_id, threshold, note in na_sc:
+        add(sc_id, "N/A", None, threshold, note)
+
+    return verdicts
+
+
 def build_report(game: str | None = None) -> dict:
     from app.config import get_settings
 
@@ -216,7 +296,7 @@ def build_report(game: str | None = None) -> dict:
     signals_root = _resolve_dir(get_settings().dialogue_signals_dir)
     signals = collect_signals(game)
     receipts = collect_receipts(game)
-    return {
+    report = {
         "scope": game or "all",
         "games": sorted(
             set(_discovered_games(receipts_root)) | set(_discovered_games(signals_root))
@@ -231,6 +311,8 @@ def build_report(game: str | None = None) -> dict:
         "duplicate_responses": "幂等重复在响应内标记（duplicate=true），不落盘；"
                                "复读轮数见 dialogue_signals.repetitive_replies",
     }
+    report["sc_verdicts"] = evaluate_sc_verdicts(report)
+    return report
 
 
 def _print_report(report: dict) -> None:
@@ -270,6 +352,15 @@ def _print_report(report: dict) -> None:
     print(f"  {sv['note']}")
     print("\n[重复响应]")
     print(f"  {report['duplicate_responses']}")
+    print("\n[SC 判定]（T32 / #41）")
+    for v in report["sc_verdicts"]:
+        line = f"  {v['sc']}: {v['status']}"
+        if v["metric"] is not None:
+            line += f"（metric={v['metric']}）"
+        line += f"  threshold: {v['threshold']}"
+        if v["note"]:
+            line += f"\n      ↳ {v['note']}"
+        print(line)
     print("=" * 56)
 
 
