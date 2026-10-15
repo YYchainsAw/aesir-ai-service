@@ -57,3 +57,11 @@ throttle:
     - player_speaking          # 玩家正在说话
     - npc_casting              # NPC 正在施法
     - ui_popup                 # 界面弹窗
+
+# LLM 熔断器参数（T35 / FIX-07 登记，2026-10-15）。
+# 当前值为代码默认值（circuit_breaker.py），待 PIE 实测后回写调参结果。
+# 触发 OPEN 后，陪伴对话/战术意图/v0.1 命令解析三条链路统一回退规则/mock。
+circuit_breaker:
+  failure_threshold: 5        # 连续失败次数阈值
+  recovery_seconds: 60.0       # OPEN 状态恢复窗口（秒），HALF_OPEN 探一次
+  note: "待 PIE 试玩后根据真实故障频次回写调参结果；当前为代码默认基线"
