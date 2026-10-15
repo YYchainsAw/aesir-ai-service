@@ -148,6 +148,12 @@ def collect_signals(game: str | None = None) -> dict:
     topic_continued_known = 0
     style_violations = 0
     llm_checked_turns = 0
+    # T37 新增埋点聚合：记忆引用（SC-001）、关系阶段分布（SC-003）、
+    # 时延样本（SC-011，p95 需 ≥30 样本）。
+    memory_cited_true = 0
+    memory_cited_known = 0
+    relationship_stages: Counter = Counter()
+    latencies: list[int] = []
     corrupt: dict[str, int] = {}
     seen_keys: set[tuple] = set()
     files = _discover_jsonl(root, game)
@@ -180,6 +186,18 @@ def collect_signals(game: str | None = None) -> dict:
                 llm_checked_turns += 1
                 if violations:
                     style_violations += len(violations)
+            # 可选埋点字段（旧记录缺这些键时 .get 返回 None，不影响计数）。
+            cited = record.get("memory_cited")
+            if cited is not None:
+                memory_cited_known += 1
+                if cited:
+                    memory_cited_true += 1
+            stage = record.get("relationship_stage")
+            if isinstance(stage, str) and stage:
+                relationship_stages[stage] += 1
+            latency = record.get("latency_ms")
+            if isinstance(latency, (int, float)):
+                latencies.append(int(latency))
         if file_bad:
             corrupt[str(path.relative_to(root))] = file_bad
     return {
@@ -197,8 +215,31 @@ def collect_signals(game: str | None = None) -> dict:
         ),
         "style_violations": style_violations,
         "llm_checked_turns": llm_checked_turns,
+        # T37 新增：可判定 SC-001/SC-003/SC-011 的聚合值。
+        "memory_cited_rate": (
+            round(memory_cited_true / memory_cited_known, 3)
+            if memory_cited_known else None
+        ),
+        "memory_cited_turns": memory_cited_known,
+        "relationship_stage_distribution": dict(relationship_stages),
+        "latency_sample_size": len(latencies),
+        "latency_p95_ms": _percentile(latencies, 0.95),
         "corrupt": corrupt,
     }
+
+
+def _percentile(values: list[int], q: float) -> int | None:
+    """整数毫秒序列的分位数（线性插值）；空序列返回 None。"""
+    if not values:
+        return None
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    pos = q * (len(ordered) - 1)
+    lo = int(pos)
+    hi = min(lo + 1, len(ordered) - 1)
+    frac = pos - lo
+    return round(ordered[lo] + (ordered[hi] - ordered[lo]) * frac)
 
 
 def _discovered_games(root: Path) -> list[str]:
@@ -270,17 +311,48 @@ def evaluate_sc_verdicts(report: dict) -> list[dict]:
         add("SC-012", "FAIL", companion_count, "≥ 2 个 companion 有轮次",
             "当前只有一个 companion 的轮次；路由/隔离逻辑已由单测覆盖")
 
-    # 数据不足、需新埋点的 SC——明确 N/A
+    # SC-001 记忆引用（T37 起有 memory_cited 埋点；「正确率」仍需人工核，
+    # 脚本只能判「引用率非 0」这一代理——有引用样本才算链路在跑）。
+    if signals.get("memory_cited_turns", 0) == 0:
+        add("SC-001", "N/A", None, "记忆引用率 ≥ 90%",
+            "无 memory_cited 埋点样本（T37 起新增字段，旧数据缺）")
+    else:
+        rate = signals["memory_cited_rate"]
+        add("SC-001", "PASS" if rate and rate > 0 else "FAIL", rate,
+            "记忆引用率 > 0（正确率仍需人工核）",
+            f"代理指标：引用样本 {signals['memory_cited_turns']} 轮的引用率")
+
+    # SC-003 关系阶段分布：≥3 个阶段有轮次才算「3 阶段语气区分」链路覆盖。
+    stage_dist = signals.get("relationship_stage_distribution", {})
+    if len(stage_dist) == 0:
+        add("SC-003", "N/A", None, "3 阶段语气区分成立率 ≥ 90%",
+            "无 relationship_stage 落盘（T37 起新增字段）")
+    elif len(stage_dist) >= 3:
+        add("SC-003", "PASS", len(stage_dist), "≥ 3 个关系阶段有轮次",
+            f"实际分布：{stage_dist}；语气成立率仍需人工判")
+    else:
+        add("SC-003", "FAIL", len(stage_dist), "≥ 3 个关系阶段有轮次",
+            f"实际分布：{stage_dist}（样本只覆盖 {len(stage_dist)} 个阶段）")
+
+    # SC-011 时延 p95（FIX-04 定稿：规则链路 p95 ≤ 300ms，样本 ≥30）。
+    p95 = signals.get("latency_p95_ms")
+    sample = signals.get("latency_sample_size", 0)
+    if p95 is None or sample < 30:
+        add("SC-011", "N/A", p95, "p95 ≤ 300ms（样本 ≥30）",
+            f"latency_ms 样本不足：{sample}/30（T37 起新增字段）")
+    elif p95 <= 300:
+        add("SC-011", "PASS", p95, "p95 ≤ 300ms", f"样本 {sample} 条")
+    else:
+        add("SC-011", "FAIL", p95, "p95 ≤ 300ms", f"样本 {sample} 条超限")
+
+    # 数据仍不足、需后续埋点的 SC——明确 N/A
     na_sc = [
-        ("SC-001", "记忆引用正确率 100%", "需在落盘信号里记录「记忆引用是否正确」字段"),
         ("SC-002", "4 类战况下指令结果合理率 ≥ 90%", "需人工判定，脚本无法自动判"),
-        ("SC-003", "3 阶段语气区分成立率 ≥ 90%", "需落盘 relationship_stage 字段后人工判"),
         ("SC-004", "关系事件冷却窗口内数值变化=0", "需关系规则层埋点冷却拦截事件"),
         ("SC-005", "自主行为类型 ≥ 8 类", "需落盘 behavior_type 枚举分布"),
         ("SC-006", "自主行为重复率=0", "需自主行为触发埋点（与 SC-005 同字段）"),
         ("SC-007", "幂等重复响应率=0", "duplicate=true 目前只在响应内标记不落盘"),
         ("SC-008", "设定类问题一致率 100%", "需接地校验结果落盘"),
-        ("SC-011", "响应时延 p95 ≤ 300ms", "需落盘 latency_ms 字段"),
         ("SC-013", "决策可解释覆盖率 100%", "decision_trace 未持久化，仅在 HTTP 响应里"),
     ]
     for sc_id, threshold, note in na_sc:

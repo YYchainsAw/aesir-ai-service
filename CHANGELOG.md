@@ -2,7 +2,16 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-15，**762 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-15，**769 通过 + 2 跳过**）。
+
+## 2026-10-15 — T37 已知小尾巴收口（4 项：穿帮文案 / 缺省回退 / degraded 字段 / 埋点扩面）
+
+- **① event_policy recommendation 硬编码「艾莉」**（穿帮修复）：`_evt_companion_mp_low` 的 `display_text` 从写死「艾莉蓝量不足」改为经 `_display_name_for(companion_id)` 查人格包 `display_name`；未登记角色回退「队友」，不中断事件。Bruno 触发蓝量低事件不再说出「艾莉建议你……」。
+- **② command_parser 缺省回退**：`_primary_companion_id` 上下文无 agent 时从 `list_registered_companions()` 取注册表第一个已登记角色，而非写死 `companion.alice`；注册表故障才退回 alice 兜底。换游戏人格包后缺省主队友随之切换。
+- **③ `/v1/agent/step` 的 `observability.degraded`**：此前 schema 恒为默认 `False`、生产路径无人写。新增 `_llm_degraded()`（共享熔断器非 CLOSED 即 true）与 `_degraded_flag()`（汇总降级原因码：`AGENCY_POLICY_ERROR`/`RELATIONSHIP_UNAVAILABLE`/`COMBAT_CONTEXT_MISSING`，外加 `source=rule_fallback`）；三个 observability 构造点全部接入，UE 可感知 LLM 熔断/规则兜底。
+- **④ 埋点扩面（SC 判定层从 4 项可判升到 7 项）**：`record_turn_signal` 新增三个可选落盘字段 `memory_cited`/`relationship_stage`/`latency_ms`（缺省不写键，旧记录结构稳定）；非流式对话主路径已接 `memory_cited`（本轮是否注入记忆）与 `relationship_stage`。`metrics_report` 据此把 SC-001（记忆引用）、SC-003（关系阶段分布 ≥3）、SC-011（p95 ≤300ms、样本 ≥30）从 N/A 升级为可判定——旧数据缺字段时正确回退 N/A 并注明「T37 起新增字段」。
+- **测试**：新增 `tests/services/test_polish_fixes.py` 7 例（Bruno/Alice 文案、注册表回退、熔断 degraded 三态、埋点落盘/缺省不写键）。测试数：762 → **769 通过**。
+- **仍留 N/A**：SC-002/004/005/006/007/008/013 需后续埋点（战况合理率人工判、冷却拦截、behavior_type 分布、duplicate 落盘、接地校验结果、decision_trace 持久化）。
 
 ## 2026-10-15 — T33 SC-011「即时」量化定稿（Issue #42 / FIX-04）
 

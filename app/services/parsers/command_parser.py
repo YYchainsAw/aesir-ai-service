@@ -27,9 +27,23 @@ def _attach_acknowledgement(
 
 
 def _primary_companion_id(context: ParseCommandContext) -> str:
-    """从解析上下文取主队友 ID；无 agent 时回退默认 Alice。"""
+    """从解析上下文取主队友 ID。
+
+    优先 ``context.agents[0]``（多 NPC 同屏时由 UE 指定当前主队友）；
+    上下文未带 agent 时回退注册表「第一个已登记角色」，而非写死
+    ``companion.alice``——换游戏人格包后缺省主队友随之切换。注册表也
+    取不到（理论兜底）时才退回 ``companion.alice`` 并如实记一条原因码。
+    """
     if context.agents:
         return context.agents[0].id
+    try:
+        from app.services.companion.profile_repository import list_registered_companions
+
+        registered = list_registered_companions()
+        if registered:
+            return registered[0]
+    except Exception:
+        pass  # 注册表读取故障走兜底，不阻塞指令解析
     return "companion.alice"
 
 

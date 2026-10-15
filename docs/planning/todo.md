@@ -42,8 +42,13 @@
 - [x] **FIX-04 SC-011「即时」量化**（SDD v1.1 待确认-2；T33 / #42，2026-10-15）：规则链路（tactical/command）**p95 ≤ 300ms** 为硬指标；样本 ≥ 30 次混合采样（文本/语音各半，覆盖普攻/技能/治疗/跟随）；LLM 生成式回复单独统计、不纳入 p95 判定。定稿见 [integration-alignment-v0.3.md §7](../protocols/integration-alignment-v0.3.md)。
 - [x] **FIX-05 关系阶段中文命名口径**（SDD v1.1 待确认-5）：distant/neutral/friendly/close 的对外展示命名。`relationship_policy.yaml` 新增 `display_name`，各对外响应新增 `relationship_stage_display`（2026-09-28）。
 - [ ] **FIX-06 重叠输入 Context 实测**（GAP-INPUT-002）：PIE 验证 Locomotion/Combat 按键重叠是否误触发，决定是否调优先级。
-- [ ] **FIX-07 熔断与节流参数调优回写**：熔断 5 次/60s、行为节流 300s/3 次均为默认值，试玩后把调参结果回写 `data/policy/` 与 CHANGELOG。
-- [ ] **FIX-08 style_guard 词表持续扩充**（T083）：实测发现的出戏术语/禁忌新样本随时补入 `data/policy/style_policy.yaml`（零代码成本）。
+- [x] **FIX-07 熔断与节流参数调优回写**（T35 / #44，2026-10-15）：熔断参数（`failure_threshold: 5` / `recovery_seconds: 60.0`）已登记到 [agency_policy.yaml](../../data/policy/agency_policy.yaml) `circuit_breaker` 段，与节流参数同文件；当前值为代码默认基线，待 PIE 试玩后根据真实故障频次回写调参结果。
+- [x] **FIX-08 style_guard 词表持续扩充**（T083 / T36 / #45，2026-10-15）：从 26 轮真实对话（2026-09-28 端到端实测）提炼边界 case——玩家输入带「第 1 次：」「第 2 次：」「第 3 次：」测试标注序号，补入 `style_policy.yaml` meta_terms（6 个新词），revision 升为 `style-policy-002`。26 轮真实对话 style_violations 全部为 []，无禁忌/虚构新样本。
+- [x] **FIX-09 已知小尾巴收口（4 项）**（T37，2026-10-15）：
+  1. `event_policy._evt_companion_mp_low` recommendation 文案硬编码「艾莉」→ 改经 `_display_name_for(companion_id)` 查人格包 `display_name`（Bruno 触发不再穿帮）；
+  2. `command_parser._primary_companion_id` 缺省回退写死 `companion.alice` → 改从 `list_registered_companions()` 取注册表第一个已登记角色；
+  3. `/v1/agent/step` 的 `observability.degraded` schema 恒 False、生产路径无人写 → 接 `_llm_degraded()`（熔断器非 CLOSED）+ 降级原因码（`AGENCY_POLICY_ERROR`/`RELATIONSHIP_UNAVAILABLE`/`COMBAT_CONTEXT_MISSING`/`rule_fallback`）；
+  4. 埋点扩面：`record_turn_signal` 新增 `memory_cited`/`relationship_stage`/`latency_ms` 可选字段，`metrics_report` 把 SC-001/003/011 从 N/A 升为可判定（可判项 4→7）。回归 `test_polish_fixes.py` 7 例，全量 769 绿。
 
 ## 三、代码审查改进项（2026-09-28 严格代码审查，只审未改）
 
