@@ -129,11 +129,19 @@ def record_turn_signal(
     previous_reply_texts: list[str] = (),
     style_violations: list[str] | None = None,
     game_id: str = _DEFAULT_GAME_ID,
+    memory_cited: bool | None = None,
+    relationship_stage: str = "",
+    latency_ms: int | None = None,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
     ``previous_*`` 为本轮记录**之前**的会话历史（旧→新），供复读度与
     话题延续比较；调用方在写入会话记忆前采集。
+
+    新增可选字段（T32 判定层列明的 N/A 项所需数据源，缺省不落盘）：
+    - ``memory_cited``：本轮回复是否引用了具体记忆（SC-001 记忆引用正确率）；
+    - ``relationship_stage``：本轮关系阶段机器名（SC-003 语气区分）；
+    - ``latency_ms``：本轮服务端耗时毫秒（SC-011 时延统计，样本 ≥30）。
     """
     try:
         signals = {
@@ -161,6 +169,13 @@ def record_turn_signal(
             "repetitive": signals["repetition_score"] >= _REPETITION_FLAG_THRESHOLD,
             "style_violations": style_violations,
         }
+        # 可选埋点仅在显式传入时落盘（保持旧记录结构稳定，缺省字段缺失不报错）。
+        if memory_cited is not None:
+            record["memory_cited"] = memory_cited
+        if relationship_stage:
+            record["relationship_stage"] = relationship_stage
+        if latency_ms is not None:
+            record["latency_ms"] = latency_ms
         root = Path(get_settings().dialogue_signals_dir) / game_id
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:

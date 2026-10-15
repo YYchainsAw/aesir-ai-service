@@ -44,6 +44,11 @@
 - [ ] **FIX-06 重叠输入 Context 实测**（GAP-INPUT-002）：PIE 验证 Locomotion/Combat 按键重叠是否误触发，决定是否调优先级。
 - [x] **FIX-07 熔断与节流参数调优回写**（T35 / #44，2026-10-15）：熔断参数（`failure_threshold: 5` / `recovery_seconds: 60.0`）已登记到 [agency_policy.yaml](../../data/policy/agency_policy.yaml) `circuit_breaker` 段，与节流参数同文件；当前值为代码默认基线，待 PIE 试玩后根据真实故障频次回写调参结果。
 - [x] **FIX-08 style_guard 词表持续扩充**（T083 / T36 / #45，2026-10-15）：从 26 轮真实对话（2026-09-28 端到端实测）提炼边界 case——玩家输入带「第 1 次：」「第 2 次：」「第 3 次：」测试标注序号，补入 `style_policy.yaml` meta_terms（6 个新词），revision 升为 `style-policy-002`。26 轮真实对话 style_violations 全部为 []，无禁忌/虚构新样本。
+- [x] **FIX-09 已知小尾巴收口（4 项）**（T37，2026-10-15）：
+  1. `event_policy._evt_companion_mp_low` recommendation 文案硬编码「艾莉」→ 改经 `_display_name_for(companion_id)` 查人格包 `display_name`（Bruno 触发不再穿帮）；
+  2. `command_parser._primary_companion_id` 缺省回退写死 `companion.alice` → 改从 `list_registered_companions()` 取注册表第一个已登记角色；
+  3. `/v1/agent/step` 的 `observability.degraded` schema 恒 False、生产路径无人写 → 接 `_llm_degraded()`（熔断器非 CLOSED）+ 降级原因码（`AGENCY_POLICY_ERROR`/`RELATIONSHIP_UNAVAILABLE`/`COMBAT_CONTEXT_MISSING`/`rule_fallback`）；
+  4. 埋点扩面：`record_turn_signal` 新增 `memory_cited`/`relationship_stage`/`latency_ms` 可选字段，`metrics_report` 把 SC-001/003/011 从 N/A 升为可判定（可判项 4→7）。回归 `test_polish_fixes.py` 7 例，全量 769 绿。
 
 ## 三、代码审查改进项（2026-09-28 严格代码审查，只审未改）
 

@@ -117,6 +117,30 @@ def _persona_revision_or_empty(companion_id: str) -> str:
     return str(profile.raw.get("profile_version", ""))
 
 
+def _llm_degraded() -> bool:
+    """共享 LLM 熔断器是否处于非 CLOSED 状态（OPEN/HALF_OPEN）。
+
+    UE 侧据此感知「LLM 链路已降级、本轮走规则兜底」。熔断器读失败时
+    保守视为未降级（不因观测故障误伤正常响应）。
+    """
+    try:
+        from app.services.llm.factory import get_llm_circuit_breaker
+
+        return get_llm_circuit_breaker().state != "closed"
+    except Exception:
+        return False
+
+
+def _degraded_flag(reason_codes: list[str], *, extra: bool = False) -> bool:
+    """汇总本轮是否处于降级态：熔断器打开，或命中已知降级原因码。"""
+    degraded_reasons = {
+        "AGENCY_POLICY_ERROR",      # 策略文件故障，候选生成降级
+        "RELATIONSHIP_UNAVAILABLE", # 关系存储故障
+        "COMBAT_CONTEXT_MISSING",    # 快照缺战斗上下文，不虚构执行
+    }
+    return extra or _llm_degraded() or any(c in degraded_reasons for c in reason_codes)
+
+
 def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> AgentStepResponse:
     """空动作轻量返回（FR-025：不虚构行为；FR-021 判定无产出时快速返回）。"""
     return AgentStepResponse(
@@ -132,6 +156,7 @@ def _empty_response(request: AgentStepRequest, reason_codes: list[str]) -> Agent
             relationship_stage=_relationship_stage_or_empty(request.companion_id),
             relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
             persona_revision=_persona_revision_or_empty(request.companion_id),
+            degraded=_degraded_flag(reason_codes),
         ),
     )
 
@@ -267,6 +292,7 @@ def _autonomous_step(request: AgentStepRequest) -> AgentStepResponse:
             relationship_stage=_relationship_stage_or_empty(companion_id),
             relationship_stage_display=_relationship_stage_display_or_empty(companion_id),
             persona_revision=_persona_revision_or_empty(companion_id),
+            degraded=_llm_degraded(),
         ),
     )
 
@@ -347,6 +373,8 @@ def _intent_observability(
         relationship_stage=_relationship_stage_or_empty(request.companion_id),
         relationship_stage_display=_relationship_stage_display_or_empty(request.companion_id),
         persona_revision=_persona_revision_or_empty(request.companion_id),
+        # source=rule_fallback 表示 LLM 解析失败已回退规则，本轮即降级。
+        degraded=_degraded_flag(reason_codes, extra=(source == "rule_fallback")),
     )
 
 

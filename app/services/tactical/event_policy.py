@@ -67,6 +67,18 @@ def _game_id_for(companion_id: str) -> str:
         return "aesir"
 
 
+def _display_name_for(companion_id: str) -> str:
+    """从人格包取对外称呼（display_name）；未登记时回退「队友」，绝不硬编码。
+
+    recommendation 文案里引用角色名时必须经此入口——Bruno 触发的事件
+    若写死「艾莉」会直接穿帮（已知小尾巴修复）。
+    """
+    try:
+        return get_registered_profile(companion_id).display_name
+    except CompanionProfileError:
+        return "队友"
+
+
 def _load_reaction(
     event_type: str, *, companion_id: str, section: str = "combat_event_reactions"
 ) -> EventReaction:
@@ -262,7 +274,10 @@ def _evt_companion_mp_low(request: CombatEventRequest, ctx: CombatContext) -> Co
             type="conserve_resources",
             target_id=ctx.companion.id,
             reason_codes=["COMPANION_MP_LOW"],
-            display_text="艾莉蓝量不足，建议让她节省技能。",
+            display_text=(
+                f"{_display_name_for(ctx.companion.id)}蓝量不足，"
+                "建议让其节省技能。"
+            ),
         ),
         companion_action=None,
     )
