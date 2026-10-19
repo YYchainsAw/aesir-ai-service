@@ -312,6 +312,13 @@ def _record_turn(
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
         _remember_turn(request.companion_id, reply_topics, origin="companion", game_id=game_id)
 
+    # 关系信号先落地拿到本轮实际 delta（冷却/日上限可能吃掉），再随信号一并
+    # 落盘——FIX-13：sentiment（LLM 判定）与 relationship_delta（实收）配对
+    # 记录，metrics 层才能核对「判定 vs 实收」并支撑 SC-004/SC-001 判定。
+    delta = _apply_relationship_signal(
+        request.companion_id, relationship_signal, game_id=game_id
+    )
+
     # 信号埋点（RL 前置）：先用记录前的会话历史算复读度/话题延续，再落 JSONL；
     # 任何故障静默（绝不阻塞对话）。
     record_turn_signal(
@@ -330,9 +337,11 @@ def _record_turn(
         style_violations=style_violations,
         relationship_stage=relationship_stage,
         memory_cited=memory_cited,
+        sentiment=relationship_signal,
+        relationship_delta=delta,
         game_id=game_id,
     )
-    return _apply_relationship_signal(request.companion_id, relationship_signal, game_id=game_id)
+    return delta
 
 
 # 对话推动关系（2026-09-22）：LLM 判定的玩家发言情感质量 → 关系事件类型。

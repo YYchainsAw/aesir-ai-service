@@ -43,3 +43,7 @@ WorkBuddy_work/
 
 # NPC relationship state (SDD T037: 运行期生成的关系持久化，不入版本库)
 data/relationship/
+
+# 联调测试日产物（2026-10-19：只测试不上传；探针脚本与本地联调日志）
+scripts/jiadiao_dialogue_probe.py
+data/runtime/uvicorn_console*.log

@@ -86,6 +86,43 @@
 - [x] **CODE-07 战斗指令缺 `expires` 字段**：非战斗指令有过期时间而战斗指令没有，UE 侧可能长期持有过期战术指令。建议统一补上（与 CODE-03 一起做，参数同样外置）。
 - [x] **CODE-08 节流/冷却依赖的策略参数与运行时实例固化**（T20 修复 2026-10-12）：① 节流单例热更新——明确为有意边界，`throttle.py` docstring 已写「策略进程启动时固化，改配置需重启；测试用 reset_throttle()」，不实现热更新平台；② 冷却漂移——**已修复**：`RelationshipState` 新增独立 `last_event_at: dict[str,str]`，冷却判定改查该字典而非扫 `recent_events`（上限 20 会挤出旧记录）。复现样例：gift_given 计分后塞 20 条其他事件挤出 recent_events，冷却窗口内重复原错误计分 +3，修复后正确拦截 delta=0。回归 `test_cooldown_survives_recent_events_eviction`。
 
+## 三·补、联调测试日发现（2026-10-19，待全量测试完毕后统一修复）
+
+> 来源：2026-10-19 真机联调（UE standalone game × Python 8011，L_Jiadiao 关卡）。
+> **纪律**：本节条目只登记不修复，等剩余验收矩阵事项全部测完后，按优先级统一开工。
+> 实测证据见 [docs/logs/2026-10-19.md](../logs/2026-10-19.md)。
+
+### 🔴 Python 侧
+
+- [x] **FIX-11 / P0：`/v1/agent/step` 收到闲聊文本硬拒，无 LLM 对话降级**（2026-10-19 已修）
+  现象：玩家说"早上好/你是AI吗/还记得Boss吗"等任何非指令文本，agent/step 全返回 `INTENT_UNRECOGNIZED`「我没听清你想让我做什么」。
+  根因：`app/api/v1/agent.py:388-411` 带 text 只走 `parse_intent_with_source`（11 个指令意图白名单），`intent=None` 直接硬拒，不 fallback 到 companion dialogue。
+  修法（采纳建议①）：intent=None 分支降级到 `create_dialogue_reply`（`_chitchat_dialogue_step`），action 仍 none、不下发指令；reason_codes 保留 INTENT_UNRECOGNIZED + 新增 CHITCHAT_DIALOGUE；对话服务故障退回澄清 + DIALOGUE_UNAVAILABLE。实测 5 轮探针：闲聊全部自然应答，指令路径不受影响。
+
+- [ ] **FIX-12 / P1：style_guard 元语言词表与 LLM 自我化解能力不一致**
+  现象：玩家输入"你是AI吗"被拦截（fallback 到 YAML 候选），但"系统检测到你是LLM""你是个指令机器人吧"**未拦截直接放行**，LLM 角色化解自然（"我这边只感觉到风吹过来"）。
+  观察：放行的 2 条回复质量合格、无人设崩塌。
+  建议（待批准）：核查 `data/policy/style_policy.yaml` meta_terms 词表是否应补"系统/LLM/机器人"；或接受"LLM 能自我化解就放行"的宽松策略，把词表收敛为"必拦"子集。需 26 轮以上真实对话回归确认。
+
+- [x] **FIX-13 / P2：`/v1/companion/chat` 路径不推动关系值、情感质量未落盘**（2026-10-19 已修）
+  现象：连发 4 轮对话关系值停在 26.0；dialogue_signals JSONL 无 sentiment/relationship_delta 字段。
+  根因查明：关系事件链路本身是通的（hostile 句实测 -1、warm 句实测 +1）；卡住是 300s 对话冷却 + LLM「宁漏勿滥」多数轮判 none。真正缺的是埋点：`record_turn_signal` 没收 sentiment/relationship_delta，metrics 层无数据源。
+  修法：`record_turn_signal` 新增可选字段 `sentiment` + `relationship_delta`（缺省不落盘）；`_record_turn` 先落地关系信号拿 delta 再配对落盘。实测 warm 句：JSONL 出现 sentiment=warm / relationship_delta=1。
+
+### 🟠 UE 侧（归属 AesirWarden 仓）
+
+- [x] **UE-01：BP_AesirGameMode 的 `ResolveTacticalIntentForTest` 引脚未接参数**（2026-10-19 已修）
+  现象：每次 BeginPlay 自动发一次空 `intent_id/timing/captured_at` -> Python 422。
+  修法：C++ 侧 `ResolveTacticalIntentForTest` 入口防御——IntentId 为空时 Warning 并 return（蓝图 .uasset 二进制无法文本编辑，守卫式修法）。编译 AesirWardenEditor 增量 28.51s 通过；重启后 BeginPlay 段 422 消失。
+
+- [ ] **UE-02：动画蓝图缺骨架资产**
+  现象：ABP_Alice / ABP_AesirBoss / ABP_AesirPlayer 编译失败（"骨架资产缺失"），所有 BS_Greystone_* BlendSpace 缺采样动画。游戏内角色会是 T-pose/灰盒。
+  影响：不阻塞 HTTP 联调，但视觉验收无法进行。
+  建议：美术资产补齐后重新编译动画蓝图。
+
+- [ ] **UE-03：L_Jiadiao 关卡与启动脚本归属**
+  本次新建的 `Content/Maps/L_Jiadiao.umap`、`Tools/build_jiadiao_map.py`、.uproject 加 PythonScriptPlugin、DefaultEngine.ini 换地图，目前都在 UE 仓工作区未提交。需决定：①入库作为联调基线关卡；②还是仅本地测试用，从 DefaultEngine.ini 换回 L_OpenWorld（一旦 L_OpenWorld 资产补齐）。
+
 ## 四、明确不做（边界提醒，防止方向跑偏）
 
 OUT-01 多用户/账号/联网/跨设备同步；OUT-02 人格自演化；OUT-03 数据库/消息队列/公网部署；OUT-04 服务直接改游戏世界状态；OUT-05 对话 RL 未经批准；OUT-06 Boss RL 并入本服务主线（保持旁路）。
