@@ -1,271 +1,55 @@
 # Aesir AI Service
 
-本仓库包含两个边界明确的子系统：供 Unreal 调用的**指令服务**，以及独立运行的 **Boss 强化学习实验**。指令服务把玩家的文本或语音战术指令转换为 UE 可校验的 JSON；Boss RL 负责训练和评估高层战术策略，不参与指令服务启动。
+AesirWarden 的 Python 配套服务。NPC 服务负责对话、记忆、关系、语音转写、行为建议和回执采集；Boss RL 在独立进程中训练和推理。UE 始终负责世界状态、技能合法性、实际执行和结果结算。
 
-> **定位升级（2026-09-13 起）**：项目要求已从「语音转 JSON 战术命令」升级为「**NPC 人格与行为代理**」——在保留战斗指挥的前提下新增持久化记忆、关系状态、非战斗自主行为与只读查证工具。需求规格、章程与任务分解见 [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md)（当前最高规划基线）；本 README 描述的 v0.1/v0.2 能力均已实现且保持兼容。
+## 启动 NPC 服务
 
-解析后端（规则 / LLM）与语音转写后端（mock / faster-whisper）均可插拔，输出协议保持不变。服务在本地运行，无外部依赖，UE 客户端通过 HTTP 直接调用。
-
-## 设计理念
-
-直接让 LLM 生成 UE 命令存在不可控风险（幻觉技能、非法参数、越权指令），因此采用「**受限协议 + 可替换解析器**」：
-
-- **协议层**：`TacticalOrder` 每个字段限定在严格白名单内；UE C++ 侧做 1:1 结构映射并二次校验。
-- **解析层**：规则 / LLM 解析器可替换，语音识别结果复用同一解析层。无论输入来源，输出协议不变。
-
-把风险收敛在解析层，UE 通信协议与校验逻辑不因接入 LLM 或语音而改变。
-
-## 技术栈
-
-| 组件 | 选型 | 说明 |
-| --- | --- | --- |
-| Web 框架 | FastAPI 0.141 | 轻量、自带 OpenAPI 文档 |
-| 数据校验 | Pydantic 2.13 | `Literal` / 判别联合实现协议白名单 |
-| ASGI 服务器 | Uvicorn 0.52 | 本地开发/运行 |
-| 测试 | pytest 9.1 + httpx | 基于 `TestClient` 的接口测试 |
-| 运行时 | Python 3.12 | — |
-| 语音转写 | faster-whisper / mock | 可插拔 ASR 后端 |
-
-## 目录结构
-
-```
-aesir-ai-service/
-├── app/                           # 指令服务（生产运行时，不依赖 rl）
-│   ├── main.py                    # FastAPI 应用入口
-│   ├── config.py                  # pydantic-settings 环境变量解析
-│   ├── api/
-│   │   ├── health.py              # /health
-│   │   ├── routes.py              # 路由聚合器（include 全部子 router）
-│   │   └── v1/
-│   │       ├── commands.py        # /v1/commands/parse（遗留 /parse-command）
-│   │       ├── voice.py           # /v1/voice/command（音频→ASR→解析）
-│   │       ├── speech.py          # /v1/speech/transcribe（独立转写）
-│   │       ├── tactical.py        # /v1/tactical/resolve + executions
-│   │       ├── combat.py          # /v1/combat/events
-│   │       └── companion.py       # /v1/companion/chat
-│   ├── schemas/                   # 协议 schema：ids / tactical_order / combat_context / directives（单一指令体系）…
-│   └── services/
-│       ├── parsers/               # rule / llm / command_parser（解析门面+回退）
-│       ├── transcribers/          # base / mock / faster_whisper / factory
-│       ├── tactical/              # resolver / event_policy / receipt_store / acknowledgement
-│       ├── companion/             # 对话服务 + 人设仓库
-│       ├── llm/                   # client + factory（共享 LLM Client）
-│       ├── memory/                # 记忆体系（US1：四层记忆/淘汰/检索/降级/事实接地校验）
-│       ├── relationship/          # 关系体系（US2：数值/阶段/防刷/阶段化调制）
-│       ├── agency/                # 自主行为（US3：场景判定/行为目录/仲裁/节流）
-│       └── skills/                # 能力注册与只读查证工具（SDD 骨架，US6）
-├── rl/                            # Boss 强化学习研究（可选依赖）
-│   └── boss/                      # Boss-as-agent + UE schema v4
-├── scripts/
-│   ├── command_service/           # ASR 评估与假 UE 联调
-│   ├── metrics_report.py          # 验收指标采集（US7 / T079）
-│   ├── migrate_memory_impressions.py   # 旧逐字记忆 → 主题印象（一次性）
-│   ├── prune_noise_impressions.py      # 清洗印象层历史噪声（一次性）
-│   └── rl/
-│       └── boss/                  # Boss 训练/评估入口
-├── data/
-│   ├── companions/                # 队友 YAML 人设（Alice + Bruno 第二角色验证骨架）
-│   ├── policy/                    # 策略阈值：战术/关系/活动域/表达一致性（tactical/relationship/agency/style_policy.yaml）
-│   ├── world/                     # 世界观知识库 lore.yaml（只读查证用）
-│   ├── golden/                    # UE 联调用 golden 快照（A/B/C/D 四类战况）
-│   ├── memory/                    # 运行期 NPC 记忆（gitignore 不入库）
-│   └── runtime/                   # 指令回执等运行数据（gitignore 不入库）
-├── tests/                         # 指令服务测试 + rl/boss
-├── docs/                          # 项目文档（planning/protocols/guides/design/logs）
-├── requirements*.txt              # 运行时 / ML / RL / 开发测试 依赖拆分
-└── CHANGELOG.md                   # 里程碑记录
-```
-
-## 文档导航
-
-| 请求 | 入口 |
-| --- | --- |
-| 项目总览 / 设计理念 | 本文档 |
-| **UE × 模型服务协议契约 v0.1**（API + 类型定义） | [`docs/protocols/ue-protocol-contract-v0.1.md`](docs/protocols/ue-protocol-contract-v0.1.md) |
-| **UE 侧接入指南 v0.1**（分步 + 验收清单） | [`docs/protocols/ue-integration-guide-v0.1.md`](docs/protocols/ue-integration-guide-v0.1.md) |
-| 战斗事件 / 上下文感知战术协议 v0.2（正式版） | [`docs/protocols/combat-tactical-protocol-v0.2.md`](docs/protocols/combat-tactical-protocol-v0.2.md) |
-| 启动 / 安装 / 接口示例 | [`docs/guides/getting-started.md`](docs/guides/getting-started.md) |
-| LLM 联调 | [`docs/guides/llm-integration.md`](docs/guides/llm-integration.md) |
-| 当前 Boss RL 代码与运行入口 | [`rl/README.md`](rl/README.md) |
-| 总策划书 v0.2 | [`docs/planning/game-design-doc-v0.2.md`](docs/planning/game-design-doc-v0.2.md) |
-| **需求规格说明书 SDD v1.0**（章程 / 用户故事 / 任务分解） | [`docs/planning/aesir-agent-sdd-v1.0.md`](docs/planning/aesir-agent-sdd-v1.0.md) |
-| 全部文档索引 | [`docs/README.md`](docs/README.md) |
-
-## 启动
+需要 Python 3.12+。在仓库根目录执行：
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -e .
 .\.venv\Scripts\python -m pip install -r requirements.txt
-.\.venv\Scripts\python -m uvicorn app.main:app --reload
+.\.venv\Scripts\python -m scripts.run_server --reload
 ```
 
-或直接双击根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）；`start.bat chat` 可在终端直接与 NPC 对话（人设质量检查，见 `docs/guides/getting-started.md` §5.7）。
+默认地址为 `http://127.0.0.1:8011`。打开 `/health` 检查运行提交，打开 `/docs` 查询当前接口。`scripts.run_server` 读取 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT`；直接运行未指定端口的 Uvicorn 会使用其自己的默认端口。修改 `.env` 或策略后重启服务。
 
-服务启动后访问：
+规则和 mock 模式不需要云端模型；启用 LLM 时会向配置后端发送文本及生成所需上下文。真实 ASR 需要可选依赖。安装、后端配置、数据流和复现步骤见下面的指南，不能由“服务在本机运行”推断没有外部调用。
 
-- `http://127.0.0.1:8011/health`：健康检查（返回 `protocol_version: "0.1"`）
-- `http://127.0.0.1:8011/docs`：交互式接口文档
+## 从哪里看
 
-## 当前接口
+| 我现在要做什么 | 入口 |
+| --- | --- |
+| 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
+| 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
+| 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
+| 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
+| 查接口和人格包字段 | [文档索引](docs/README.md)的契约入口 |
+| 查当前需求、规则、异常和对象职责 | [NPC需求主文](docs/planning/aesir-agent-sdd-v1.1.md) |
+| 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/course-requirements-index.md) |
+| 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/todo.md) |
+| 训练或运行Boss PPO | [Boss RL说明](rl/README.md) |
+| 查真实联调和历史里程碑 | [验证记录](docs/logs/verification-records.md) · [CHANGELOG](CHANGELOG.md) |
 
-| 方法 | 路径 | 说明 |
+## 服务边界与端口
+
+| 服务 | 默认端口 | 职责 |
 | --- | --- | --- |
-| `POST` | `/v1/commands/parse` | 契约 v0.1：文本 + 能力目录 `context` + `request_id` |
-| `POST` | `/v1/voice/command` | 语音：multipart WAV(16kHz/mono/16bit) → ASR → 同一解析层 |
-| `POST` | `/v1/speech/transcribe` | 独立转写：只做音频 → 文本（两步式调试 ASR） |
-| `POST` | `/v1/tactical/resolve` | v0.2 预览：意图 + 战斗快照 → 上下文决策（规则策略） |
-| `POST` | `/v1/tactical/command` | v0.2 组合端点：文本 + 战斗快照 → 上下文决策，一次调用 |
-| `POST` | `/v1/tactical/executions` | v0.2 §7：UE 执行回执（202 受理，落 JSONL） |
-| `POST` | `/v1/combat/events` | v0.2 §6：战斗事件 → 艾莉反应/建议/候选动作 |
-| `POST` | `/v1/companion/chat` | 陪伴对话（按 `companion_id` 路由到已登记角色） |
-| `POST` | `/v1/companion/chat/stream` | 陪伴对话流式变体（SSE：delta 增量 + meta 权威帧，契约附录 A；同按 `companion_id` 路由） |
-| `POST` | `/v1/agent/step` | v0.3 主入口：心跳/世界快照 → 禁打断判定 → 候选生成 → 仲裁 → 节流 → 自主行为指令（US3）；携带 `text` 时与 `/v1/tactical/command` 同源处理玩家指令（战斗/非战斗意图按域路由，US4） |
-| `POST` | `/v1/world/events` | v0.3 世界事件（含幂等回放） |
-| `GET` | `/v1/console/state` · `/memory`，`POST /memory/reset` | v0.3 调试台（状态查询含场景/情绪/关系/近期记忆，US7） |
-| `POST` | `/parse-command` | 遗留别名：只传 `text`，服务端回填默认能力目录 |
+| `app.main:app`，由 `scripts.run_server` 启动 | 8011 | NPC对话/指令/快照/事件/调试与回执 |
+| `rl.boss.inference_app`，由 `scripts/rl/boss/serve.py` 启动 | 8012 | schema v4、26维观测、9动作的冻结Boss策略推理 |
 
-支持的 5 条战术指令（`intent`）：
+`app` 不导入 `rl`，NPC服务可在未安装Gymnasium、SB3或Torch时运行。Boss HTTP推理已存在；UE运行接入、故障回退修复和正式BT/PPO对照分别验收。模型不随Git克隆分发，获取和身份核对见RL说明。
 
-| 指令 | intent | 动作 `then.type` |
-| --- | --- | --- |
-| 艾莉，等 Boss 眩晕时使用爆裂魔法 | `conditional_cast` | `cast_ability` |
-| 艾莉，保留爆裂魔法 | `hold_ability` | `hold_ability` |
-| 艾莉，撤退并优先保命 | `retreat` | `retreat` |
-| 艾莉，跟随我并保持距离 | `follow_keep_distance` | `follow` |
-| 艾莉，优先普通攻击 | `prioritize_attack` | `set_priority` |
+协议v0.1、v0.2、v0.3按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作，回执当前只追加记录。
 
-不识别的文本会明确返回 `recognized: false` 且 `order: null`，UE 端可安全忽略。
-
-### 文本示例
-
-```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/commands/parse `
-  -ContentType "application/json" `
-  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，撤退并优先保命","context":{"agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
-```
-
-### 语音（真实 ASR）
-
-`.env` 设 `AESIR_ASR_BACKEND=faster_whisper`（模型/设备等见 `.env.example`；首次需装 `requirements-ml.txt` 并配 `HF_ENDPOINT=https://hf-mirror.com` 下载模型）：
-
-```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/voice/command `
-  -Form @{ file = Get-Item cmd.wav; request_id = "1fad2e69-4a2d-4308-ad4f-2f8abb338b89" }
-```
-
-默认 `AESIR_ASR_BACKEND=mock` 返回 `AESIR_ASR_MOCK_TEXT` 固定文本，用于无模型环境自测。
-
-~~真人声调优~~（已取消：无真人录音样本；`scripts/command_service/asr_eval.py` 评测脚手架保留备用）。
-
-## 核心设计
-
-`TacticalOrder` 由 `intent` 判别的联合类型；`when` / `then` / `expires` 又各自按 `type` 判别。完整类型定义、Golden JSON 与能力目录白名单见[协议契约](docs/protocols/ue-protocol-contract-v0.1.md)。
-
-解析流程：
-
-```
-玩家文本 / ASR 文本 → 后端选型（rule / llm）
-        → 规则解析器 _normalize（去空格/标点/大小写/全半角）
-        → 匹配 agent → 按「更具体优先」匹配 5 个意图
-        → 生成 TacticalOrder / recognized=false
-        → LLM 失败时回退到规则（rule_fallback → source 标记）
-```
-
-解析逻辑隔离在 `app/services/parsers/`，输出 `ParseCommandResponse` 由 schema 固定。`source` 字段标注最终实际来源（`rule` / `llm` / `rule_fallback`），供 UE 端日志与降级观测。
-
-## Polish 加固（SDD Phase 11）
-
-### 多角色隔离（US8）
-
-`/v1/companion/chat`、`/v1/companion/chat/stream` 与 `/v1/agent/step` 均按请求中的 `companion_id` 路由到已登记角色。当前已登记角色见 `data/personas/aesir/`（S2 人格包目录化：Alice 主角色 + Bruno 第二角色验证骨架）。不同角色拥有独立的记忆目录、关系目录与表现 ID 白名单；未登记的 `companion_id` 返回 `404`，不会静默回退默认角色。
-
-### 表达一致性校验（T083）
-
-`app/services/companion/style_guard.py` 在 LLM 对话输出后执行三类配置驱动校验：
-
-- **出戏术语**：拦截 "指令/协议/系统/模型/客户端" 等破坏沉浸感的元语言（`data/policy/style_policy.yaml` 的 `meta_terms`）。
-- **禁忌表达**：拦截占有、控制、贬低、胁迫、情感勒索式短语（`forbidden_expressions`）。
-- **虚构事实信号**：当回复包含 "你说过/你答应过/当然记得" 等短语且当前上下文无记忆支撑时拦截（`fabrication_signals`）。
-
-非流式路径命中后自动重试一次；两次失败抛 `LLMClientError`，由 `dialogue_service` 回退到 YAML 分类候选回复。流式路径在完整接收后校验，失败由 SSE `error` 事件兜底。
-
-### LLM 熔断与超时统一（T084）
-
-`app/services/llm/circuit_breaker.py` 提供进程内共享熔断器，包装所有通过 `create_llm_client()` 创建的 LLM 客户端：
-
-- 连续失败达到 `AESIR_LLM_CIRCUIT_FAILURE_THRESHOLD`（默认 5）后进入 OPEN 状态，在 `AESIR_LLM_CIRCUIT_RECOVERY_SECONDS`（默认 60 秒）内直接拒绝 LLM 调用。
-- 恢复窗口后进入 HALF_OPEN，下一次调用成功则关闭，失败则重新打开。
-- 陪伴对话、战术意图解析、v0.1 命令解析三条链路共享同一熔断状态；熔断后各链路既有 fallback（规则 / mock）自动生效，不阻塞游戏流程。
-
-超时配置已统一外置：`AESIR_LLM_TIMEOUT_SECONDS`、`AESIR_TOOLS_LOOKUP_TIMEOUT_SECONDS`、`AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS`。
-
-## Boss RL（当前答辩主线）
-
-`rl/boss/` 是当前唯一的强化学习实现，动作和观察契约与 UE 对齐。它不会被 `app.main:app` 导入：
-
-```powershell
-.\.venv\Scripts\python -m pip install -r requirements-rl.txt      # gymnasium/sb3/torch(CPU)
-.\.venv\Scripts\python scripts\rl\boss\eval.py --episodes 20      # BT/规则基线
-.\.venv\Scripts\python scripts\rl\boss\train.py --timesteps 20000 # PPO 冒烟训练
-```
-
-正式训练会额外生成 TensorBoard 日志、周期 Checkpoint、周期评估结果和最佳模型；
-最终 manifest 同时记录总体指标及每种玩家画像的胜率、伤害与动作分布。
-
-冻结后的 Boss 策略由独立服务提供推理，不与玩家指令服务混合：
-
-```powershell
-.\.venv\Scripts\python scripts\rl\boss\serve.py  # http://127.0.0.1:8012
-```
-
-目录边界与旧实验说明见 [`rl/README.md`](rl/README.md)。RL 尚未接入 HTTP 推理路径；后续会通过独立 Boss policy adapter 接入，而不是混进玩家指令解析器。
-
-## 测试
+## 检查改动
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m pytest
 ```
 
-覆盖契约 v0.1、语音链路、LLM 回退、v0.2 tactical resolve/executions/combat events（含幂等）、策略 YAML、当前 Boss RL 和归档队友实验。测试数量以当前 `pytest` 输出为准；真机 ASR 与完整 PPO 训练需要各自的可选依赖和显式冒烟开关。
+测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
 
-### UE 联调前预演（不写一行 C++ 也能看到全链路）
-
-```powershell
-.\.venv\Scripts\python -m uvicorn app.main:app --reload          # 终端 1：起服务
-.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow    # 终端 2：假 UE 全链路
-```
-
-脚本按策划书 §9 的 UE 伪流程依次调用 chat → parse → resolve（同一句治疗指令 × A/B/C/D 四类战况，见 `data/golden/`）→ combat/events（含同一 `event_id` 重试的幂等回放）→ executions 回执，全部打印响应 JSON，可直接作为 UE 侧开发与答辩演示素材。末段含 v0.3 主入口心跳/文本指令（US4）与「输入 → 理解 → 关系 → 决策 → 依据 → 结果」逐段可解释演示（US7）。
-
-验收指标采集（US7 / T079）：`.\.venv\Scripts\python -m scripts.metrics_report` 汇总执行回执、降级次数、复读轮数与话题延续率（`--json` 为机器可读格式）。
-
-记忆维护（一次性脚本，均支持 `--dry-run` 预览）：`scripts.migrate_memory_impressions` 把旧的逐字玩家发言迁成主题印象；`scripts.prune_noise_impressions` 清洗印象层里已判为噪声/黑名单的历史主题（过滤规则升级后旧数据不会自愈）。
-
-## 路线图
-
-- [x] 规则解析器：支持首批 5 条战术指令（契约 v0.1 判别联合）
-- [x] LLM 指令解析：`llm` 后端接入，失败回退规则（`source: rule_fallback`）
-- [x] 语音识别 mock 全链路：`/v1/voice/command` 音频 → ASR(mock) → 同一解析层
-- [x] 语音识别接入 faster-whisper：`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper
-- [x] 专用 `/v1/speech/transcribe` 端点，与组合端点并存
-- [x] v0.2 第一阶段：CombatContext/TacticalIntent/TacticalDecision schema + `/v1/tactical/resolve` 规则策略 v1 + 85 例回归评测
-- [x] `/v1/combat/events` 战斗事件端点 + `/v1/tactical/executions` 执行回执
-- [x] v0.2 协议定稿：`event_id` 服务端幂等（重试回放 + `duplicate` 标记）、快照时间 ISO-8601 校验、策略阈值/优先级迁 `data/policy/tactical_policy.yaml`（2026-09-09）
-- [x] UE 联调支持资产：`data/golden/` 四类战况 golden 快照 + `scripts/command_service/mock_ue_flow.py` 全链路演示（2026-09-09）
-- [x] 组合端点 `/v1/tactical/command`：文本 + 快照 → 上下文决策一次到位（规则意图解析 v1，后续可接 LLM）
-- [x] US4 加固（2026-09-21）：意图白名单按域扩展 4 个非战斗意图；`/v1/agent/step` 文本路径与 `/v1/tactical/*` 共用同一决策层（战斗意图含关系调制，非战斗意图映射 agency 行为目录）；回归集加关系阶段维度
-- [x] US7 可解释性（2026-09-21）：响应统一携带 persona_revision / memory_layers 链路字段；调试台扩展场景/情绪/关系/近期记忆；mock_ue_flow 全链路可解释演示；`scripts.metrics_report` 验收指标采集
-- [x] 对话实测三修（2026-09-21）：prompt 常驻「不得凭空断言过去事件」（修首轮幻视）；`origin=companion` 的提及不再自我强化 + 近期已聊话题检索冷却（修印象正反馈回路与复读）；印象噪声/黑名单扩充 + 历史数据清洗脚本
-- [x] 记忆四层接线（2026-09-21）：LLM 顺带抽出玩家**事实**入档案（写档前过接地校验，编造的事实丢弃）、世界事件里的共同经历入摘要层；注入端按来源分口吻并许可「记得的可以直说」——她终于有据可说，不再靠脑补补全过去
-- [x] 对话实测五修（2026-09-22）：情绪惯性（上一轮情绪作为「当前心情」注入，同时收回「情绪也要轮换」的旧指令）；关系阶段硬边界（`boundary` 与基础人设冲突时以边界为准）；按字面理解玩家（禁止敌意归因与安上玩家没表达过的态度）
-- [x] 对话实测六修（2026-09-22）：重写教她编造记忆的 few-shot 示范（示例与诚实规则同向）；能力目录注入对话 prompt（不再现编水系魔法）；Memory honesty 扩到过去/世界/能力/时长四类；她自述主题改走 LLM 顺带返回（印象层不再被规则切词碎片污染）
-- [x] 对话推动关系（2026-09-22）：LLM 顺带判定玩家发言情感质量（warm/deep/cold/hurtful），映射 `dialogue_*` 事件复用关系规则层全套（300 秒冷却/日上限/持久化）；响应回带 `relationship_delta`，约 5 轮真诚交流升一档——聊得动感情了
-- [x] US8 多角色路由与隔离（2026-09-24）：`/v1/companion/chat` 与 `/v1/agent/step` 按 `companion_id` 路由；新增 Bruno 作为第二角色验证骨架；记忆/关系按角色隔离；未登记角色 404
-- [x] T083 表达一致性校验（2026-09-24）：配置驱动的 style_guard，拦截出戏术语、禁忌表达与无记忆支撑的虚构事实信号；LLM 对话链路自动重试一次，失败回退 mock
-- [x] T084 LLM 熔断与限流加固（2026-09-24）：`CircuitBreaker` 包装共享 LLM 客户端，三态熔断；陪伴对话/战术意图解析/v0.1 命令解析共享同一熔断状态；超时配置外置统一
-- [x] Boss RL schema v4、训练模拟器、奖励和 Behavior Tree 规则基线
-- [ ] 训练 Boss PPO，接入 UE 的共享 GAS Boss action executor，并完成 BT 对照实验
-
-## 调试
-
-PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，**请改用 `Invoke-RestMethod` 或 `curl.exe`**。浏览器打开 `http://127.0.0.1:8011/docs` 可交互式调用接口。
+日常任务只维护一个状态来源，文档保留规则、依赖与验收定义。修改接口字段时同步schema、契约与golden样例；修改业务规则时同步需求、图和追踪，未决定的技能数量或跨端阶段协议继续列为未决。

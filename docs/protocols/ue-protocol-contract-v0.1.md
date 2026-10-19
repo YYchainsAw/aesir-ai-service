@@ -1,14 +1,14 @@
 # Aesir Combat Prototype｜UE5 × 模型服务 协议契约 v0.1
 
-> 状态：**格式化金标准（golden）**，作为 UE / Python / LLM 三者共同的反序列化契约。
-> 适用范围：单机 ARPG 的语音战术指挥、队友任务执行与后续 RL 走位策略。
-> 更新日期：2026-09-14（补注演进方向；类型定义本身未改动）
+> 兼容契约：v0.1订单、对话及语音接口。2026-10-19按源码基线`a2dd426`校对；需求主文见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
+> 适用范围：仍兼容的单机ARPG订单、语音解析和人格对话。Boss RL是独立工作流，不由本页规定其训练或部署。
+> 本轮只修正文档说明，不升级接口或修改模型。Golden示例用于类型核对，不代表已完成UE执行验收。
 
 本文由原《协议格式契约》与《UE5 × 模型服务联调技术规范》合并而成，只保留**类型穷尽定义**与**两端共同契约**，删除会随进度过期的「进度/目标」章节。
 
-> **实现状态说明：** 本文是当前代码已经实现的 v0.1 格式基线。战斗状态快照、自动事件、上下文技能选择、执行回执不属于本版本；请参见《[战斗事件与上下文感知战术协议 v0.2(combat-tactical-protocol-v0.2.md)》。v0.2 中 `/v1/tactical/resolve`（规则策略 v1）、`/v1/combat/events`、`/v1/tactical/executions` 均已在 Python 侧实现。
+> **实现状态说明：** 本文是当前代码已经实现的 v0.1 格式基线。战斗状态快照、自动事件、上下文技能选择、执行回执不属于本版本；请参见[战斗事件与上下文感知战术协议v0.2](combat-tactical-protocol-v0.2.md)。v0.2 中 `/v1/tactical/resolve`（规则策略 v1）、`/v1/combat/events`、`/v1/tactical/executions` 均已在 Python 侧实现。
 >
-> **演进方向（2026-09-13 起）：** 项目定位升级为「NPC 人格与行为代理」（需求规格见 [SDD v1.0](../planning/aesir-agent-sdd-v1.0.md)）。v0.1 的 `TacticalOrder` 将并入**单一指令体系**的统一信封（按行为类型判别的联合类型，见 SDD 章程原则 VI 与 FR-045），不另起平行协议族；本文格式在迁移前保持不变。
+> **当前分工：**本页保留仍兼容的`TacticalOrder`和对话协议；统一指令、世界事件、调试及回执的当前说明见[NPC契约v0.3](npc-contract-v0.3.md)。API版本与人格包版本分开管理，不因存在v0.3删除旧端点。
 
 ---
 
@@ -50,7 +50,7 @@
 | Python API | 请求编排、Schema 校验、日志、规则/LLM/ASR 适配 | 修改游戏世界或绕过 UE 规则 |
 | ASR | 音频转文字 | 解释战术语义 |
 | LLM | 文本转受限战术命令 | 直接发出移动、伤害或 Tick 级操作 |
-| RL 策略 | 站位、躲避、接近/撤离建议 | 伤害结算和技能规则 |
+| Boss RL独立服务 | 由[RL入口](../../rl/README.md)定义观测、动作、冻结部署与评估 | 不属于本页NPC订单接口 |
 
 ### 运行时拓扑
 
@@ -70,21 +70,11 @@ UE 再校验 → TacticalOrderComponent → BT/StateTree → GAS/技能系统
 
 ---
 
-## 3. 锁定技术栈
+## 3. 当前技术与权威位置
 
-| 范围 | 选型 | 状态 / 说明 |
-| --- | --- | --- |
-| 游戏端 | UE 5.8、C++、Blueprint、Enhanced Input | 已有项目基础 |
-| UE AI | `TacticalOrderComponent` + Blackboard + Behavior Tree 或 StateTree | 首版优先选一种，不能混用同一决策职责 |
-| UE 战斗事件 | Gameplay Tags 或显式 C++ Delegate | Boss 眩晕等状态必须由事件/Tag 提供 |
-| UE 通信 | `FHttpModule`、`Json`、`JsonUtilities` | 本机 HTTP + JSON；首版不使用 WebSocket/gRPC |
-| UE 语音 | Audio Capture 插件、`AudioCaptureCore` | C++ 采集原始 PCM；Blueprint 可用于原型验证 |
-| API 服务 | Python 3.12、FastAPI、Uvicorn、Pydantic 2、HTTPX | 已建立 |
-| 配置 | `python-dotenv`、`.env` | 已安装使用 |
-| ASR | 首版 ASR Adapter；本地方案使用 `faster-whisper` | 已接线：`AESIR_ASR_BACKEND=faster_whisper`（`small` 模型，`mock` 可回退） |
-| LLM | 支持结构化 JSON 输出的云端或本地 Provider | 已接入：OpenAI 兼容共享 Client（默认 DeepSeek，已实测） |
-| RL 训练 | PyTorch、Gymnasium、Stable-Baselines3 | 在 UE 训练场稳定后才加入 |
-| RL 部署 | ONNX + UE 端本地推理 | 先验证 Python 推理，再导出 ONNX |
+服务使用FastAPI/Pydantic、规则/可配置LLM解析和mock/本机faster_whisper转写。依赖版本与启动命令集中在[启动指南](../guides/getting-started.md)。UE使用异步HTTP及JSON解释本页类型，实际模块/组件和资产接线由UE仓维护；历史AudioCapture或组件布置建议不是本仓已接入事实。
+
+LLM后端、数据出站与配置生命周期见[LLM指南](../guides/llm-integration.md)。Boss冻结PPO现由独立HTTP服务与UE共享动作执行器接入，见[RL入口](../../rl/README.md)；旧队友走位/ONNX设想不是当前Boss契约或启动前置。
 
 ---
 
@@ -130,9 +120,12 @@ GET /health
 {
   "status": "ok",
   "service": "aesir-ai-service",
-  "protocol_version": "0.1"
+  "protocol_version": "0.1",
+  "service_commit": "<运行实例的short SHA，非Git环境为unknown>"
 }
 ```
+
+`/health.protocol_version`当前来自v0.1订单常量，不代表每个端点都使用0.1；端点版本见[v0.3入口矩阵](npc-contract-v0.3.md#1-端点与版本)。`service_commit`用于识别运行实例，不应写死成本地HEAD。
 
 ### 5.2 文本命令解析
 
@@ -178,7 +171,7 @@ Content-Type: application/json
 }
 ```
 
-> `POST /parse-command` 是早期原型别名，迁移期保留为调试入口，只传 `text`、服务端回填默认能力目录。
+> `POST /parse-command`是保留的调试别名，只传`text`并回填`DEFAULT_CONTEXT`。语音命令不传`context_json`也会使用该目录。正式接入应显式提交当前角色、能力及目标，不用默认Alice目录证明当前游戏/角色授权。
 
 错误语义：
 
@@ -186,7 +179,7 @@ Content-Type: application/json
 | --- | --- | --- |
 | 请求字段不合法 | 422 | 显示“命令格式错误”，不创建任务 |
 | 文本不可识别 | 200 + `recognized: false` | 显示原因，维持原 AI |
-| LLM / ASR 不可用 | 502/503 | 显示“语音服务不可用”，维持原 AI |
+| LLM / ASR 不可用 | 解析LLM可回退规则；ASR失败可502 | 根据实际状态显示原因，维持本地AI；不把降级当动作完成 |
 | 超时（UE 建议 3 秒） | UE 本地取消 | 不阻塞主线程，维持原 AI |
 | UE 本地校验失败 | UE 记录原因 | 不执行，显示“技能不可用”等原因 |
 
@@ -211,7 +204,7 @@ Content-Type: multipart/form-data
 
 UE 收到转写后再调用 `/v1/commands/parse`。两步请求便于单独调试 ASR 和 LLM；后续可保留组合端点但不得删除这两个基础端点。
 
-> **现状：** 组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`）已实现，内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper（默认 `small` 模型，已端到端验证），`mock` 返回固定文本。专用 `POST /v1/speech/transcribe` 已实现，与组合端点并存，长期保留。
+> **现状：** 组合端点 `POST /v1/voice/command`（multipart `file` + 可选 `request_id`/`context_json`）已实现，内部先 ASR 再送同一解析层，一次返回 `ParseCommandResponse`。`AESIR_ASR_BACKEND=faster_whisper` 走真实本机 Whisper（默认`small`模型，具体本机识别效果需按配置验证），`mock` 返回固定文本。专用 `POST /v1/speech/transcribe` 已实现，与组合端点并存，长期保留。
 
 ---
 
@@ -525,132 +518,13 @@ UE 收到转写后再调用 `/v1/commands/parse`。两步请求便于单独调�
 
 ---
 
-## 13. UE5 侧实施规格
+## 13. 执行边界与维护
 
-### 13.1 必备模块与组件
+UE接收后核对支持版本、当前可控角色、已实现订单类型、获准能力、可解析目标、有效期/优先级；真正触发时再验目标存活、资源、冷却、距离和忙碌。具体接入顺序与失败场景统一见[联调指南](integration-alignment-v0.3.md#接入顺序与通过条件)，本页不把建议组件表当UE实现清单。
 
-在 UE 项目的 `.Build.cs` 中加入：
+LLM只形成受约束建议，服务与UE都需校验；其配置可来自本机.env或进程环境，密钥不传给UE或提交Git，具体数据流见[LLM指南](../guides/llm-integration.md)。不要由旧订单解析路径推断所有LLM只在commands/voice调用，也不要将NPC rl占位或旧队友走位实验当当前Boss部署。
 
-```text
-HTTP
-Json
-JsonUtilities
-AudioCapture
-AudioCaptureCore
-```
-
-需要的 UE 组件：
-
-| 组件 | 推荐位置 | 职责 |
-| --- | --- | --- |
-| `UCommandServiceSubsystem` | `GameInstanceSubsystem` | 异步 HTTP、超时、JSON 序列化和回调分发 |
-| `UVoiceCommandComponent` | PlayerController / Local Player | Push-to-Talk、音频缓存、WAV 编码 |
-| `UTacticalOrderComponent` | 队友角色或其 AI Controller | 保存/取消/完成命令，暴露失败原因 |
-| Boss 状态组件 | Boss Character | 广播 `state.stunned`、阶段切换、死亡等事件 |
-
-### 13.2 UE 最终校验清单
-
-接收 JSON 后，UE 必须按顺序验证：
-
-1. `protocol_version` 是否支持。
-2. `agent_id` 是否存在、可控制且未死亡。
-3. `intent`、`when.type`、`then.type` 是否为已实现类型。
-4. `ability_id` 是否属于该队友的能力目录。
-5. `subject` 与 `target` 是否为当前可解析对象。
-6. 命令是否已过期或被更高优先级命令覆盖。
-7. 触发时再检查目标存活、蓝量、冷却、距离和角色状态。
-
-### 13.3 事件与 AI
-
-Boss 眩晕应由明确状态或事件驱动，例如：
-
-```text
-Gameplay Tag：state.stunned
-Delegate：OnBossStunned
-Blackboard Key：BossCombatState
-```
-
-禁止以“某动画正在播放”作为战术触发条件。
-
----
-
-## 14. 模型服务实施规格
-
-### 14.1 LLM 接入位置
-
-LLM 只在下列路径接入：
-
-```text
-app/api/health.py / app/api/v1/commands.py / app/api/v1/voice.py
-  → app/services/parsers/command_parser.py
-    → app/services/parsers/llm.py
-      → app/services/llm/client.py（共享 OpenAI 兼容 Client，factory 按配置创建）
-```
-
-`LLMCommandParser` 的唯一输出是本契约的 JSON。其处理步骤：
-
-1. 接收文本和 UE 能力目录。
-2. 将目录中的稳定 ID 加入 Prompt。
-3. 请求结构化 JSON 输出。
-4. 用 Pydantic 验证响应。
-5. 校验 ID 是否存在于请求上下文。
-6. 失败时回退 `RuleCommandParser`，或返回 `recognized: false`。
-
-LLM Provider 的 API Key、模型名和 Base URL 只存在 `.env`，绝不传给 UE 或提交 Git。
-
-### 14.2 ASR 接入位置
-
-```text
-app/services/transcribers/base.py          # ASRBackend 抽象 + TranscriptionError
-app/services/transcribers/mock.py           # 固定文本自测后端
-app/services/transcribers/faster_whisper.py # 真实本机 Whisper
-app/services/transcribers/factory.py        # 按 AESIR_ASR_BACKEND 选后端
-```
-
-`ASRBackend.transcribe(audio_bytes)` 返回文本。它不调用 LLM，也不生成战术命令。
-
-### 14.3 RL 接入位置
-
-RL 在命令得到 UE 接受后才参与。它的输入为已脱敏、固定长度的战斗状态；输出为低频走位建议，例如方向、距离档位或目标站位。
-
-```text
-TacticalOrder（等待眩晕施法）
-→ RL：安全站位 / 躲避 / 接近施法范围
-→ UE：移动、导航、技能合法性检查与执行
-```
-
-首版必须先完成规则 AI 基线。RL 只替换“怎么移动”，不替换“执行什么命令”。
-
----
-
-## 15. 版本与变更规则
-
-- `protocol_version` 为两端共同版本。字段删除、字段含义变化或 ID 语义变化必须升级版本。
-- 仅新增可选字段时，保留旧版本兼容并记录迁移期限。
-- UE 与 Python 启动时应记录支持的协议版本和 `catalog_revision`。
-- 每个请求使用 `request_id`；每个生成命令使用 `order_id`，便于跨端定位日志。
-- 修改本契约时，必须同步更新 Pydantic Schema、UE `USTRUCT`、接口测试与示例 JSON。
-
----
-
-## 16. 当前明确不做的技术决策
-
-- 不使用 WebSocket：语音指令是低频请求，HTTP 更易调试和恢复。
-- 不让 UE 直接携带/调用 LLM API Key。
-- 不让模型输出 UE 资产路径、动画名、原始坐标或 C++ 函数名。
-- 不将模型权重、训练缓存、`.env` 或 API Key 提交 Git。
-- 不在队友 AI、Boss 状态和技能系统未完成前开始 RL 在线训练。
-
----
-
-## 17. 落地清单
-
-- [x] Python：`TacticalOrder` 改为按 `intent` 判别 + `when`/`then`/`expires` 判别联合 + ID 字符串 + `priority:int`
-- [x] Python：`ParseCommandResponse` 增加 `request_id`/`order_id`；`order` 内移除硬编码 `protocol_version`
-- [x] Python：解析时校验 ID ∈ `context`；目录外 ID → `recognized:false`
-- [x] LLM prompt：改喂 `context` 的 ID 目录 + 判别联合结构说明 + 5 份 golden 示例
-- [ ] UE：`FTacticalOrder` 实现判别反序列化 + `{ref:...}` 解析 + UUID 校验
-- [x] 测试：5 份 golden JSON 各配 1 例合法 + 1 例未知 type/越界 ID 负例
+字段删除或语义变化须升级并协调双方schema、接口测试、示例和UE反序列化；可选扩展也需明确兼容行为。改规则时同步当前需求与验收；新增公开端口、训练或模型格式不是仅改本文能完成的功能。
 
 ---
 
@@ -723,77 +597,23 @@ v0.1 完全一致，属附加式扩展、不升版本。
 - `AESIR_ASR_BACKEND` 与转写端点共用：`mock` 返回 `AESIR_ASR_MOCK_TEXT`，
   `faster_whisper` 走真实本机 Whisper。
 
-### 附加扩展（2026-09-21，SDD US4 加固 T074/T075）：主入口文本指令
 
-`POST /v1/agent/step` 携带可选 `text` 字段时，与 `/v1/tactical/command`
-共用同一意图解析与决策层（规则/LLM 门面，按域路由），不再返回
-`TEXT_PIPELINE_PENDING` 骨架原因码：
+## 附录 B. 对话JSON、状态和数据副作用
 
-- **战斗意图**（治疗/护盾/爆发/等眩晕集火/撤退，6 类）：复用
-  `resolve_intent` 战术决策（含 US2 关系阶段调制），快照 `world_context.combat`
-  存在时产出统一信封 `DirectiveEnvelope`（`domain="combat"`，
-  `source="player_command"`，action_type 取 combat 白名单
-  major_heal/quick_heal/shield/burst/retreat）；未携带战斗快照 →
-  `action="none"` + `COMBAT_CONTEXT_MISSING`；决策不可执行 → 原因码 +
-  `reply_text` 说明。
-- **非战斗意图**（T074 新增白名单）：`follow_player` / `inspect_interactable`
-  / `pickup_item` / `rest_here` / `wait_here`，映射到 agency 行为目录
-  （follow/inspect/pickup/rest/wait），并按当前 `scene` 做目录域校验
-  （不匹配 → `BEHAVIOR_NOT_IN_SCENE`）、目标类型/距离校验（有目标行为取快照内
-  最近可交互物，无合适目标 → `NO_VALID_TARGET`，不虚构目标）。
-- **不可识别文本**：`action="none"` + `INTENT_UNRECOGNIZED` + 澄清
-  `reply_text`，不猜测执行（FR-028）。
-- 意图解析来源进 `observability.source`（`rule`/`llm`/`rule_fallback`），
-  关系阶段进 `observability.relationship_stage`，原因码完整可解释（US7 前置）。
+`POST /v1/companion/chat`请求由`CompanionDialogueRequest`定义：`text`必填（1～500字符）；`companion_id`默认`companion.alice`；`game_state`为`exploration|conversation`；可选`session_id`（1～64字符）、`world_context`。请求和响应均配置`extra="forbid"`。对话主路径先查已注册角色，未知角色404，非法场景422；配置错误可503。
 
-### 附加扩展（2026-09-21，SDD US7 T076/T077）：链路信息字段与调试台
+响应为`protocol_version="0.1"`、角色/会话标识、`reply_text`、表现ID、`interruptible`、`source=mock|llm|fallback`，以及`relationship_stage`、`relationship_stage_display`、`relationship_delta`、`persona_revision`、`memory_layers`。关系阶段是本轮生成前状态，实际关系变化另由delta表达。
 
-- **链路字段补全（T076）**：`AgentStepObservability` 新增 `persona_revision`
-  （人设 YAML 的 `profile_version`）与 `memory_layers`（本轮注入记忆条数；
-  心跳路径为空字典）；`CompanionDialogueResponse` 同样新增 `persona_revision`
-  与 `memory_layers`（`{"long_term": n, "impressions": m}`）；tactical
-  `Observability` 新增 `persona_revision`。全部为可选字段，缺省空——UE
-  不应依赖其做表现逻辑，仅供调试与归因。
-- **调试台（T077）**：`GET /v1/console/state` 返回扩展为完整调试视图：
-  `relationship_stage` / `relationship_value`（关系）、`last_scene` /
-  `last_emotion_id`（运行期最近观测，服务重启后为空）、`recent_memory`
-  （按重要性前 5 条）、`persona_revision` / `agency_policy_revision` /
-  `tactical_policy_revision`（三个策略版本）。
-- **指标采集（T079）**：`.venv/Scripts/python -m scripts.metrics_report`
-  汇总执行回执分布、降级次数、复读轮数、负反馈与话题延续率
-  （`--json` 输出机器可读格式）。
+- `session_id`只控制短期会话窗口。缺省时不保存该窗口，仍会检索/写入长期事实和印象、读取关系并尝试记录完整对话信号，不是“完全无状态”。
+- 正常完成轮次默认尝试将完整`player_text/reply_text`追加到`data/runtime/dialogue_signals/<game>/<companion>.jsonl`；显著声明还可能逐字入长期档案。写失败按实际降级，不保证每轮均落盘成功。
+- LLM模式会把人格、当前文本、检索记忆/印象、近期会话及适用查证结果送到配置后端；回环HTTP监听不等于全部本地。发送范围、存储和清理边界见[LLM与数据流](../guides/llm-integration.md)。
+- 记忆reset只处理指定角色会话和长期记忆，保留人格、关系和信号日志；可能部分完成，见[v0.3调试接口](npc-contract-v0.3.md#5-调试与记忆重置)。
 
-### 附加扩展（2026-09-21）：记忆写入链路（对话事实 + 世界事件共同经历）
+订单类型中的技能字段沿用v0.1定义；整个NPC领域不要求日常/社交建议均有技能。需要技能的动作必须引用本角色获准能力，单条指令可引用几项尚未冻结；不能把类型字段直接推广成每条领域指令必有一个技能。
 
-**协议零变更**（请求/响应字段与上面完全一致），仅说明两个端点在处理成功后的
-记忆副作用——UE 侧无需任何改动，但调试时可据此预期「她为什么记得这件事」：
+## 当前实现与规范的边界
 
-- `POST /v1/companion/chat`（含 `/chat/voice` 与流式变体）：LLM 顺带抽出
-  玩家陈述过的**事实**（0~3 条第三人称陈述）写入长期档案层，经接地校验
-  （实词须大部分出自玩家真说过的话）后才落档——**编造的事实会被丢弃**。
-  下一轮起这些事实作为「她确定知道的事」注入，她可以直说，但不得加细节。
-- `POST /v1/world/events`（含 v0.2 `POST /v1/combat/events`）：有共同经历
-  语义的事件（`region_first_entered` / `gift_given` /
-  `player_protected_companion` / `promise_kept` / `companion_recovered` /
-  `boss_defeated`）写入经历摘要层；瞬时战斗状态（`player_hp_critical` /
-  `companion_mp_low` / `boss_stunned` 等）**不**入记忆。文案里的细节只取
-  请求 `details`（`item_id` / `promise_id` / `boss_id` / `region_id`）或快照
-  地区，取不到就写泛一点，服务端不推断任何未上报的名字。
-- **幂等**：同一 `event_id` 重放（`duplicate: true`）不重复记共同经历；
-  记忆文件损坏/不可写时静默降级，事件响应照常返回（FR-011）。
-
-### 附加扩展（2026-09-22）：对话推动关系
-
-**响应新增一个可选字段**（附加式扩展，不升版本）：
-
-- `CompanionDialogueResponse.relationship_delta`（int，默认 0）：本轮玩家发言的
-  情感质量实际造成的关系增减（+1/+2/-1/-2；冷却窗口或每日上限吃掉则为 0）。
-  UE 可用作好感度反馈动效（心形粒子/震动），不应依赖其做逻辑。
-- 信号由 LLM 顺带判定（none/warm/deep/cold/hurtful，绝大多数轮次为 none），
-  写入复用关系规则层全套（同类事件冷却 300 秒、每日正向净上限 15 与事实
-  事件共享、负向不限、持久化与损坏降级）。事件类型与数值见
-  `data/policy/relationship_policy.yaml` 的 `dialogue_*` 条目。
-- `relationship_stage` 读的是本轮生成**前**的值——对话造成升档时，阶段变化自
-  下一轮生效（下一轮的称呼/语气/硬边界自动跟随，无需 UE 处理）。
-- mock/回退路径不推动关系（规则判不了情感质量，宁缺毋滥）；关系层故障静默
-  降级为 delta=0，对话照常（FR-011）。
+- `ParseCommandRequest`校验版本0.1、UUID请求ID和文本长度，但顶层没有`extra=forbid`；嵌套`ParseCommandContext`及订单判别联合配置了forbid。不能笼统声称所有端点都拒绝多余字段。
+- 目录白名单是解析/接收的约束，UE仍须核验当前角色、技能、目标、冷却、距离、忙碌、有效期及游玩/遭遇身份。未知身份、L0能力门控在不同旧入口的检查并不完整，见[v0.3差距表](npc-contract-v0.3.md#7-当前实现差距)。
+- 音频格式是传输约定。当前上传路径把文件读为内存字节交给ASR，没有统一的大小/时长/WAV头门禁；不能把文档写了格式等同每项已由服务器强校验。
+- v0.3玩家指令、世界事件、有限幂等与观测字段集中到[NPC契约](npc-contract-v0.3.md)；UE接入步骤集中到[联调指南](integration-alignment-v0.3.md)，不在兼容契约重复维护任务状态。

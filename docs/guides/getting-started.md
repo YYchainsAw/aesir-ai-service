@@ -1,296 +1,94 @@
-# Aesir AI Service — 启动说明
+# 本机启动与检查
 
-本文档说明如何在本地启动、运行与测试 Aesir AI Service。
+> 2026-10-19按`a2dd426`校对；当前默认NPC端口8011。本页集中启动、依赖与常见操作，字段见[当前契约](../protocols/npc-contract-v0.3.md)，需求见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
 
-> 本文描述的是**当前已实现**的 v0.1/v0.2 能力（语音/文本战术指挥、事件反应、陪伴对话）。项目定位已于 2026-09-13 升级为「NPC 人格与行为代理」（持久化记忆、关系状态、非战斗自主行为等），规划与任务分解见 [SDD v1.0](../planning/aesir-agent-sdd-v1.0.md)；新端点落地后将补充到本文。
+## 第一次准备
 
-## 1. 环境要求
-
-- **Python 3.12**（本项目使用 3.12.7 开发）
-- **Windows**（当前开发环境；Linux/macOS 仅需替换虚拟环境路径）
-- 可选：`pip` 可访问 PyPI 以安装依赖
-
-## 2. 安装依赖
-
-### 2.1 创建虚拟环境（首次）
-
-在项目根目录执行：
+当前开发环境为Windows、Python3.12。以下在仓库根目录用PowerShell执行，无需先激活虚拟环境：
 
 ```powershell
 python -m venv .venv
-```
-
-### 2.2 激活虚拟环境
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-> 若 PowerShell 提示执行策略限制，可先执行：
-> ```powershell
-> Set-ExecutionPolicy -Scope Process RemoteSigned
-> ```
-
-### 2.3 安装依赖
-
-按用途分三类安装（也可用 `-r` 一条命令带上主依赖）：
-
-```powershell
-# 先做一次可编辑安装（让 app/rl/scripts 成为可导入包，脚本即可用 python -m 运行）
 .\.venv\Scripts\python -m pip install -e .
-# 仅运行服务
 .\.venv\Scripts\python -m pip install -r requirements.txt
-# 或开发/测试（含运行依赖 + pytest + httpx）
+```
+
+开发测试另外安装requirements-dev.txt；需要真实本机语音才安装requirements-ml.txt。版本以这些清单为准，不在本页重复维护依赖版本表。
+
+```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
-# 真实语音识别（faster-whisper，按需）：在服务之外单独安装；mock 后端不需要
+# 按需：真实语音识别
 .\.venv\Scripts\python -m pip install -r requirements-ml.txt
 ```
 
-运行时依赖清单（`requirements.txt`）：
+如果要激活环境，可用`.\.venv\Scripts\Activate.ps1`；受当前进程执行策略限制时可不激活，继续使用上述解释器绝对入口。默认rule解析、mock对话和mock语音不要求LLM密钥；mock语音文本默认空，演示需显式设置AESIR_ASR_MOCK_TEXT。
 
-```
-fastapi==0.141.1
-uvicorn[standard]==0.52.4
-pydantic==2.13.5
-httpx[socks]==0.28.1
-python-dotenv==1.2.3
-PyYAML==6.0.3
-python-multipart==0.0.32      # /v1/voice/command 的 File/Form 上传必需
-pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Settings）
-```
-
-## 3. 启动服务
+## 启动与检查地址
 
 ```powershell
-# 方式一：按 .env / 环境变量中的 AESIR_SERVICE_HOST/AESIR_SERVICE_PORT 启动
 .\.venv\Scripts\python -m scripts.run_server --reload
-
-# 方式二：直接指定端口（覆盖配置）
-.\.venv\Scripts\python -m scripts.run_server --port 8001 --reload
+curl.exe http://127.0.0.1:8011/health
 ```
 
-或直接双击项目根目录的 `start.bat`（可带参数指定端口，如 `start.bat 8001`）。
-
-**终端对话模式（人设质量检查）**：`start.bat chat [端口]` —— 服务已在运行则直接复用，否则后台最小化启动；随后进入终端 REPL 直接与艾莉对话（详见 5.7 节）。等价命令：`.venv\Scripts\python -m scripts.chat_console`。
-
-- `--reload`：代码改动后自动重启，仅开发环境使用。
-- 默认监听 `127.0.0.1:8011`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
-- 当前为单一服务架构，UE 的 `UCompanionChatSubsystem` 与 `UCommandServiceSubsystem` 应指向同一地址（见 [UML 基线](../design/uml/baseline.md) GAP-001/002 处理）。
-
-### 3.1 按游戏启动独立实例（一进程一游戏，S3）
-
-进程通过 `AESIR_GAME_ID` 选择服务的游戏（默认 `aesir`），只加载 `data/games/<game_id>/` 游戏档案与 `data/personas/<game_id>/` 下的人格包；跨游戏 `companion_id` 返回 404，不回退默认角色。多游戏并存时每游戏各起一个实例、配不同端口：
+run_server读取AESIR_SERVICE_HOST/AESIR_SERVICE_PORT，默认127.0.0.1:8011；指定其他端口时调用方也同步改地址：
 
 ```powershell
-# 实例一：Aesir（默认），端口 8011（默认值，可省略 --port）
-.\.venv\Scripts\python -m scripts.run_server
+.\.venv\Scripts\python -m scripts.run_server --port 8002 --reload
+curl.exe http://127.0.0.1:8002/health
+```
 
-# 实例二：demo-vn（自有第二游戏样例，L0 仅对话/记忆/关系），端口 8002
-$env:AESIR_GAME_ID = "demo-vn"
+`--reload`用于开发代码重载，不保证修改.env自动生效。config在导入时加载.env，get_settings重读进程环境；修改.env后重启服务。策略YAML/人格注册表等另有缓存或加载生命周期，不宣传全系统热更新。
+
+`/health`返回status、service、protocol_version和service_commit；当前health版本为0.1，端点仍分别用0.1/0.2/0.3。commit识别运行实例，非Git分发可为unknown。UE两个NPC Subsystem使用同一个8011地址；Boss RL另起8012实例，见[RL入口](../../rl/README.md)。
+
+根目录`start.bat`可作为启动包装；终端对话用`start.bat chat`或以下脚本。端口冲突先确认占用，不要只改一端后把404/拒连误判为协议错误。
+
+## 按游戏启动独立实例
+
+进程默认AESIR_GAME_ID=aesir，加载该游戏能力档案及注册人格。第二游戏在另一个进程与端口启动：
+
+```powershell
+$env:AESIR_GAME_ID = 'demo-vn'
 .\.venv\Scripts\python -m scripts.run_server --port 8002
 ```
 
-游戏档案与人格包的字段契约见 [人格包与游戏档案 Canonical Schema](../protocols/persona-pack-schema-v0.2.md)。
+回到Aesir实例前使用独立终端或恢复AESIR_GAME_ID=aesir。人格包格式见[schema](../protocols/persona-pack-schema-v0.2.md)。一进程一游戏是部署约束，不代表旧parse/voice、v0.2战术和回执已全面实现逐角色/当前游戏绑定；实际差距见[NPC契约](../protocols/npc-contract-v0.3.md#7-当前实现差距)。
 
-启动成功后访问：
+## 先走哪条调用
 
-| 地址 | 说明 |
+| 目的 | 命令或入口 |
 | --- | --- |
-| `http://127.0.0.1:8011/health` | 健康检查 |
-| `http://127.0.0.1:8011/docs` | 交互式接口文档（Swagger UI） |
+| 检查人格、关系、记忆 | `.\.venv\Scripts\python -m scripts.chat_console`；或注册角色的console/state、console/memory |
+| 文本闲聊 | companion/chat；语音闲聊为companion/chat/voice，不能误用voice/command |
+| 战斗命令/旧订单 | tactical/command或commands/parse；显式提供当前角色、目标和能力目录 |
+| 非战斗文本/心跳 | agent/step带text/不传text；action为none或directive |
+| 事实事件与反馈 | world/events；UE实际结果到tactical/executions，202不表示完成 |
+| 按顺序接UE | [联调指南](../protocols/integration-alignment-v0.3.md) |
+| 切换真实LLM/ASR | [LLM和数据流](llm-integration.md)；本机ASR配置见下节 |
 
-## 4. 运行测试
-
-测试需要开发依赖，先装再跑：
+一个最小文本对话示例（PowerShell用结构化JSON，不在单引号内转义双引号）：
 
 ```powershell
-.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+$chatBody = @{text='你好，艾莉'; companion_id='companion.alice'; game_state='conversation'} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8011/v1/companion/chat' -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($chatBody))
+```
+
+这是会产生正常记忆/信号副作用的请求。不传session_id只是不维护短期窗口，仍可读取/写入长期数据；默认信号尝试存完整输入和回复，显著声明可能逐字入档案。reset仅清目标会话和长期记忆，保留人格/关系及信号日志；持久失败可能会话已清，不承诺回滚。
+
+## 语音和外部后端
+
+ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机能力配置AESIR_ASR_MODEL/DEVICE/COMPUTE_TYPE/LANGUAGE。首次下载模型可能联网，运行需已有模型和依赖，不能把mock通过当真实语音已验收。
+
+传输约定16kHz/单声道/16-bit PCM WAV。命令上传字段为file、context_json；闲聊与纯转写字段为audio。当前没有统一大小/时长/WAV头门禁，失败按实际响应处理，保留文本入口。不要在教程或测试记录中放密钥、私人对话和未脱敏音频。
+
+## 检查与结果记录
+
+```powershell
+# 安装开发依赖后按改动运行适用测试；先阅读测试及conftest的隔离约定
 .\.venv\Scripts\python -m pytest
+# 需先起服务：演示会调用API并可能写正常运行数据
+.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow
 ```
 
-测试覆盖：健康检查、5 条已支持指令的解析、未知指令的安全拒绝、LLM 解析回退、语音端点（mock / 桩 / 错误链路）、v0.2 tactical resolve 与回归评测（20 意图 × 4 战况 × 关系阶段维度）、combat/events 幂等、策略 YAML 加载、US1 分级记忆（持久化/淘汰/降级）、US2 关系驱动、US3 自主行为编排、US4 意图域扩展、US7 可解释性、US8 多角色隔离、T083 表达一致性校验、T084 LLM 熔断、语料红线。测试数以 `pytest` 输出为准（2026-09-24：**669 通过 + 2 跳过**，锚点见根目录 [CHANGELOG](../../CHANGELOG.md)）；真机 ASR 冒烟需 `$env:AESIR_ASR_SMOKE = "1"`（并装好 `requirements-ml.txt`）。
+本页本轮未执行上述命令。历史669通过/2跳过等数字属于当时提交，不承诺当前总数；真实ASR、LLM、UE执行、Windows包和正式P95均需各自记录。metrics_report的覆盖代理不自动等于需求验收通过，详见[复现与验收](repro.md)。
 
-另备 UE 联调前预演（无需写 C++ 即可看到全链路响应）：起服务后运行 `.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow`，脚本按策划书 §9 伪流程跑 chat → parse → resolve（四类战况 golden 快照见 `data/golden/`）→ combat/events（含幂等重试）→ executions → v0.3 主入口心跳/限流/自主行为 → 世界事件幂等 → 调试台 → US7 可解释链路演示。
-
-## 5. 接口验证示例
-
-### 5.1 健康检查
-
-```powershell
-curl http://127.0.0.1:8011/health
-```
-
-返回：
-
-```json
-{"status": "ok", "service": "aesir-ai-service", "protocol_version": "0.1"}
-```
-
-### 5.2 解析战术指令（契约 v0.1）
-
-推荐使用正式接口 `/v1/commands/parse`（携带能力目录与 request_id）：
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/commands/parse `
-  -H "Content-Type: application/json" `
-  -d '{\"protocol_version\": \"0.1\", \"request_id\": \"1fad2e69-4a2d-4308-ad4f-2f8abb338b89\", \"text\": \"艾莉，等 Boss 眩晕时使用爆裂魔法\", \"context\": {\"catalog_revision\": \"dev-001\", \"locale\": \"zh-CN\", \"agents\": [{\"id\": \"companion.alice\", \"ability_ids\": [\"ability.alice.explosion\", \"ability.alice.basic_attack\"]}], \"target_selectors\": [\"encounter.primary_hostile\", \"party.player\"], \"state_tags\": [\"state.stunned\", \"state.phase_two\"]}}'
-```
-
-返回（节选）：
-
-```json
-{
-  "protocol_version": "0.1",
-  "request_id": "1fad2e69-4a2d-4308-ad4f-2f8abb338b89",
-  "recognized": true,
-  "message": "好，等 Boss 眩晕时释放爆裂魔法。",
-  "source": "rule",
-  "order": {
-    "intent": "conditional_cast",
-    "order_id": "<uuid 生成>",
-    "agent_id": "companion.alice",
-    "priority": 80,
-    "expires": { "type": "encounter_end" },
-    "when": { "type": "state_entered", "subject": "encounter.primary_hostile", "tag": "state.stunned" },
-    "then": { "type": "cast_ability", "ability_id": "ability.alice.explosion", "target": { "ref": "when.subject" } }
-  }
-}
-```
-
-遗留入口 `POST /parse-command` 只传 `text`，服务端自动回填默认能力目录与 request_id，用于旧客户端调试。
-
-未知指令返回：
-
-```json
-{
-  "protocol_version": "0.1",
-  "recognized": false,
-  "order": null,
-  "message": "当前无法确认该技能或目标。"
-}
-```
-
-### 5.3 语音指令（ASR 链路）
-
-`/v1/voice/command` 接收 WAV / 16kHz / 单声道 / 16bit 的 multipart 上传，先经 ASR 转成文本再送入同一解析层。
-
-**方式一：mock 后端（默认，无需模型）**——返回固定文本：
-
-```powershell
-$env:AESIR_ASR_BACKEND = "mock"
-$env:AESIR_ASR_MOCK_TEXT = "艾莉，撤退并优先保命"
-
-curl -X POST http://127.0.0.1:8011/v1/voice/command `
-  -F "file=@cmd.wav" `
-  -F "request_id=1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
-```
-
-**方式二：真实 faster-whisper**——需先装 `requirements-ml.txt`；首次下载模型要配国内镜像：
-
-```powershell
-$env:HF_ENDPOINT = "https://hf-mirror.com"   # 首次下载模型需要；已缓存则可省
-$env:AESIR_ASR_BACKEND = "faster_whisper"    # 模型/设备/量化/语言见 .env.example
-
-curl -X POST http://127.0.0.1:8011/v1/voice/command -F "file=@cmd.wav"
-```
-
-返回同契约 v0.1：mock 方式下 `order.intent == "retreat"`；转写出空串则 `recognized: false`，转写抛错则 `502`。
-
-### 5.3.1 独立转写（调试 ASR 单环节）
-
-`POST /v1/speech/transcribe` 只做「音频 → 文本」，不接解析层，便于 UE 单独调试 ASR（两步式：先 transcribe 再 `parse`）：
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/speech/transcribe -F "audio=@cmd.wav" -F "request_id=1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
-```
-
-返回：
-
-```json
-{"request_id": "1fad2e69-4a2d-4308-ad4f-2f8abb338b89", "text": "艾莉，撤退并优先保命", "language": "zh"}
-```
-
-未识别出语音内容时 `text` 为空串（仍 HTTP 200）；转写抛错返回 `502`。
-
-### 5.3.2 真人声调优评测（已取消，脚手架保留）
-
-真人录音按「文件名即期望文本」放入 `data/asr_samples/`（如 `艾莉撤退并优先保命.wav`，16kHz/单声道/16bit），然后跑：
-
-```powershell
-.\.venv\Scripts\python -m scripts.command_service.asr_eval
-.\.venv\Scripts\python -m scripts.command_service.asr_eval --model small --beam 5 --no-vad
-```
-
-脚本输出每条样本的转写结果、字错误率（CER）与耗时，以及整体平均；用于对比模型 / beam_size / VAD 组合选出最优配置。
-
-### 5.4 v0.2 战术决策 `/v1/tactical/resolve`
-
-语义意图 + 战斗快照 → 上下文战术决策（规则策略 v1；协议详见 `../protocols/combat-tactical-protocol-v0.2.md` §5）：
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/tactical/resolve `
-  -H "Content-Type: application/json" `
-  -d '{\"protocol_version\": \"0.2\", \"request_id\": \"88d7e6b4-f4f2-4d39-8c96-a23d293882f6\", \"intent\": {\"intent_id\": \"support_heal_player\", \"target_id\": \"party.player\", \"timing\": \"immediate\"}, \"combat_context\": {\"encounter_id\": \"encounter.001\", \"snapshot_id\": \"11111111-1111-1111-1111-111111111111\", \"captured_at\": \"2026-09-07T12:00:00Z\", \"mode\": \"combat\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 18, \"is_downed\": false, \"distance_to_boss_m\": 4.5}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 83, \"mp_percent\": 72, \"current_behavior\": \"ranged_attack\", \"ability_states\": {\"ability.alice.basic_attack\": \"ready\"}}, \"boss\": {\"id\": \"encounter.primary_hostile\", \"hp_percent\": 42, \"stun_percent\": 0, \"state_tags\": [], \"phase\": 1}}}'
-```
-
-返回（节选）：`decision.status`（actionable / not_actionable）、`decision.action`（候选动作 + priority + expires）、`reason_codes`（可解释决策依据）。同一意图在不同快照（玩家濒危 / 健康 / Boss 眩晕 / 艾莉缺蓝）下产出不同决策；能力不可用时返回 `not_actionable`，绝不虚构动作。目前为纯规则策略（`source` 固定 `rule`），无 LLM 调用。
-
-组合端点 `POST /v1/tactical/command` 可省一次往返——把 `intent` 换成 `text` 即可（"艾莉，帮我回一下血"这类文本由服务端规则解析出意图再落地；不可识别时返回 `recognized:false` + 澄清台词）：
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/tactical/command `
-  -H "Content-Type: application/json" `
-  -d '{\"protocol_version\": \"0.2\", \"request_id\": \"99d7e6b4-f4f2-4d39-8c96-a23d293882f6\", \"text\": \"艾莉，帮我回一下血\", \"combat_context\": {\"encounter_id\": \"encounter.001\", \"snapshot_id\": \"11111111-1111-1111-1111-111111111111\", \"captured_at\": \"2026-09-09T12:00:00Z\", \"mode\": \"combat\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 18, \"is_downed\": false, \"distance_to_boss_m\": 4.5}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 83, \"mp_percent\": 72, \"current_behavior\": \"ranged_attack\", \"ability_states\": {\"ability.alice.basic_attack\": \"ready\"}}, \"boss\": {\"id\": \"encounter.primary_hostile\", \"hp_percent\": 42, \"stun_percent\": 0, \"state_tags\": [], \"phase\": 1}}}'
-```
-
-### 5.5 非战斗陪伴对话
-
-`POST /v1/companion/chat`（仅 `exploration` / `conversation` 状态；后端由 `AESIR_COMPANION_BACKEND` 决定，默认 `mock`，LLM 故障时回退 YAML 分类候选回复）：
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/companion/chat `
-  -H "Content-Type: application/json" `
-  -d '{\"text\": \"艾莉，今天心情怎么样？\", \"companion_id\": \"companion.alice\", \"game_state\": \"conversation\", \"session_id\": \"ue-session-42\"}'
-```
-
-- `session_id`（选填，v0.3 新增）：UE 生成并在同一轮对话中复用；传入时服务端维护最近 N 轮（`AESIR_DIALOGUE_HISTORY_TURNS`，默认 10）滚动记忆并注入 LLM，角色可接续上文，并**在同一窗口内延续上一轮的情绪**（每轮回复的 `emotion_id` 随轮次落窗口，下一轮作为「当前心情」注入；缺省时不延续）；缺省 `session_id` 时请求完全无状态。
-- **流式变体（2026-09-15）**：`POST /v1/companion/chat/stream` 返回 SSE——`delta` 帧出 `reply_text` 增量（打字机式即时展示），`meta` 帧出权威完整响应（表现 ID/来源以此为准），`error` 帧表示流中途故障；帧语法与语义见契约 `ue-protocol-contract-v0.1.md` 附录 A。非流式端点行为不变。终端调试台默认已走流式（`--no-stream` 回退）。
-- **长期记忆已接入（SDD US1）**：每轮对话玩家发言写入分级记忆（`data/memory/<companion_id>/`，重启保留）；LLM 生成时按预算（`AESIR_MEMORY_INJECTION_BUDGET`，默认 12 条）注入档案/摘要/短期记忆，角色可自然引用历史信息。记忆故障自动降级为无记忆继续对话（FR-011）。重置入口：`POST /v1/console/memory/reset`；持久化演示：`python -m scripts.demo_memory_persistence`。
-- 未登记的 `companion_id` 返回 `404`。
-- **T083 表达一致性校验**：LLM 输出后由 `style_guard` 拦截出戏术语、禁忌表达与无记忆支撑的虚构事实信号；命中后非流式路径自动重试一次，失败回退 mock。词表见 `data/policy/style_policy.yaml`。
-
-### 5.6 v0.3 端点（主入口/世界事件/调试台；US3 自主行为已接入）
-
-主入口 `/v1/agent/step` 已接入 US3 自主行为编排（SDD Phase 5，2026-09-15）：纯心跳路径串联「禁打断判定 → 候选生成（注入关系阶段）→ 目录校验 → 跨域仲裁 → 节流去重 → 指令输出」。请求/响应结构以 `data/golden/` 下的样例为准：
-
-| 端点 | 状态 | 说明 |
-| --- | --- | --- |
-| `POST /v1/agent/step` | **已实现（US3/US8/T084）** | 心跳与指令统一处理：无 `text` 即心跳（限流 429，最小间隔 `AESIR_HEARTBEAT_MIN_INTERVAL_SECONDS` 默认 2s）。非战斗场景产出自主行为指令 `action:"directive"`（`source:"autonomy"`，策略版本 `agency-policy-002`）；禁打断/节流/无候选时返回空动作并附原因码（`INTERRUPT_FORBIDDEN:*` / `THROTTLED` / `NO_AUTONOMOUS_CANDIDATE`）。战斗场景不产生活类行为（决策归 v0.1/v0.2 链路）。按 `companion_id` 路由到已登记角色，未登记 404。行为白名单与优先级配置：`data/policy/agency_policy.yaml` |
-| `POST /v1/world/events` | 骨架 | 世界事件（战斗+生活类型白名单）：`companion_id + event_id` 幂等回放（`duplicate:true`）；反应暂回退角色默认表现 |
-| `GET /v1/console/state` / `GET /v1/console/memory` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、三级长期记忆视图、会话+长期记忆重置 |
-
-```powershell
-curl -X POST http://127.0.0.1:8011/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
-```
-
-完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 链路（心跳限流 → 世界事件幂等 → 调试台 → US3 自主行为四分支演示：休整指令/同触发源去重静止/物件查看指令/剧情演出禁打断静止）。
-
-### 5.7 终端对话调试（start.bat chat）
-
-无需 UE 即可与 NPC 面对面聊天，用于检查人设与记忆是否合格：
-
-```powershell
-start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console
-```
-
-- 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/personas/aesir/companion.alice/presentation.yaml` 白名单核对。
-- 同一次 REPL 使用固定 `session_id`，可验证短期会话记忆（接续上文）与长期记忆（重启服务后 `/memory` 仍能看到之前说过的内容）。
-- 内置命令：`/help` 帮助、`/memory` 查看三级长期记忆、`/reset` 清空会话+长期记忆、`/scene exploration|conversation` 切换对话场景、`/quit` 退出（服务留在后台）。
-
-人格训练语料（few-shot 优先路线）见 `data/training/README.md`：语料格式、14 个互动分类、人工过滤红线与入库流程。
-
-## 6. 常见问题
-
-- **端口被占用**：启动失败时，可用 `python -m scripts.run_server --port 8001` 或 `start.bat 8001` 指定其他端口；持久化修改请编辑 `.env` 中的 `AESIR_SERVICE_PORT` 并同步 UE 侧配置。
-- **PowerShell 激活失败**：按 2.2 节调整执行策略，或改用 `cmd` 执行 `.\\.venv\\Scripts\\activate.bat`。
-- **依赖安装缓慢**：可临时使用国内镜像 `-i https://pypi.tuna.tsinghua.edu.cn/simple`。
+常见问题：401/模型不可用检查配置并重启；缺faster-whisper仅安装所需语音依赖；端口不通核对run_server实际打印地址与UE配置；PowerShell别名curl导致参数错误时使用curl.exe或Invoke-RestMethod。完整字段不要在本页另建一套，回到对应契约查。

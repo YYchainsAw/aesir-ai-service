@@ -4,9 +4,9 @@
 >
 > 目标：在不破坏 v0.1 的前提下，增加战斗状态快照、自动事件、上下文战术决策、可观察字段和 UE 执行回执。
 >
-> 更新日期：2026-09-14
+> 校对日期：2026-10-19；源码基线`a2dd426`。接口存在、测试材料与UE实际执行分别记录，本轮未运行服务。
 >
-> **演进方向（2026-09-13 起）**：项目定位已升级为「NPC 人格与行为代理」，见 [SDD v1.0](../planning/aesir-agent-sdd-v1.0.md)。v0.2 战斗链路继续有效且为兼容基线；后续新增（世界状态快照、世界事件、单一指令体系统一信封 `app/schemas/directives/`、记忆与关系输入）将在 v0.3 契约中定义，破坏性变更会提升 `protocol_version`。关系阶段将作为战术决策（US4 加固）的输入维度接入。
+> **当前分工：**本页定义仍兼容的战斗快照、意图与决策；统一代理、世界事件、调试和回执边界见[NPC契约v0.3](npc-contract-v0.3.md)。需求主文为[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。v0.2保持规则决策，关系调制在agent/step编排，不能由此推断旧端点已经接入关系调制。
 
 ---
 
@@ -24,7 +24,7 @@
 | `POST /v1/combat/events` | 已实现（事件策略 v1 + 幂等） | UE 关键事件 → 艾莉反应/建议/候选动作 |
 | `POST /v1/tactical/executions` | 已实现 | UE 回传接受、执行或拒绝原因 |
 
-`/v1/commands/parse` 可以在 v0.2 中继续承担“文本到意图”的前半段；`/v1/tactical/resolve` 负责决定具体技能。首版可由 UE 先调用 parse，再调用 resolve；稳定后再提供服务端组合端点。
+`/v1/commands/parse` 可以在 v0.2 中继续承担“文本到意图”的前半段；`/v1/tactical/resolve` 负责决定具体技能。当前可直接调用`/v1/tactical/command`；v0.1 parse返回的是TacticalOrder，不是本页TacticalIntent，不能把其响应原样当resolve请求。若分步调用，调用方须形成符合§4的意图。
 
 ---
 
@@ -34,7 +34,7 @@
 
 | 字段 | 生成方 | 规则 |
 | --- | --- | --- |
-| `request_id` | UE | UUID v4；一次请求全链路唯一；服务原样回显 |
+| `request_id` | UE | 建议UUID v4；v0.2模型实际按字符串接收并回显 |
 | `encounter_id` | UE | 本场 Boss 战唯一 ID；战斗结束后失效 |
 | `snapshot_id` | UE | 状态快照唯一 ID；用于排查时效性 |
 | `event_id` | UE | 一次状态边沿唯一 ID；重试必须复用同一 ID |
@@ -47,13 +47,13 @@
 ### 2.2 状态快照不是指令
 
 - `CombatContext` 只描述 UE 观测到的事实；Python 不得对其修改后当作权威状态。
-- 状态只在玩家命令或边沿事件发生时上传；不得每 Tick 请求服务。
+- 本页战斗链路在玩家命令或边沿事件发生时上传，不逐Tick请求。v0.3自主行为有单独的限频心跳，不与本页事件链路混淆。
 - UE 接收响应时应比较 `encounter_id`；战斗已经结束、目标死亡或快照明显过期时，丢弃动作但仍可显示文本。
 - UE 必须以当前本地状态重验动作，即使服务声明 `status:"actionable"`。
 
 ### 2.3 枚举与错误
 
-- 请求结构错误、UUID/枚举非法、缺少必填字段：HTTP `422`。
+- 已声明且受校验的类型、枚举、必填字段错误：HTTP`422`。v0.2多项ID仍是普通字符串，部分模型默认忽略额外字段；实际边界见末节，不保证所有UUID/额外字段都被拒绝。
 - 合法请求但文本不可理解：HTTP `200`，`recognized:false`。
 - 合法请求但当前无安全动作：HTTP `200`，`decision.status:"not_actionable"`。
 - LLM/ASR 不可用：HTTP `200` 且 `source:"rule_fallback"`（可安全回退时），否则 `502/503` 并由 UE 执行本地降级。
@@ -134,7 +134,7 @@
 }
 ```
 
-首版 `intent_id` 白名单：
+战斗意图的主要取值如下；实际`TacticalIntent`还保留`inspect_interactable/pickup_item/rest_here/wait_here`四项，用于v0.3非战斗分流。v0.2 CombatContext仍仅适用于combat，不能因意图枚举存在就认定其支持非战斗场景。
 
 | ID | 说明 |
 | --- | --- |
@@ -243,10 +243,9 @@
 ```
 
 - 响应结构与 `/v1/tactical/resolve` 完全一致（`ResolveResponse`）。
-- 文本先经规则意图解析（`app/services/tactical/intent_parser.py`，关键词
-  白名单映射到 §4 的 7 个 `intent_id`，要求 wake 词「艾莉/艾琳/alice/eirin」），
-  再走同一份上下文策略；后续可接 LLM 意图解析（回退规则）。
-- 文本不可识别时按策划书 §5.2 回复澄清：HTTP 200 + `recognized:false` +
+- 文本先经规则意图解析（`app/services/tactical/intent_parser.py`），由关键词匹配当前11项意图白名单，并按角色配置检查唤醒词（例如艾莉/Alice），
+  再走同一份上下文策略；`AESIR_INTENT_BACKEND=llm`已可选择LLM解析，失败回退规则，具体配置见[LLM指南](../guides/llm-integration.md)。
+- 文本不可识别时按当前SDD回复澄清：HTTP 200 + `recognized:false` +
   `decision:null` + 澄清台词——不猜测、不施放。
 - 多意图冲突按意图优先级判序（撤退 > 等眩晕爆发 > 治疗 > 保护 > 爆发 > 集火 > 跟随），
   与 v0.1 规则解析器同一纪律。
@@ -256,7 +255,7 @@
 ## 6. `POST /v1/combat/events`（服务端已实现）
 
 > **实现注记（2026-09-08）**：`app/api/v1/combat.py`、`app/schemas/combat_event.py`、
-> `app/services/tactical/event_policy.py`。事件反应从 data/personas 人格包 reactions.yaml 的
+> `app/services/tactical/event_policy.py`。事件反应从data/personas人格包reactions.yaml的
 > `combat_event_reactions` 读取（ID 越界回退安全默认）；动作候选仅在能力就绪
 > 且蓝量允许时返回，否则为 `null`（不虚构动作）。眩晕窗口的动作过期时间
 > 绑定快照 `stunned_remaining_seconds`。治疗/蓝量阈值复用 resolver 常量。
@@ -319,95 +318,24 @@
 
 `companion_action` 可为 `null`：例如艾莉蓝量低、爆裂 CD 中，服务仍可返回反应和建议，但不得虚构可施放动作。
 
-### 6.3 事件幂等
+### 6.3 事件幂等与UE执行去重
 
-服务端按 `encounter_id + event_id` 做幂等（总策划书 §4.2）：
+服务使用`(companion_id, encounter_id, event_id)`作为战斗事实幂等键，与v0.3世界事件通道共享缓存；生活事件的遭遇部分为空串。
 
-- 首次受理的事件正常返回，`duplicate: false`。
-- 同一 `encounter_id + event_id` 的网络重试**回放首次响应**：`request_id` 回显本次请求，但 `order_id`、台词、动作均与首次一致，并标记 `duplicate: true`。
-- UE 可据此识别重试（丢弃重放或仅去重显示）；回放不产生新的 `order_id`，因此不会重复施法。
-- 不同 `encounter_id` 下相同 `event_id` 是两次独立事件。
+- 首次处理返回`duplicate:false`；相同键重试回放首次反应/候选动作并标`duplicate:true`，请求ID回显本次请求，order_id不重新生成。
+- 缓存是单进程内存的1024项有界表，淘汰最旧项；进程重启不保留。它不承诺跨重启或淘汰后的永久恰好一次，冷却也不代替幂等。
+- 同一event_id在不同角色/遭遇中是不同作用域。UE重试同一事实应保留ID，并对回放的order_id另外做执行去重；相同order_id本身不能证明世界动作不重复。
+- 返回候选建议不等于已经启动或命中。旧游玩、结束遭遇或过期建议必须由UE拒绝。
 
 ---
 
-## 7. `POST /v1/tactical/executions`（服务端已实现）
+## 7. 执行回执（单条兼容与批量）
 
-> **实现注记（2026-09-07）**：服务端已实现。请求采用信封 `{"receipt": {…}}`
->（字段与本节示例一致，另含可选 `request_id`/`reported_at`/`policy_revision`/
-> `sequence`/`agent_id`/`ability_id`）；`reported_at` 由 UE 可选提供，服务端
-> 受理时间 `received_at` 自动补齐。成功返回 **202** + `{"stored": true, ...}`，
-> 按天落 `data/runtime/command_service/executions/{YYYYMMDD}.jsonl`。
-> **v0.3 更新（2026-09-28）**：同一端点新增批量模式 `{"receipts": [...]}`，
-> 与单条模式二选一，旧客户端保持兼容。
-> 实现细节：`app/schemas/tactical_execution.py`、`app/services/tactical/receipt_store.py`。
+`POST /v1/tactical/executions`支持`{"receipt":{...}}`或`{"receipts":[...]}`，二选一且批量非空。单条兼容v0.2，批量为后来增加的能力；实际信封没有顶层protocol_version字段，每条ExecutionReceipt的protocol_version固定0.2。完整字段及示例集中见[NPC契约回执节](npc-contract-v0.3.md#4-执行回执)。
 
-UE 的回执用于观察、异常反馈与后续评测，不能反向改变已经结算的战斗事实。
+`result`实际只允许`accepted/executed/rejected/expired/cancelled`。accepted表示登记/受理，不是命中或完成；202仅表示记录受理。当前仅追加JSONL，没有按order维护状态机、重复/乱序合并或验证真实动作。需要的开始、命中、完成阶段是需求目标，不能无版本设计就改成已支持的新枚举。
 
-### 单条回执（v0.2 保留）
-
-```json
-{
-  "protocol_version": "0.2",
-  "request_id": "88d7e6b4-f4f2-4d39-8c96-a23d293882f6",
-  "receipt": {
-    "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
-    "encounter_id": "encounter.20260903.001",
-    "result": "rejected",
-    "reason_code": "ABILITY_ENTERED_COOLDOWN",
-    "reported_at": "2026-09-03T12:00:01Z"
-  }
-}
-```
-
-响应：
-
-```json
-{
-  "stored": true,
-  "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
-  "path": "data/runtime/command_service/executions/20260903.jsonl"
-}
-```
-
-### 批量回执（v0.3）
-
-```json
-{
-  "protocol_version": "0.2",
-  "request_id": "88d7e6b4-f4f2-4d39-8c96-a23d293882f6",
-  "receipts": [
-    {
-      "order_id": "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
-      "encounter_id": "encounter.20260903.001",
-      "result": "executed"
-    },
-    {
-      "order_id": "8a2c1f9e-3d4b-4e5c-9f0a-1b2c3d4e5f6a",
-      "encounter_id": "encounter.20260903.001",
-      "result": "rejected",
-      "reason_code": "UE_TARGET_GONE"
-    }
-  ]
-}
-```
-
-响应：
-
-```json
-{
-  "stored": true,
-  "count": 2,
-  "order_ids": [
-    "527b4c0d-0fe1-4e4c-9057-3c991ba1616c",
-    "8a2c1f9e-3d4b-4e5c-9f0a-1b2c3d4e5f6a"
-  ],
-  "path": "data/runtime/command_service/executions/20260903.jsonl"
-}
-```
-
-`result`：`accepted`（登记成功）、`executed`（实际施放/行为发生）、`rejected`（本地校验拒绝）、`expired`（过期）、`cancelled`（被更高优先级命令取消）。
-
-首版可以先记录在服务日志中；不将该数据自动用于训练。未来用户词典或 RL 数据集必须经过筛选和人工评测。
+按UTC日期写入`data/runtime/command_service/executions/<game_id>/<YYYYMMDD>.jsonl`。旧文中缺game_id层的路径不再是当前默认。请求game_id尚未绑定当前进程游戏，是待修差距；回执不自动用于训练，也不能反向制造战斗事实。
 
 ---
 
@@ -415,26 +343,9 @@ UE 的回执用于观察、异常反馈与后续评测，不能反向改变已�
 
 ### 8.1 音频传输
 
-现有 `/v1/voice/command` 使用 `multipart/form-data`：
+语音命令入口`/v1/voice/command`使用multipart字段`file`、可选UUID `request_id`和`context_json`，返回v0.1 ParseCommandResponse；纯转写入口`/v1/speech/transcribe`使用`audio`、可选request_id/locale，实际返回`request_id/text/language`，没有协议版本、置信度或source字段。二者完整格式见[v0.1契约](ue-protocol-contract-v0.1.md#53-语音转写)。
 
-- `file`：WAV，16 kHz、单声道、16-bit PCM；
-- `request_id`：可选 UUID；
-- `context_json`：现有 v0.1 能力目录。
-
-阶段 3 的独立转写端点建议返回：
-
-```json
-{
-  "protocol_version": "0.2",
-  "request_id": "<uuid>",
-  "text": "艾莉，等它晕了放大招",
-  "confidence": 0.88,
-  "language": "zh",
-  "source": "faster_whisper"
-}
-```
-
-ASR 低置信度不应直接导致施放高资源技能；规范化层可以给出候选、要求确认，或仅做低风险建议。
+传输约定为16kHz、单声道、16-bit PCM WAV。当前入口未统一限制大小/时长或验证全部音频参数，不能把建议格式当已实现门禁。闲聊语音使用`/v1/companion/chat/voice`，不把语音命令入口当对话分流器。
 
 ### 8.2 词典输入/输出示例
 
@@ -457,9 +368,9 @@ ASR 低置信度不应直接导致施放高资源技能；规范化层可以给�
 
 ```text
 OnPlayerVoiceCommand(audio):
-  1. 获取一次 CombatContext（非 Tick）
-  2. 上传音频；得到文本/意图
-  3. 调 /v1/tactical/resolve
+  1. 获取一次当前CombatContext（非Tick）
+  2. 调/v1/speech/transcribe得到文本
+  3. 以text + combat_context调/v1/tactical/command；不把v0.1 order误当TacticalIntent
   4. 校验 encounter_id、agent_id、ability_id、CD/MP/距离/角色状态
   5. 若通过：TacticalOrderComponent.Register(order)
   6. 显示 companion_reply / explanation
@@ -478,8 +389,16 @@ HTTP 回调不可直接操作角色 Actor；回调应投递到子系统/指令�
 
 ## 10. v0.1 迁移原则
 
-1. v0.1 的 `/v1/commands/parse`、`TacticalOrder` 和 golden JSON 在 v0.2 上线前保持不变。
+1. v0.1的`/v1/commands/parse`、TacticalOrder和golden JSON继续按兼容契约维护，不由v0.2或v0.3的存在推断删除。
 2. `companion.eirin` 是旧默认样例，v0.2 联调统一改为 `companion.alice`；修改默认目录、规则解析和 UE DataAsset 时必须一起提交。
 3. 不修改旧响应字段语义；新能力采用新端点和 `protocol_version:"0.2"`。
 4. 先写 Pydantic schema、golden tests 和 mock response，再实现策略，最后接 UE。
 5. 正式升级前，以“同一治疗命令、至少四份状态快照”的回归集验证行为稳定。
+
+
+## 11. 当前验证与实现边界
+
+- `ResolveRequest/TacticalCommandRequest`校验版本0.2，request_id为普通字符串；CombatContext.snapshot_id等也不是UUID类型。它们及若干决策模型未设置extra=forbid，额外字段可能被忽略，严格拒绝仍需实现与兼容评估。
+- L3端点等级门控已经存在，但v0.2 resolver没有完整统一执行“已注册角色404、当前游戏逐能力授权”的入口校验；能力ready检查不等同人格注册或游戏能力目录全验证。UE最终复核仍必需。
+- 策略YAML、配置及JSONL存储仍可能失败；LLM解析有回退不等于整条链路保证永无500。按实际响应和日志处理故障，未验收能力列入SDD实现差距。
+- 本页示例是契约/历史样例，不是当前UE联调结果；当前配置、分阶段检查与历史样本见[联调指南](integration-alignment-v0.3.md)。Boss RL为独立服务，训练/部署/评估见[RL入口](../../rl/README.md)。
