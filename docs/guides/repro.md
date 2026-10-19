@@ -7,7 +7,7 @@
 启动服务后，UE 侧第一步打 `/health`：
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8011/health
 ```
 
 返回：

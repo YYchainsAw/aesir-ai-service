@@ -5,8 +5,8 @@ session_id，回复按增量打字机式输出，meta 帧显示来源（mock/llm
 表现 ID，方便核对角色人设是否合格。--no-stream 回退到非流式 /chat。
 
 用法：
-    .venv/Scripts/python -m scripts.chat_console                     # 默认 127.0.0.1:8000
-    .venv/Scripts/python -m scripts.chat_console --port 8001
+    .venv/Scripts/python -m scripts.chat_console                     # 默认 127.0.0.1:8011
+    .venv/Scripts/python -m scripts.chat_console --port 8000          # 临时换端口
     .venv/Scripts/python -m scripts.chat_console --companion companion.alice
     .venv/Scripts/python -m scripts.chat_console --no-stream
 

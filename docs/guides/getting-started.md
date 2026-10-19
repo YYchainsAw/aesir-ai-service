@@ -74,7 +74,7 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 **终端对话模式（人设质量检查）**：`start.bat chat [端口]` —— 服务已在运行则直接复用，否则后台最小化启动；随后进入终端 REPL 直接与艾莉对话（详见 5.7 节）。等价命令：`.venv\Scripts\python -m scripts.chat_console`。
 
 - `--reload`：代码改动后自动重启，仅开发环境使用。
-- 默认监听 `127.0.0.1:8000`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
+- 默认监听 `127.0.0.1:8011`，由 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT` 配置；与 UE 联调前请两端统一该端口。
 - 当前为单一服务架构，UE 的 `UCompanionChatSubsystem` 与 `UCommandServiceSubsystem` 应指向同一地址（见 [UML 基线](../design/uml/baseline.md) GAP-001/002 处理）。
 
 ### 3.1 按游戏启动独立实例（一进程一游戏，S3）
@@ -82,8 +82,8 @@ pydantic-settings==2.15.0     # 运行时配置（AESIR_* 环境变量 → Setti
 进程通过 `AESIR_GAME_ID` 选择服务的游戏（默认 `aesir`），只加载 `data/games/<game_id>/` 游戏档案与 `data/personas/<game_id>/` 下的人格包；跨游戏 `companion_id` 返回 404，不回退默认角色。多游戏并存时每游戏各起一个实例、配不同端口：
 
 ```powershell
-# 实例一：Aesir（默认），端口 8000
-.\.venv\Scripts\python -m scripts.run_server --port 8000
+# 实例一：Aesir（默认），端口 8011（默认值，可省略 --port）
+.\.venv\Scripts\python -m scripts.run_server
 
 # 实例二：demo-vn（自有第二游戏样例，L0 仅对话/记忆/关系），端口 8002
 $env:AESIR_GAME_ID = "demo-vn"
@@ -96,8 +96,8 @@ $env:AESIR_GAME_ID = "demo-vn"
 
 | 地址 | 说明 |
 | --- | --- |
-| `http://127.0.0.1:8000/health` | 健康检查 |
-| `http://127.0.0.1:8000/docs` | 交互式接口文档（Swagger UI） |
+| `http://127.0.0.1:8011/health` | 健康检查 |
+| `http://127.0.0.1:8011/docs` | 交互式接口文档（Swagger UI） |
 
 ## 4. 运行测试
 
@@ -117,7 +117,7 @@ $env:AESIR_GAME_ID = "demo-vn"
 ### 5.1 健康检查
 
 ```powershell
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8011/health
 ```
 
 返回：
@@ -131,7 +131,7 @@ curl http://127.0.0.1:8000/health
 推荐使用正式接口 `/v1/commands/parse`（携带能力目录与 request_id）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/commands/parse `
+curl -X POST http://127.0.0.1:8011/v1/commands/parse `
   -H "Content-Type: application/json" `
   -d '{\"protocol_version\": \"0.1\", \"request_id\": \"1fad2e69-4a2d-4308-ad4f-2f8abb338b89\", \"text\": \"艾莉，等 Boss 眩晕时使用爆裂魔法\", \"context\": {\"catalog_revision\": \"dev-001\", \"locale\": \"zh-CN\", \"agents\": [{\"id\": \"companion.alice\", \"ability_ids\": [\"ability.alice.explosion\", \"ability.alice.basic_attack\"]}], \"target_selectors\": [\"encounter.primary_hostile\", \"party.player\"], \"state_tags\": [\"state.stunned\", \"state.phase_two\"]}}'
 ```
@@ -180,7 +180,7 @@ curl -X POST http://127.0.0.1:8000/v1/commands/parse `
 $env:AESIR_ASR_BACKEND = "mock"
 $env:AESIR_ASR_MOCK_TEXT = "艾莉，撤退并优先保命"
 
-curl -X POST http://127.0.0.1:8000/v1/voice/command `
+curl -X POST http://127.0.0.1:8011/v1/voice/command `
   -F "file=@cmd.wav" `
   -F "request_id=1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
 ```
@@ -191,7 +191,7 @@ curl -X POST http://127.0.0.1:8000/v1/voice/command `
 $env:HF_ENDPOINT = "https://hf-mirror.com"   # 首次下载模型需要；已缓存则可省
 $env:AESIR_ASR_BACKEND = "faster_whisper"    # 模型/设备/量化/语言见 .env.example
 
-curl -X POST http://127.0.0.1:8000/v1/voice/command -F "file=@cmd.wav"
+curl -X POST http://127.0.0.1:8011/v1/voice/command -F "file=@cmd.wav"
 ```
 
 返回同契约 v0.1：mock 方式下 `order.intent == "retreat"`；转写出空串则 `recognized: false`，转写抛错则 `502`。
@@ -201,7 +201,7 @@ curl -X POST http://127.0.0.1:8000/v1/voice/command -F "file=@cmd.wav"
 `POST /v1/speech/transcribe` 只做「音频 → 文本」，不接解析层，便于 UE 单独调试 ASR（两步式：先 transcribe 再 `parse`）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/speech/transcribe -F "audio=@cmd.wav" -F "request_id=1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
+curl -X POST http://127.0.0.1:8011/v1/speech/transcribe -F "audio=@cmd.wav" -F "request_id=1fad2e69-4a2d-4308-ad4f-2f8abb338b89"
 ```
 
 返回：
@@ -228,7 +228,7 @@ curl -X POST http://127.0.0.1:8000/v1/speech/transcribe -F "audio=@cmd.wav" -F "
 语义意图 + 战斗快照 → 上下文战术决策（规则策略 v1；协议详见 `../protocols/combat-tactical-protocol-v0.2.md` §5）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/tactical/resolve `
+curl -X POST http://127.0.0.1:8011/v1/tactical/resolve `
   -H "Content-Type: application/json" `
   -d '{\"protocol_version\": \"0.2\", \"request_id\": \"88d7e6b4-f4f2-4d39-8c96-a23d293882f6\", \"intent\": {\"intent_id\": \"support_heal_player\", \"target_id\": \"party.player\", \"timing\": \"immediate\"}, \"combat_context\": {\"encounter_id\": \"encounter.001\", \"snapshot_id\": \"11111111-1111-1111-1111-111111111111\", \"captured_at\": \"2026-09-07T12:00:00Z\", \"mode\": \"combat\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 18, \"is_downed\": false, \"distance_to_boss_m\": 4.5}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 83, \"mp_percent\": 72, \"current_behavior\": \"ranged_attack\", \"ability_states\": {\"ability.alice.basic_attack\": \"ready\"}}, \"boss\": {\"id\": \"encounter.primary_hostile\", \"hp_percent\": 42, \"stun_percent\": 0, \"state_tags\": [], \"phase\": 1}}}'
 ```
@@ -238,7 +238,7 @@ curl -X POST http://127.0.0.1:8000/v1/tactical/resolve `
 组合端点 `POST /v1/tactical/command` 可省一次往返——把 `intent` 换成 `text` 即可（"艾莉，帮我回一下血"这类文本由服务端规则解析出意图再落地；不可识别时返回 `recognized:false` + 澄清台词）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/tactical/command `
+curl -X POST http://127.0.0.1:8011/v1/tactical/command `
   -H "Content-Type: application/json" `
   -d '{\"protocol_version\": \"0.2\", \"request_id\": \"99d7e6b4-f4f2-4d39-8c96-a23d293882f6\", \"text\": \"艾莉，帮我回一下血\", \"combat_context\": {\"encounter_id\": \"encounter.001\", \"snapshot_id\": \"11111111-1111-1111-1111-111111111111\", \"captured_at\": \"2026-09-09T12:00:00Z\", \"mode\": \"combat\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 18, \"is_downed\": false, \"distance_to_boss_m\": 4.5}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 83, \"mp_percent\": 72, \"current_behavior\": \"ranged_attack\", \"ability_states\": {\"ability.alice.basic_attack\": \"ready\"}}, \"boss\": {\"id\": \"encounter.primary_hostile\", \"hp_percent\": 42, \"stun_percent\": 0, \"state_tags\": [], \"phase\": 1}}}'
 ```
@@ -248,7 +248,7 @@ curl -X POST http://127.0.0.1:8000/v1/tactical/command `
 `POST /v1/companion/chat`（仅 `exploration` / `conversation` 状态；后端由 `AESIR_COMPANION_BACKEND` 决定，默认 `mock`，LLM 故障时回退 YAML 分类候选回复）：
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/companion/chat `
+curl -X POST http://127.0.0.1:8011/v1/companion/chat `
   -H "Content-Type: application/json" `
   -d '{\"text\": \"艾莉，今天心情怎么样？\", \"companion_id\": \"companion.alice\", \"game_state\": \"conversation\", \"session_id\": \"ue-session-42\"}'
 ```
@@ -270,7 +270,7 @@ curl -X POST http://127.0.0.1:8000/v1/companion/chat `
 | `GET /v1/console/state` / `GET /v1/console/memory` / `POST /v1/console/memory/reset` | 骨架 | 调试台：注册表/状态查询、三级长期记忆视图、会话+长期记忆重置 |
 
 ```powershell
-curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
+curl -X POST http://127.0.0.1:8011/v1/agent/step -H "Content-Type: application/json" -d '{\"protocol_version\": \"0.3\", \"request_id\": \"88888888-8888-4888-8888-888888888888\", \"companion_id\": \"companion.alice\", \"world_context\": {\"snapshot_id\": \"44444444-4444-4444-8444-444444444444\", \"captured_at\": \"2026-09-13T12:00:00Z\", \"scene\": \"exploration\", \"player\": {\"id\": \"party.player\", \"hp_percent\": 80}, \"companion\": {\"id\": \"companion.alice\", \"hp_percent\": 90, \"mp_percent\": 70}}}'
 ```
 
 完整样例（探索/营地/待机/非战斗危险四类世界快照 + 心跳请求/响应 + 世界事件）见 `data/golden/`；`python -m scripts.mock_ue_flow` 已覆盖 v0.3 链路（心跳限流 → 世界事件幂等 → 调试台 → US3 自主行为四分支演示：休整指令/同触发源去重静止/物件查看指令/剧情演出禁打断静止）。
@@ -280,7 +280,7 @@ curl -X POST http://127.0.0.1:8000/v1/agent/step -H "Content-Type: application/j
 无需 UE 即可与 NPC 面对面聊天，用于检查人设与记忆是否合格：
 
 ```powershell
-start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console --port 8000
+start.bat chat          # 或 .\.venv\Scripts\python -m scripts.chat_console
 ```
 
 - 每轮回复附带 `[source | emotion | gesture | face]` 调试行：`source` 为 `mock`（无 LLM 后端）、`llm` 或 `fallback`（LLM 故障回退），表现 ID 可对照 `data/personas/aesir/companion.alice/presentation.yaml` 白名单核对。

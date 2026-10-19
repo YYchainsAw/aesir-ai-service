@@ -102,8 +102,8 @@ aesir-ai-service/
 
 服务启动后访问：
 
-- `http://127.0.0.1:8000/health`：健康检查（返回 `protocol_version: "0.1"`）
-- `http://127.0.0.1:8000/docs`：交互式接口文档
+- `http://127.0.0.1:8011/health`：健康检查（返回 `protocol_version: "0.1"`）
+- `http://127.0.0.1:8011/docs`：交互式接口文档
 
 ## 当前接口
 
@@ -138,7 +138,7 @@ aesir-ai-service/
 ### 文本示例
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
+Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/commands/parse `
   -ContentType "application/json" `
   -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，撤退并优先保命","context":{"agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
@@ -148,7 +148,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 `.env` 设 `AESIR_ASR_BACKEND=faster_whisper`（模型/设备等见 `.env.example`；首次需装 `requirements-ml.txt` 并配 `HF_ENDPOINT=https://hf-mirror.com` 下载模型）：
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
+Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/voice/command `
   -Form @{ file = Get-Item cmd.wav; request_id = "1fad2e69-4a2d-4308-ad4f-2f8abb338b89" }
 ```
 
@@ -268,4 +268,4 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/voice/command `
 
 ## 调试
 
-PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，**请改用 `Invoke-RestMethod` 或 `curl.exe`**。浏览器打开 `http://127.0.0.1:8000/docs` 可交互式调用接口。
+PowerShell 里 `curl` 是 `Invoke-WebRequest` 的别名，**请改用 `Invoke-RestMethod` 或 `curl.exe`**。浏览器打开 `http://127.0.0.1:8011/docs` 可交互式调用接口。

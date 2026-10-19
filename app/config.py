@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # -- 服务监听 -----------------------------------------------------------
     service_host: str = "127.0.0.1"             # uvicorn 监听地址
-    service_port: int = 8000                    # 默认监听端口；与 UE 联调前请统一为此端口
+    service_port: int = 8011                    # 默认监听端口；与 UE 两 Subsystem 代码默认值（8011）对齐，UE 侧零改动
 
     # -- 游戏档案（S3 / T028：一进程一游戏）-----------------------------------
     # 当前进程服务的游戏：决定加载 data/games/<game_id>/capability.yaml 游戏档案，
