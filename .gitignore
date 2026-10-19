@@ -47,3 +47,6 @@ data/relationship/
 # 联调测试日产物（2026-10-19：只测试不上传；探针脚本与本地联调日志）
 scripts/jiadiao_dialogue_probe.py
 data/runtime/uvicorn_console*.log
+
+# 会话日志（2026-10-19：logs 仅本地留存，取消入库；历史 10 篇已 git rm --cached）
+docs/logs/
