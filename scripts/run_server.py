@@ -5,7 +5,7 @@
 
 优先读取环境变量 / .env 中的：
     AESIR_SERVICE_HOST（默认 127.0.0.1）
-    AESIR_SERVICE_PORT（默认 8000）
+    AESIR_SERVICE_PORT（默认 8011，与 UE 两 Subsystem 代码默认值对齐）
 
 命令行 ``--host`` / ``--port`` 可覆盖配置；未提供时走配置默认值，
 避免 ``start.bat``、文档与 UE 各子系统口径不一致（FIX-01）。

@@ -67,7 +67,7 @@ for text in [
 用 `Invoke-RestMethod` 调（PowerShell 里 `curl` 是别名，勿用）。正式接口为契约 v0.1 的 `/v1/commands/parse`（携带能力目录；目录缺省时新指令可能因 ID 越界被拒）：
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
+Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/commands/parse `
   -ContentType "application/json" `
   -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，等 Boss 血量低于一半就开大","context":{"catalog_revision":"dev-001","locale":"zh-CN","agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
 ```
@@ -77,7 +77,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/commands/parse `
 > 遗留别名 `POST /parse-command` 只传 `text`，服务端回填默认能力目录，也可用于快速自测：
 >
 > ```powershell
-> Invoke-RestMethod -Method Post http://127.0.0.1:8000/parse-command `
+> Invoke-RestMethod -Method Post http://127.0.0.1:8011/parse-command `
 >   -ContentType "application/json" `
 >   -Body '{"text":"艾莉，等 Boss 血量低于一半就开大"}'
 > ```

@@ -2,7 +2,7 @@
 chcp 65001 >nul
 REM Aesir AI Service one-click launcher
 REM Usage:
-REM   start.bat            start server only (default port 8000)
+REM   start.bat            start server only (default port 8011, aligned with UE subsystems)
 REM   start.bat 8001       start server on a given port
 REM   start.bat chat       start server (reuse if running) and enter terminal chat
 REM   start.bat chat 8001  given port + terminal chat
@@ -18,7 +18,7 @@ cd /d "%~dp0"
 
 set MODE=%1
 set PORT=%2
-if "%PORT%"=="" set PORT=8000
+if "%PORT%"=="" set PORT=8011
 
 if /i not "%MODE%"=="chat" (
     if not "%MODE%"=="" set PORT=%MODE%

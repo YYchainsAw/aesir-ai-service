@@ -20,14 +20,14 @@
 
 | 实例 | 进程 | 默认端口 | UE 侧指向（代码默认值） | 联调口径 |
 |------|------|----------|--------------------------|----------|
-| NPC 服务 | `aesir-ai-service`（本仓库） | **8000**（`AESIR_SERVICE_PORT`，[config.py](../../app/config.py)） | `CompanionChatSubsystem` / `CommandServiceSubsystem` 均为 `http://127.0.0.1:8011` | **统一指向 8000**：UE 两个 Subsystem 的 `ServiceBaseUrl` 改为 `http://127.0.0.1:8000`（FIX-01 已收口 Python 侧，UE 侧改默认值属 UE 仓改动） |
+| NPC 服务 | `aesir-ai-service`（本仓库） | **8011**（`AESIR_SERVICE_PORT`，[config.py](../../app/config.py)；FIX-10 起默认从 8000 改为 8011） | `CompanionChatSubsystem` / `CommandServiceSubsystem` 均为 `http://127.0.0.1:8011` | **两端默认值已对齐 8011**：Python 默认端口改为 8011 匹配 UE 两 Subsystem 代码默认值，UE 侧零改动（FIX-01 先外置端口，FIX-10 收口默认值方向） |
 | Boss 服务 | Boss RL `serve.py`（独立实例） | **8012** | `AesirBossPolicyClientComponent` = `http://127.0.0.1:8012` | 与 NPC **分开部署**，互不占用端口 |
 
 **启动命令（实测）**
 
 ```bash
 # NPC 服务（仓库根目录，.env 已配置 LLM）
-./.venv/Scripts/python.exe -m scripts.run_server          # 默认 127.0.0.1:8000
+./.venv/Scripts/python.exe -m scripts.run_server          # 默认 127.0.0.1:8011（FIX-10 起）
 ./.venv/Scripts/python.exe -m scripts.run_server --port 8002   # 指定端口（如 demo-vn 第二实例）
 ```
 

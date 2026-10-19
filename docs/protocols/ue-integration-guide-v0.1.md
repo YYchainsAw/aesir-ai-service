@@ -82,7 +82,7 @@ $env:AESIR_ASR_BACKEND = "faster_whisper"
 UE 对每个 `order_id` 回传执行结果，服务端落 `data/rl/executions/` 按天 JSONL：
 
 ```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/v1/tactical/executions `
+Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/tactical/executions `
   -ContentType "application/json" `
   -Body '{"receipt":{"order_id":"527b4c0d-0fe1-4e4c-9057-3c991ba1616c","result":"executed","encounter_id":"encounter.20260907.001"}}'
 # result ∈ accepted/executed/rejected/expired/cancelled；预期 202 {"stored":true,...}
