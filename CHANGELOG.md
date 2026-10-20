@@ -2,7 +2,19 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-15，**769 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-20，**812 通过 + 2 跳过**）。
+
+## 2026-10-20 — T30 / S5 外部人格包守卫（Issue #39 / N3 里程碑）
+
+把现有「归属校验」扩展为完整的「外部不可信资产守卫」，落地设计文档 §6.6 安全防线。**自有人格包（alice/bruno/demo-vn）零改动豁免**，仅 `origin: external` 的包强制强校验。
+
+- **① checksum 真实内容哈希**（`pack_checksum.py`）：sha256 对包目录顶层 YAML 按文件名字典序拼接；**破循环**——manifest.yaml 唯一做解析、删除 `checksum` 字段后 canonical 重序列化，故 `checksum: null` 行自身不参与哈希，而其他字段/其他文件任何字节改动必检出。输出 `sha256:<hex>`，可由命令重算。
+- **② 配额 + 注入 lint**（`pack_lint.py` + `data/policy/external_pack_policy.yaml`）：dialogue_examples ≤80 / 单条 reply_text ≤200 字 / background ≤2000 字 / 规则 ≤40 条；注入黑名单最小词表（忽略以上指令 / system prompt / 你现在是 / 忘记之前 等 10 条）。阈值与词表全部外置，代码不硬编码。
+- **③ 人工审核记录落盘**（`persona_review.py`）：`data/persona_reviews/<game_id>/<companion_id>.yaml`（入库、人写签字），含包版本/内容哈希/lint 结论/审核人/日期/signed_by。加载时核对哈希漂移、版本漂移、lint_status≠pass。
+- **④ 加载时强校验**（`external_pack_guard.py` 挂入 `profile_repository.load_primary`）：外部包 checksum 缺失/不符、缺审核记录、lint 失败 → 聚合冲突一次性抛 `CompanionProfileError` → **503**，不静默跳过、不降级。origin 缺省 `self` 时守卫第一行放行、零新读盘。
+- **⑤ lint 命令**（`scripts/lint_persona_pack.py`）：三子命令 `checksum`（重算哈希）/ `lint`（全量检查，返回码 0 通过 / 1 冲突 / 2 错误，`--json` 结构化）/ `review-init`（生成审核骨架，预填哈希与版本，签字栏留空）。
+- **测试**：新增 42 例（checksum 确定性/破循环、policy 加载、lint 配额与注入、审核记录核对、guard 通过/篡改/缺审核/注入/全冲突聚合、repository 集成、脚本返回码）。测试数：770 → **812 通过**。
+- **门禁语义**：本项落地后，「接第三方游戏包」红线具备技术保障——未通过 lint 且无人工签字的外部包无法进入加载路径。
 
 ## 2026-10-15 — T37 已知小尾巴收口（4 项：穿帮文案 / 缺省回退 / degraded 字段 / 埋点扩面）
 
