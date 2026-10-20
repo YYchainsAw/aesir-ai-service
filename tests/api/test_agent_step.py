@@ -123,13 +123,37 @@ def test_text_command_without_combat_context_reports_missing() -> None:
     assert "COMBAT_CONTEXT_MISSING" in body["observability"]["reason_codes"]
 
 
-def test_text_command_unrecognized_replies_clarification() -> None:
-    """不可识别文本：回复澄清 + INTENT_UNRECOGNIZED，不猜测执行（FR-028）。"""
+def test_text_command_unrecognized_falls_back_to_dialogue() -> None:
+    """FIX-11：不可识别文本（闲聊）降级到陪伴对话应答，action 仍为 none、不猜测执行。"""
     response = client.post("/v1/agent/step", json=_step_payload(text="艾莉，今天天气不错啊"))
     assert response.status_code == 200
     body = response.json()
     assert body["action"] == "none"
+    assert body["directive"] is None
     assert "INTENT_UNRECOGNIZED" in body["observability"]["reason_codes"]
+    assert "CHITCHAT_DIALOGUE" in body["observability"]["reason_codes"]
+    assert body["reply_text"]
+    # 对话降级链路的埋点透传：人设版本 + 记忆注入条数
+    assert body["observability"]["persona_revision"] != ""
+
+
+def test_chitchat_dialogue_unavailable_falls_back_to_clarification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """对话服务自身故障（人设损坏）：退回澄清口径 + DIALOGUE_UNAVAILABLE，不 500。"""
+    from app.services.companion import dialogue_service
+    from app.services.companion.profile_repository import CompanionProfileError
+
+    def _boom(*_args, **_kwargs):
+        raise CompanionProfileError("boom")
+
+    monkeypatch.setattr(dialogue_service, "create_dialogue_reply", _boom)
+    response = client.post("/v1/agent/step", json=_step_payload(text="艾莉，今天天气不错啊"))
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"] == "none"
+    assert body["observability"]["source"] == "rule_fallback"
+    assert "DIALOGUE_UNAVAILABLE" in body["observability"]["reason_codes"]
     assert body["reply_text"]
 
 

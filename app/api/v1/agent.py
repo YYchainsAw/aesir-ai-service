@@ -7,7 +7,8 @@ UE 以固定间隔携带世界快照调用 ``/v1/agent/step``：
 - 玩家指令（有 ``text``）：与 ``/v1/tactical/command`` 共用同一决策层
   （T075：``parse_intent_with_source`` → 按域路由）。战斗意图走
   ``resolve_intent`` 战术决策（含 US2 关系调制），非战斗意图映射到 agency
-  行为目录并按当前场景做目录/距离校验；不可识别时回复澄清，不猜测执行。
+  行为目录并按当前场景做目录/距离校验；未命中意图时（FIX-11）降级到陪伴
+  对话链路自然应答（action 仍为 none，不猜测执行指令）。
 
 系统 MUST NOT 主动向客户端推送：一切产出经本响应返回。
 """
@@ -316,6 +317,26 @@ def agent_step(request: AgentStepRequest) -> AgentStepResponse:
         last_seen=request.world_context.captured_at,
     )
     response = _dispatch_step(request)
+    # T38：决策埋点（SC-005 行为类型分布 / SC-006 相邻重复率 / SC-013 可解释
+    # 覆盖率）。主汇合点一次覆盖心跳自主步、文本指令步与空响应全部分支；
+    # record_agent_step 内部已全量静默，此处不再包 try。
+    from app.services.companion.agent_step_signals import record_agent_step
+
+    directive_action = (
+        getattr(response.directive.action_type, "value", response.directive.action_type)
+        if response.directive is not None
+        else None
+    )
+    record_agent_step(
+        request.companion_id,
+        game_id=get_registered_profile(request.companion_id).game_name.lower(),
+        scene=request.world_context.scene,
+        action=response.action,
+        directive_action_type=directive_action,
+        reason_codes=list(response.observability.reason_codes),
+        observability_source=response.observability.source,
+        degraded=response.observability.degraded,
+    )
     if response.directive and response.directive.presentation:
         record_observation(
             request.companion_id, emotion_id=response.directive.presentation.emotion_id
@@ -391,17 +412,12 @@ def _command_step(request: AgentStepRequest) -> AgentStepResponse:
     ctx = request.world_context
 
     if intent is None:
-        # 不可识别：按策划书 §5.2 回复澄清，不猜测执行（FR-028）
-        return AgentStepResponse(
-            protocol_version=PROTOCOL_VERSION,
-            request_id=request.request_id,
-            companion_id=request.companion_id,
-            action="none",
-            reply_text="我没听清你想让我做什么，能再说一遍吗？",
-            observability=_intent_observability(
-                request, source, ["INTENT_UNRECOGNIZED"], ctx.snapshot_id
-            ),
-        )
+        # FIX-11（2026-10-19 联调实测）：文本未命中 11 个指令意图时，不再硬拒
+        # 「我没听清」——UE 把所有玩家输入（含闲聊）都走 agent/step，硬拒会让
+        # 随便说话都被顶回来。降级到陪伴对话链路（与 /v1/companion/chat 同一
+        # create_dialogue_reply）：LLM 生成、记忆检索、style_guard、情感信号与
+        # 关系推动全部生效。指令不猜测执行的纪律不变（action 仍为 none）。
+        return _chitchat_dialogue_step(request)
 
     from app.schemas.tactical_intent import COMBAT_INTENT_IDS
 
@@ -409,6 +425,90 @@ def _command_step(request: AgentStepRequest) -> AgentStepResponse:
         return _combat_command_step(request, intent, source)
 
     return _non_combat_command_step(request, intent, source)
+
+
+# FIX-11：agent/step 文本未命中指令意图时复用陪伴对话服务。
+# agent 请求 session_id 上限 128、对话请求上限 64——超长截断，避免构造时 ValidationError。
+_CHITCHAT_CONVERSATION_SCENES = {"conversation"}
+
+
+def _chitchat_dialogue_step(request: AgentStepRequest) -> AgentStepResponse:
+    """闲聊降级：intent=None → 陪伴对话回复（action 仍为 none，无指令信封）。
+
+    observability.source 映射：对话 llm → "llm"、fallback → "rule_fallback"、
+    mock → "rule"。reason_codes 保留 ``INTENT_UNRECOGNIZED``（文本确实未命中
+    意图，监控/RL 埋点口径不变）并新增 ``CHITCHAT_DIALOGUE`` 标识本轮走了
+    对话降级。对话服务自身故障（人设损坏等）退回澄清口径，绝不 500
+    （FR-011 降级纪律同其余子系统）。
+    """
+    from pydantic import ValidationError
+
+    from app.schemas.companion_dialogue import CompanionDialogueRequest
+    from app.services.companion.dialogue_service import create_dialogue_reply
+
+    ctx = request.world_context
+    try:
+        dialogue = create_dialogue_reply(
+            CompanionDialogueRequest(
+                text=request.text or "",
+                companion_id=request.companion_id,
+                game_state=(
+                    "conversation"
+                    if ctx.scene in _CHITCHAT_CONVERSATION_SCENES
+                    else "exploration"
+                ),
+                session_id=(request.session_id or "")[:64] or None,
+                world_context=ctx,
+            )
+        )
+    except (CompanionProfileError, ValidationError):
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text="我没听清你想让我做什么，能再说一遍吗？",
+            observability=_intent_observability(
+                request,
+                "rule_fallback",
+                ["INTENT_UNRECOGNIZED", "DIALOGUE_UNAVAILABLE"],
+                ctx.snapshot_id,
+            ),
+        )
+
+    obs_source = {"llm": "llm", "fallback": "rule_fallback", "mock": "rule"}.get(
+        dialogue.source, "rule"
+    )
+    reason_codes = ["INTENT_UNRECOGNIZED", "CHITCHAT_DIALOGUE"]
+    if dialogue.source == "fallback":
+        reason_codes.append("LLM_FALLBACK")
+    return AgentStepResponse(
+        protocol_version=PROTOCOL_VERSION,
+        request_id=request.request_id,
+        companion_id=request.companion_id,
+        action="none",
+        reply_text=dialogue.reply_text,
+        observability=AgentStepObservability(
+            source=obs_source,
+            reason_codes=reason_codes,
+            policy_revision=_policy_revision(),
+            used_snapshot_id=ctx.snapshot_id,
+            relationship_stage=(
+                dialogue.relationship_stage
+                or _relationship_stage_or_empty(request.companion_id)
+            ),
+            relationship_stage_display=(
+                dialogue.relationship_stage_display
+                or _relationship_stage_display_or_empty(request.companion_id)
+            ),
+            persona_revision=(
+                dialogue.persona_revision
+                or _persona_revision_or_empty(request.companion_id)
+            ),
+            memory_layers=dialogue.memory_layers,
+            degraded=dialogue.source == "fallback" or _degraded_flag(reason_codes),
+        ),
+    )
 
 
 def _combat_command_step(request: AgentStepRequest, intent, source: str) -> AgentStepResponse:

@@ -132,6 +132,12 @@ class PersonaPackValidator:
         if checksum is not None and not isinstance(checksum, str):
             conflicts.append("checksum must be a string or null")
 
+        # 8. origin 合法性（S5 / T30）：缺省 self；非 self/external 视为非法声明。
+        #    外部包（origin=external）的 checksum/审核/lint 强校验由 ExternalPackGuard 挂载，不在此处。
+        origin = str(manifest.get("origin", "self"))
+        if origin not in ("self", "external"):
+            conflicts.append(f"origin must be 'self' or 'external', got '{origin}'")
+
         if conflicts:
             raise PersonaPackValidationError(
                 f"Persona pack validation failed for {pack_dir.name}:; " + "; ".join(conflicts)

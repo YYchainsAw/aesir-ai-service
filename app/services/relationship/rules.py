@@ -49,6 +49,35 @@ def apply_relationship_event(
     - 冷却窗口内同类型重复 → 不计分（防刷）；
     - 当日正向净变化超上限 → 截断到剩余额度（负向不受限）；
     - 数值最终钳制在策略表边界内。
+
+    本签名保持两元组不变（既有测试/demo 依赖）；拦截原因的可区分性由
+    :func:`apply_relationship_event_ex` 提供（T38 / SC-004 埋点数据源）。
+    """
+    new_state, delta, _reason = apply_relationship_event_ex(
+        state,
+        event_type,
+        occurred_at,
+        policy=policy,
+        cooldown_seconds=cooldown_seconds,
+        daily_cap=daily_cap,
+    )
+    return new_state, delta
+
+
+def apply_relationship_event_ex(
+    state: RelationshipState,
+    event_type: str,
+    occurred_at: str | None,
+    *,
+    policy: RelationshipPolicy | None = None,
+    cooldown_seconds: float | None = None,
+    daily_cap: int | None = None,
+) -> tuple[RelationshipState, int, str]:
+    """同 :func:`apply_relationship_event`，额外返回拦截原因（T38 / SC-004）。
+
+    reason ∈ ``scored``（正常计分）/ ``unknown_event``（未登记）/
+    ``cooldown_blocked``（冷却窗口拦截）/ ``daily_cap``（当日正向上限耗尽）/
+    ``clamped_zero``（边界钳制吃掉全部变化）。四种「delta=0」从此可区分。
     """
     policy = policy or get_policy()
     settings = get_settings()
@@ -56,7 +85,7 @@ def apply_relationship_event(
     cap = daily_cap if daily_cap is not None else settings.relationship_daily_cap
 
     if event_type not in policy.events:
-        return state, 0
+        return state, 0, "unknown_event"
 
     moment = _parse(occurred_at) if occurred_at else _now()
     day = moment.date().isoformat()
@@ -71,19 +100,19 @@ def apply_relationship_event(
     if last_at is not None:
         elapsed = (moment - _parse(last_at)).total_seconds()
         if 0 <= elapsed < cooldown:
-            return state, 0
+            return state, 0, "cooldown_blocked"
 
     delta = policy.events[event_type]
     if delta > 0:
         allowed = max(cap - daily_net, 0)  # 当日剩余正向额度
         if allowed == 0:
-            return state, 0
+            return state, 0, "daily_cap"
         delta = min(delta, allowed)
 
     value = max(policy.min, min(policy.max, state.value + delta))
     applied = value - state.value  # 边界钳制可能吃掉部分变化
     if applied == 0:
-        return state, 0
+        return state, 0, "clamped_zero"
     if applied > 0:
         daily_net += applied
 
@@ -103,4 +132,4 @@ def apply_relationship_event(
         recent_events=recent,
         last_event_at=last_event_at,
     )
-    return new_state, applied
+    return new_state, applied, "scored"

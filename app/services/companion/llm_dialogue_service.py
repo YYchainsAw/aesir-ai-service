@@ -174,6 +174,9 @@ class LLMCompanionDialogueService:
         self.last_salient: bool = False
         # T083 风格校验：成功时为空列表；如上层需要，可从抛出的异常 detail 中读取失败原因。
         self.last_style_violations: list[str] = []
+        # T38 / SC-008：最近一轮查证的 ToolResult（无查证轮为 None）。
+        # 原先用完即弃（只进第二轮 prompt），现在透传给埋点落盘。
+        self.last_lookup: ToolResult | None = None
 
     def reply(
         self,
@@ -293,6 +296,7 @@ class LLMCompanionDialogueService:
             world_context=world_context,
             deadline=deadline,
         )
+        self.last_lookup = result  # T38 / SC-008：透传埋点
         second = self._client.generate_json(
             system_prompt=_build_system_prompt(
                 self._profile,
@@ -374,6 +378,7 @@ class LLMCompanionDialogueService:
                 world_context=world_context,
                 deadline=deadline,
             )
+            self.last_lookup = result  # T38 / SC-008：透传埋点
             for kind, value in self._stream_round(
                 system_prompt=_build_system_prompt(
                     self._profile,

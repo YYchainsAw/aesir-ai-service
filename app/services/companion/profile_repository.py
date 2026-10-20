@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from app.services.companion.external_pack_guard import ExternalPackGuard, ExternalPackGuardError
 from app.services.companion.persona_pack_loader import PersonaPackLoadError, PersonaPackLoader
 from app.services.companion.persona_pack_validator import (
     Capability,
@@ -137,6 +138,13 @@ class CompanionProfileRepository:
             try:
                 validator.validate(source, raw_profile)
             except PersonaPackValidationError as error:
+                raise CompanionProfileError(str(error)) from error
+
+            # S5 / T30：外部人格包强校验（checksum + lint + 人工审核记录）。
+            # 自有人格包（origin 缺省/self）在守卫内部第一行放行，不触发新读盘。
+            try:
+                ExternalPackGuard().check(source, raw_profile)
+            except ExternalPackGuardError as error:
                 raise CompanionProfileError(str(error)) from error
 
         identity = _required_mapping(raw_profile, "identity")

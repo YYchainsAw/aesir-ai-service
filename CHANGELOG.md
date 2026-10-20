@@ -2,7 +2,15 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-历史末次全量记录为 **2026-10-15，769 passed + 2 skipped**；2026-10-19端口专项为12 passed。它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-20，843 passed + 2 skipped**（T38/#53 埋点补齐后）。此前末次全量记录为 2026-10-15 的 769 passed + 2 skipped、2026-10-19 端口专项 12 passed——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-20 — T38 SC 验收埋点补齐（#53）
+
+SC-004/005/006/007/008/013 六项 N/A 升为脚本可判定，纯观测层埋点、业务语义零改动：`agent_steps` 落盘（agent/step 主汇合点，一份 JSONL 同时喂自主行为类型分布、相邻重复率与 reason_codes 覆盖率）、`event_signals` 落盘（同事件非首条必须 duplicate=True）、关系层 `apply_relationship_event_ex` 三元组透传四种 delta=0 拦截原因、查证结果 `lore_lookup` 与接地丢弃数落盘。SC-002 保持 N/A（receipts 加战况字段属 UE 契约变更，不硬凑）。实测 SC-013/006/007 PASS，SC-005 FAIL 真实暴露自主行为仅 inspect 一类、多样性不足。测试 812→843。
+
+## 2026-10-20 — T30 S5 外部人格包守卫（#39 / N3 闭环）
+
+归属校验扩展为外部不可信资产守卫：sha256 内容哈希（manifest 唯一解析删 checksum 字段破循环）、配额+注入 lint（词表外置 policy yaml）、人工审核记录落盘、加载时强校验失败 503 不静默跳过。自有人格包 origin 缺省 self 豁免，alice/bruno/demo-vn 零改动。测试 770→812。
 
 ## 2026-10-19 — 文档整合与模型重构
 

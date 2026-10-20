@@ -85,6 +85,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         relationship_signal=relationship_signal,
         injected_topics=[i.topic for i in impressions],
         style_violations=getattr(service, "last_style_violations", None) if get_settings().companion_backend == "llm" else None,
+        lore_lookup=_lookup_signal(getattr(service, "last_lookup", None)) if get_settings().companion_backend == "llm" else None,
         relationship_stage=stage,
         memory_cited=bool(memories),
         game_id=game_id,
@@ -164,6 +165,7 @@ def _stream_llm_reply(
                 relationship_signal=service.last_relationship_signal,
                 injected_topics=[i.topic for i in impressions],
                 style_violations=service.last_style_violations,
+                lore_lookup=_lookup_signal(getattr(service, "last_lookup", None)),
                 game_id=game_id,
             )
             _annotate_observability(
@@ -243,6 +245,21 @@ def _annotate_observability(
     }
 
 
+def _lookup_signal(result) -> dict | None:
+    """把 LLM 链路用完即弃的查证 ToolResult 折成落盘可选字段（T38 / SC-008）。
+
+    只取可判定的三样：查证工具、是否有据、原因码（无据时带 TOOL_NO_RESULT
+    之类）；回复内容不进埋点（逐句一致率仍属人工抽检范围）。
+    """
+    if result is None:
+        return None
+    return {
+        "tool": getattr(result, "tool", ""),
+        "found": bool(getattr(result, "found", False)),
+        "reason_codes": list(getattr(result, "reason_codes", None) or []),
+    }
+
+
 def _record_turn(
     request: CompanionDialogueRequest,
     response: CompanionDialogueResponse,
@@ -256,6 +273,7 @@ def _record_turn(
     style_violations: list[str] | None = None,
     relationship_stage: str = "",
     memory_cited: bool | None = None,
+    lore_lookup: dict | None = None,
     game_id: str,
 ) -> int:
     """成功完成一轮后写入会话记忆与长期记忆（与非流式路径相同副作用）。
@@ -292,7 +310,7 @@ def _record_turn(
         salient = looks_salient(request.text)
     if salient:
         _remember_fact(request.companion_id, request.text, game_id=game_id)
-    _remember_facts(
+    _grounded_count, facts_rejected = _remember_facts(
         request.companion_id,
         facts or [],
         # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
@@ -312,6 +330,13 @@ def _record_turn(
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
         _remember_turn(request.companion_id, reply_topics, origin="companion", game_id=game_id)
 
+    # 关系信号先落地拿到本轮实际 delta（冷却/日上限可能吃掉），再随信号一并
+    # 落盘——FIX-13：sentiment（LLM 判定）与 relationship_delta（实收）配对
+    # 记录，metrics 层才能核对「判定 vs 实收」并支撑 SC-004/SC-001 判定。
+    delta, relationship_reason = _apply_relationship_signal(
+        request.companion_id, relationship_signal, game_id=game_id
+    )
+
     # 信号埋点（RL 前置）：先用记录前的会话历史算复读度/话题延续，再落 JSONL；
     # 任何故障静默（绝不阻塞对话）。
     record_turn_signal(
@@ -330,9 +355,14 @@ def _record_turn(
         style_violations=style_violations,
         relationship_stage=relationship_stage,
         memory_cited=memory_cited,
+        sentiment=relationship_signal,
+        relationship_delta=delta,
+        relationship_reason=relationship_reason,
+        lore_lookup=lore_lookup,
+        facts_rejected=facts_rejected or None,
         game_id=game_id,
     )
-    return _apply_relationship_signal(request.companion_id, relationship_signal, game_id=game_id)
+    return delta
 
 
 # 对话推动关系（2026-09-22）：LLM 判定的玩家发言情感质量 → 关系事件类型。
@@ -345,29 +375,36 @@ _DIALOGUE_RELATIONSHIP_EVENTS = {
 }
 
 
-def _apply_relationship_signal(companion_id: str, signal: str | None, *, game_id: str) -> int:
-    """把情感质量信号计进关系层；返回本轮实际 delta，故障静默返回 0。
+def _apply_relationship_signal(
+    companion_id: str, signal: str | None, *, game_id: str
+) -> tuple[int, str]:
+    """把情感质量信号计进关系层；返回（本轮实际 delta, 拦截原因）。
 
     复用关系规则层全套（同类冷却/日上限/持久化/损坏降级）——对话信号用
     更严的冷却窗口（默认 300 秒 vs 事实事件 60 秒）：对话每轮都发生，
     60 秒拦不住连点刷分。关系层故障不中断对话（FR-011 同纪律）。
+
+    拦截原因（T38 / SC-004）：``none`` 信号为 ``no_signal``；关系层故障为
+    ``store_error``；其余透传规则层（scored/cooldown_blocked/daily_cap/...）。
     """
     event_type = _DIALOGUE_RELATIONSHIP_EVENTS.get(signal or "none")
     if event_type is None:
-        return 0
+        return 0, "no_signal"
     from app.services.relationship.state import (
         RelationshipStoreError,
         get_relationship_store,
     )
 
     try:
-        _, delta = get_relationship_store(companion_id, game_id=game_id).apply_event(
+        _, delta, reason = get_relationship_store(
+            companion_id, game_id=game_id
+        ).apply_event(
             event_type,
             cooldown_seconds=get_settings().relationship_dialogue_cooldown_seconds,
         )
-        return delta
+        return delta, reason
     except RelationshipStoreError:
-        return 0
+        return 0, "store_error"
 
 
 def _recall(companion_id: str, *, game_id: str) -> list[MemoryEntry]:
@@ -444,8 +481,13 @@ def _care_scaled_boost(companion_id: str, *, game_id: str) -> float | None:
     return settings.memory_impression_salience_boost * care_scale(value)
 
 
-def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str], game_id: str) -> int:
-    """把本轮抽出的事实写进长期档案（过接地校验），返回落档条数。
+def _remember_facts(
+    companion_id: str, facts: list[str], *, sources: list[str], game_id: str
+) -> tuple[int, int]:
+    """把本轮抽出的事实写进长期档案（过接地校验）。
+
+    返回（通过接地校验的条数, 被接地校验丢弃的条数）——T38 / SC-008 观测：
+    丢弃条数是「LLM 倾向编造」的直接证据，随对话信号落盘。
 
     接地校验（``memory.facts.is_grounded``）是这条通道的**安全阀**：档案里的
     事实会被当作「她确定知道的事」长期注入，一旦编造就是永久错误记忆——
@@ -453,10 +495,11 @@ def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str], 
     写失败静默降级（与其余记忆写入同语义）。
     """
     grounded = [fact for fact in facts if is_grounded(fact, sources)]
+    rejected = len(facts) - len(grounded)
     if not grounded:
-        return 0
+        return 0, rejected
     try:
-        return get_memory_store(companion_id, game_id=game_id).record_facts(
+        get_memory_store(companion_id, game_id=game_id).record_facts(
             [
                 MemoryEntry(
                     content=fact,
@@ -468,7 +511,8 @@ def _remember_facts(companion_id: str, facts: list[str], *, sources: list[str], 
             ]
         )
     except MemoryStoreError:
-        return 0
+        pass
+    return len(grounded), rejected
 
 
 def _remember_fact(companion_id: str, player_text: str, *, game_id: str) -> None:

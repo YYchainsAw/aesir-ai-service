@@ -1,0 +1,31 @@
+# 外部人格包守卫策略（S5 / T30 / issue #39）。
+#
+# 本文件维护「外部不可信人格包」接入前的校验参数：配额阈值 + 提示注入检测黑名单。
+# 配额阈值经设计文档 6.6 节定稿，真实自有人格包（alice 68 条 examples / 最长 reply 127 字）
+# 已验证在限内；词表为最小集合，接入真实外部包时可扩充（章程原则 I：代码不硬编码）。
+# 修改后由 get_external_pack_policy 的 mtime 缓存自动热加载；破坏性调整应同步 revision。
+
+revision: external-pack-policy-001
+
+# -- 配额阈值（仅对 origin: external 的包强制；自有人格包豁免）--------------
+limits:
+  max_dialogue_examples: 80        # examples.yaml dialogue_examples 条数上限
+  max_reply_chars: 200             # 单条 reply_text 字数上限
+  max_background_chars: 2000        # persona.background 字数上限
+  max_rules: 40                    # rules.yaml 规则条数上限（response_rules + runtime_state_policy）
+
+# -- 提示注入检测最小黑名单（子串命中即违规）-------------------------------
+# 覆盖「忽略以上指令 / system prompt / 你现在是 / 忘记之前」四类攻击模式。
+# 扫描范围：examples.yaml（player + 每条 reply_text）、persona.yaml（background 等字符串值）、
+# rules.yaml 规则文本。命中即判 lint 违规，外部包不得上线。
+injection_terms:
+  - "忽略以上指令"
+  - "忽略之前的指令"
+  - "忘记之前"
+  - "system prompt"
+  - "system_prompt"
+  - "you are now"
+  - "你现在是"
+  - "你现在扮演"
+  - "developer message"
+  - "指令优先级"
