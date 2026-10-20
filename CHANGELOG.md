@@ -2,7 +2,20 @@
 
 按里程碑记录本项目进展。原始逐日开发记录归档于 [`docs/logs/`](docs/logs/)，本文件只保留里程碑摘要与当前测试数锚点。
 
-> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-20，**812 通过 + 2 跳过**）。
+> 测试数锚点纪律：各文档不单独维护测试数，统一以本文件最新锚点为准（当前：2026-10-20，**843 通过 + 2 跳过**）。
+
+## 2026-10-20 — T38 / SC 验收埋点补齐（Issue #53）
+
+7 项 N/A 验收指标（SC-002/004/005/006/007/008/013）中 6 项从「需人工判定」升为**脚本可判定**；纯观测层埋点，业务语义零改动。
+
+- **① agent_steps 决策埋点（一箭三雕）**：新建 `app/services/companion/agent_step_signals.py`，挂载在 `agent_step()` 主汇合点（`_dispatch_step` 之后），一份 JSONL 覆盖心跳自主步/文本指令步/空响应步全部分支，落 `data/runtime/agent_steps/<game_id>/<companion_id>.jsonl`。此前以为要补「decision_trace」——实际代码里它不存在，事实上的可解释载体就是 `AgentStepObservability + reason_codes`，持久化即可：**SC-013**（reason_codes 非空率，实测 21 步 100%）、**SC-005**（自主步 ARB_WON 行为类型分布 ≥8）、**SC-006**（相邻自主步行为重复率=0）。
+- **② event_signals 幂等埋点**：新建 `app/services/tactical/event_signals.py`，`handle_combat_event`/`handle_world_event` 两通道 `_resolve` 返回后各挂一行。**SC-007** 判定口径：同一 `(event_id, encounter_id)` 的非首条记录 `duplicate` 必须全为 True；出现一条 False = 幂等表被绕过，判 FAIL（脚本可算的严格口径）。
+- **③ 关系拦截原因透传（SC-004）**：`apply_relationship_event` 保持两元组签名（20+ 测试/demo 零破坏），新增 `apply_relationship_event_ex` 返回 `(state, delta, reason)`——`scored/unknown_event/cooldown_blocked/daily_cap/clamped_zero` 四种「delta=0」从此可区分；`RelationshipStore.apply_event` 三元组透传，对话信号落 `relationship_reason` 字段。判定：冷却拦截样本 delta 恒为 0 → PASS。
+- **④ 查证结果落盘（SC-008）**：`run_lookup` 的 ToolResult 原先用完即弃（只进第二轮 prompt），现在存 `LLMCompanionDialogueService.last_lookup`（非流式+流式两路径），透传落 `lore_lookup: {tool, found, reason_codes}`；顺手把 `_remember_facts` 接地丢弃数带出落 `facts_rejected`（LLM 倾向编造的直接证据）。逐句一致率仍属人工抽检，不伪造全自动。
+- **⑤ SC-002 保持 N/A**：receipts 无 `game_state` 字段（加字段属 UE 契约变更），「结果合理率」本质人工判定——note 写明理由，不硬凑。
+- **metrics_report 升级**：新增 `collect_agent_steps()`/`collect_event_signals()`；`collect_signals` 扩展三个可选字段（旧记录 `.get()` 兼容）；6 项 verdict 从 N/A 列表移出写正式三段式（无样本 → N/A 注明「T38 起新增字段」）。
+- **实测暴露的真实信号**（埋点价值兑现）：干净演练下 SC-013 PASS（100%）、SC-006 PASS、SC-007 PASS；SC-005 FAIL（当前探索场景自主行为仅 inspect 一类——候选多样性不足，留待多场景联调丰富）；SC-004/008 N/A（本日未触发冷却/查证）。
+- **测试**：新增 31 例。测试数：812 → **843 通过**。
 
 ## 2026-10-20 — T30 / S5 外部人格包守卫（Issue #39 / N3 里程碑）
 

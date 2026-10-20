@@ -317,6 +317,26 @@ def agent_step(request: AgentStepRequest) -> AgentStepResponse:
         last_seen=request.world_context.captured_at,
     )
     response = _dispatch_step(request)
+    # T38：决策埋点（SC-005 行为类型分布 / SC-006 相邻重复率 / SC-013 可解释
+    # 覆盖率）。主汇合点一次覆盖心跳自主步、文本指令步与空响应全部分支；
+    # record_agent_step 内部已全量静默，此处不再包 try。
+    from app.services.companion.agent_step_signals import record_agent_step
+
+    directive_action = (
+        getattr(response.directive.action_type, "value", response.directive.action_type)
+        if response.directive is not None
+        else None
+    )
+    record_agent_step(
+        request.companion_id,
+        game_id=get_registered_profile(request.companion_id).game_name.lower(),
+        scene=request.world_context.scene,
+        action=response.action,
+        directive_action_type=directive_action,
+        reason_codes=list(response.observability.reason_codes),
+        observability_source=response.observability.source,
+        degraded=response.observability.degraded,
+    )
     if response.directive and response.directive.presentation:
         record_observation(
             request.companion_id, emotion_id=response.directive.presentation.emotion_id

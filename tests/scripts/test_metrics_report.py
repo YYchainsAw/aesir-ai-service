@@ -15,13 +15,17 @@ from scripts import metrics_report as mr
 
 @pytest.fixture
 def isolated_dirs(tmp_path, monkeypatch):
-    """把 receipts/signals 根目录指到临时目录，返回 (receipts_root, signals_root)。"""
+    """把 receipts/signals/agent_steps/event_signals 根目录指到临时目录。"""
     receipts_root = tmp_path / "executions"
     signals_root = tmp_path / "signals"
+    agent_steps_root = tmp_path / "agent_steps"
+    event_signals_root = tmp_path / "event_signals"
     receipts_root.mkdir()
     signals_root.mkdir()
     monkeypatch.setenv("AESIR_RECEIPTS_DIR", str(receipts_root))
     monkeypatch.setenv("AESIR_DIALOGUE_SIGNALS_DIR", str(signals_root))
+    monkeypatch.setenv("AESIR_AGENT_STEPS_DIR", str(agent_steps_root))
+    monkeypatch.setenv("AESIR_EVENT_SIGNALS_DIR", str(event_signals_root))
     return receipts_root, signals_root
 
 
@@ -282,3 +286,165 @@ def test_sc_verdicts_na_when_no_data(isolated_dirs):
                "SC-006", "SC-007", "SC-008", "SC-011", "SC-013"):
         assert vmap[sc]["status"] == "N/A"
         assert vmap[sc]["note"]  # 必须写明要补什么埋点
+
+
+# ---- T38（#53）：agent_steps / event_signals 采集与 verdict 升级 ------------
+
+def _agent(action_type="inspect", *, ts="2026-10-12T00:00:00+00:00",
+          companion="companion.alice", codes=("ARB_WON:roam",), action="directive"):
+    return {
+        "ts": ts, "companion_id": companion, "scene": "exploration",
+        "action": action, "directive_action_type": action_type,
+        "reason_codes": list(codes), "observability_source": "rule", "degraded": False,
+    }
+
+
+def _event(event_id, duplicate, *, ts="2026-10-12T00:00:00+00:00", encounter_id=""):
+    return {
+        "ts": ts, "companion_id": "companion.alice", "channel": "world",
+        "event_type": "gift_given", "event_id": event_id,
+        "duplicate": duplicate, "encounter_id": encounter_id,
+    }
+
+
+def test_collect_agent_steps_distribution_and_adjacent_repeats(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent("inspect"),
+        _agent("inspect", ts="2026-10-12T00:01:00+00:00"),   # 与上一条相邻重复
+        _agent("approach", ts="2026-10-12T00:02:00+00:00"),
+        _agent(None, ts="2026-10-12T00:03:00+00:00",
+               codes=["NO_AUTONOMOUS_CANDIDATE"], action="none"),
+    ])
+    a = mr.collect_agent_steps()
+    assert a["total_steps"] == 4
+    assert a["autonomous_steps"] == 3
+    assert a["behavior_type_distribution"] == {"inspect": 2, "approach": 1}
+    assert a["autonomous_adjacent_repeats"] == 1
+    assert a["explained_coverage"] == 1.0  # 四条都带 reason_codes
+
+
+def test_collect_event_signals_flags_idempotency_violation(isolated_dirs, tmp_path):
+    root = tmp_path / "event_signals"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _event("e1", False),
+        _event("e1", True, ts="2026-10-12T00:01:00+00:00"),       # 合法重放
+        _event("e1", False, ts="2026-10-12T00:02:00+00:00"),       # 绕过！
+        _event("e1", False, ts="2026-10-12T00:03:00+00:00",
+               encounter_id="enc2"),                               # 跨遭遇：独立事件
+    ])
+    e = mr.collect_event_signals()
+    assert e["total_events"] == 4
+    assert e["duplicate_events"] == 1
+    assert e["idempotency_violations"] == 1  # 第三条
+
+
+def test_sc004_pass_when_cooldown_blocked_with_zero_delta(isolated_dirs):
+    _, signals_root = isolated_dirs
+    _write(signals_root / "aesir" / "companion.alice.jsonl", [
+        {**_signal(), "relationship_reason": "cooldown_blocked", "relationship_delta": 0},
+    ])
+    v = _verdict_map(mr.build_report())["SC-004"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 1
+
+
+def test_sc004_fail_when_blocked_but_delta_nonzero(isolated_dirs):
+    _, signals_root = isolated_dirs
+    _write(signals_root / "aesir" / "companion.alice.jsonl", [
+        {**_signal(), "relationship_reason": "cooldown_blocked", "relationship_delta": 2},
+    ])
+    v = _verdict_map(mr.build_report())["SC-004"]
+    assert v["status"] == "FAIL"
+
+
+def test_sc005_pass_with_eight_behavior_types(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    rows = [
+        _agent(f"beh{i}", ts=f"2026-10-12T00:0{i}:00+00:00")
+        for i in range(8)
+    ]
+    _write(root / "aesir" / "companion.alice.jsonl", rows)
+    v = _verdict_map(mr.build_report())["SC-005"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 8
+
+
+def test_sc005_fail_below_eight_types(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent("beh1"), _agent("beh2", ts="2026-10-12T00:01:00+00:00"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-005"]
+    assert v["status"] == "FAIL"
+    assert v["metric"] == 2
+
+
+def test_sc006_pass_when_no_adjacent_repeat(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent("beh1"), _agent("beh2", ts="2026-10-12T00:01:00+00:00"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-006"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 0
+
+
+def test_sc006_fail_on_adjacent_repeat(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent("beh1"), _agent("beh1", ts="2026-10-12T00:01:00+00:00"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-006"]
+    assert v["status"] == "FAIL"
+
+
+def test_sc007_pass_with_clean_replay(isolated_dirs, tmp_path):
+    root = tmp_path / "event_signals"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _event("e1", False), _event("e1", True, ts="2026-10-12T00:01:00+00:00"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-007"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 0
+
+
+def test_sc007_fail_on_violation(isolated_dirs, tmp_path):
+    root = tmp_path / "event_signals"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _event("e1", False), _event("e1", False, ts="2026-10-12T00:01:00+00:00"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-007"]
+    assert v["status"] == "FAIL"
+
+
+def test_sc008_pass_with_lookup_samples(isolated_dirs):
+    _, signals_root = isolated_dirs
+    _write(signals_root / "aesir" / "companion.alice.jsonl", [
+        {**_signal(), "lore_lookup": {"tool": "lore", "found": True, "reason_codes": []}},
+        {**_signal(), "lore_lookup": {"tool": "lore", "found": False,
+                                      "reason_codes": ["TOOL_NO_RESULT"]},
+         "ts": "2026-10-08T01:00:00+00:00"},
+    ])
+    v = _verdict_map(mr.build_report())["SC-008"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 2
+
+
+def test_sc013_pass_when_all_steps_explained(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent(None, codes=["NO_AUTONOMOUS_CANDIDATE"], action="none"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-013"]
+    assert v["status"] == "PASS"
+    assert v["metric"] == 1.0
+
+
+def test_sc013_fail_when_step_missing_reason_codes(isolated_dirs, tmp_path):
+    root = tmp_path / "agent_steps"
+    _write(root / "aesir" / "companion.alice.jsonl", [
+        _agent(None, codes=[], action="none"),
+    ])
+    v = _verdict_map(mr.build_report())["SC-013"]
+    assert v["status"] == "FAIL"

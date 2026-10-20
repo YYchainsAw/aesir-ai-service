@@ -134,6 +134,9 @@ def record_turn_signal(
     latency_ms: int | None = None,
     sentiment: str | None = None,
     relationship_delta: int | None = None,
+    relationship_reason: str | None = None,
+    lore_lookup: dict | None = None,
+    facts_rejected: int | None = None,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
@@ -147,7 +150,14 @@ def record_turn_signal(
     - ``sentiment``：LLM 判定的玩家发言情感质量（warm/deep/cold/hurtful；
       FIX-13 新增，SC-004 防刷与关系驱动判定的数据源）；
     - ``relationship_delta``：本轮关系层实际增减（冷却/日上限吃掉为 0；
-      FIX-13 新增，与 ``sentiment`` 配对落盘便于核对「判定 vs 实收」）。
+      FIX-13 新增，与 ``sentiment`` 配对落盘便于核对「判定 vs 实收」）；
+    - ``relationship_reason``：关系层拦截原因（T38 / SC-004：scored /
+      cooldown_blocked / daily_cap / no_signal / store_error……四种 delta=0
+      从此可区分）；
+    - ``lore_lookup``：本轮查证结果 ``{tool, found, reason_codes}``
+      （T38 / SC-008；未索取查证的轮次为 None 不落盘）；
+    - ``facts_rejected``：本轮被接地校验丢弃的事实条数（T38 / SC-008，
+      LLM 倾向编造的直接证据；仅 >0 时落盘）。
     """
     try:
         signals = {
@@ -186,6 +196,12 @@ def record_turn_signal(
             record["sentiment"] = sentiment
         if relationship_delta is not None:
             record["relationship_delta"] = relationship_delta
+        if relationship_reason:
+            record["relationship_reason"] = relationship_reason
+        if lore_lookup is not None:
+            record["lore_lookup"] = lore_lookup
+        if facts_rejected is not None:
+            record["facts_rejected"] = facts_rejected
         root = Path(get_settings().dialogue_signals_dir) / game_id
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:

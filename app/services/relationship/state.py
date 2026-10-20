@@ -17,7 +17,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.schemas.relationship import RelationshipState
-from app.services.relationship.rules import apply_relationship_event, stage_of
+from app.services.relationship.rules import apply_relationship_event_ex, stage_of
 
 
 _DEFAULT_GAME_ID = "aesir"
@@ -78,20 +78,24 @@ class RelationshipStore:
         occurred_at: str | None = None,
         *,
         cooldown_seconds: float | None = None,
-    ) -> tuple[RelationshipState, int]:
-        """计分一条事实事件并落盘；返回（新状态快照, 实际计分值）。
+    ) -> tuple[RelationshipState, int, str]:
+        """计分一条事实事件并落盘；返回（新状态快照, 实际计分值, 拦截原因）。
 
         ``cooldown_seconds`` 覆盖默认冷却窗口（对话信号用更严的窗口：
         对话每轮都发生，60 秒拦不住连点刷分）。
+
+        拦截原因（T38 / SC-004）：``scored`` / ``unknown_event`` /
+        ``cooldown_blocked`` / ``daily_cap`` / ``clamped_zero``——四种「不计分」
+        路径从此可区分，供埋点核对冷却窗口内数值变化确实为 0。
         """
         with self._lock:
-            new_state, delta = apply_relationship_event(
+            new_state, delta, reason = apply_relationship_event_ex(
                 self._state, event_type, occurred_at, cooldown_seconds=cooldown_seconds
             )
             if delta != 0:
                 self._set(new_state)
                 self._persist_locked()
-            return new_state.model_copy(deep=True), delta
+            return new_state.model_copy(deep=True), delta, reason
 
     def reset(self) -> None:
         """关系重置（调试/新周目）：回初值并清空留痕。"""

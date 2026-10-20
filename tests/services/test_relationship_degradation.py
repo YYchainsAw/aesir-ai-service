@@ -24,9 +24,10 @@ def test_corrupt_file_quarantined_and_service_usable(tmp_path) -> None:
     assert store.state().value == get_settings().relationship_initial
     assert (tmp_path / "aesir" / "companion.alice" / "relationship.json.corrupt").exists()
 
-    # 降级后服务可用：事件仍可计分并落盘
-    state, delta = store.apply_event("gift_given")
+    # 降级后服务可用：事件仍可计分并落盘（T38 起返回三元组）
+    state, delta, reason = store.apply_event("gift_given")
     assert delta == 3
+    assert reason == "scored"
     reloaded = RelationshipStore("companion.alice", root=str(tmp_path))
     reloaded.load()
     assert reloaded.state().value == state.value

@@ -36,6 +36,7 @@ from app.services.companion.profile_repository import (
 )
 from app.services.memory.experiences import record_world_event_experience
 from app.services.relationship.policy import get_policy as get_relationship_policy
+from app.services.tactical.event_signals import record_event_resolved
 from app.services.relationship.state import RelationshipStoreError, get_relationship_store
 from app.services.tactical.policy import get_policy
 from app.services.tactical.resolver import (
@@ -417,6 +418,16 @@ def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
         request.event.event_id,
     )
     evaluation, duplicate = _resolve(key, lambda: _evaluate_combat(request))
+    # T38：幂等埋点（SC-007 数据源）；内部全量静默。
+    record_event_resolved(
+        request.combat_context.companion.id,
+        game_id=_game_id_for(request.combat_context.companion.id),
+        channel="combat",
+        event_type=request.event.event_type,
+        event_id=request.event.event_id,
+        duplicate=duplicate,
+        encounter_id=request.combat_context.encounter_id,
+    )
     if not duplicate:
         # 与 v0.3 世界通道同一张幂等表：同一事件经两个通道上报也只记一次。
         record_world_event_experience(
@@ -482,9 +493,11 @@ def _score_relationship(
     if event_type not in _relationship_policy.events:
         return _REL_SKIPPED, "", 0
     try:
-        state, delta = get_relationship_store(companion_id, game_id=game_id).apply_event(
-            event_type, occurred_at
-        )
+        # T38：apply_event 现在返回三元组；生活事件的拦截原因不进本链路埋点，
+        # 丢弃（SC-004 的冷却观测走对话信号通道，见 dialogue_service）。
+        state, delta, _reason = get_relationship_store(
+            companion_id, game_id=game_id
+        ).apply_event(event_type, occurred_at)
     except RelationshipStoreError:
         return _REL_UNAVAILABLE, "", 0
     return _REL_SCORED, state.stage, delta
@@ -573,6 +586,16 @@ def handle_world_event(request: WorldEventRequest) -> WorldEventResponse:
     else:
         key = (request.companion_id, "", request.event.event_id)
         evaluation, duplicate = _resolve(key, lambda: _evaluate_lifestyle(request))
+    # T38：幂等埋点（SC-007 数据源）；内部全量静默。
+    record_event_resolved(
+        request.companion_id,
+        game_id=_game_id_for(request.companion_id),
+        channel="world",
+        event_type=request.event.event_type,
+        event_id=request.event.event_id,
+        duplicate=duplicate,
+        encounter_id=ctx.encounter_id if ctx is not None else "",
+    )
     if not duplicate:
         # 共同经历入摘要层（记忆接线）：只在首次处理时写，重放不重复记。
         record_world_event_experience(

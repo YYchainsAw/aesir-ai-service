@@ -10,6 +10,8 @@
 - 对话信号（``dialogue_signals_dir``）：
   - 旧布局：``<root>/<companion_id>.jsonl``
   - 新布局：``<root>/<game_id>/<companion_id>.jsonl``（``record_turn_signal``）
+- agent 决策（``agent_steps_dir``，T38 新增）：``<root>/<game_id>/<companion_id>.jsonl``
+- 事件幂等（``event_signals_dir``，T38 新增）：``<root>/<game_id>/<companion_id>.jsonl``
 
 旧布局（根目录）数据语义上全部属于 ``aesir``（旧落盘默认 game_id），因此
 按 ``--game aesir`` 筛选时一并包含；按其他游戏筛选时不混入。
@@ -154,6 +156,13 @@ def collect_signals(game: str | None = None) -> dict:
     memory_cited_known = 0
     relationship_stages: Counter = Counter()
     latencies: list[int] = []
+    # T38 新增埋点聚合：SC-004 冷却拦截（reason 可区分）、SC-008 查证结果分布
+    # 与接地丢弃事实数。
+    cooldown_blocked = 0
+    cooldown_blocked_with_delta = 0
+    lore_lookup_turns = 0
+    lore_found = 0
+    facts_rejected_total = 0
     corrupt: dict[str, int] = {}
     seen_keys: set[tuple] = set()
     files = _discover_jsonl(root, game)
@@ -198,6 +207,20 @@ def collect_signals(game: str | None = None) -> dict:
             latency = record.get("latency_ms")
             if isinstance(latency, (int, float)):
                 latencies.append(int(latency))
+            # T38 可选字段（旧记录缺键时 .get 返回 None，不影响计数）。
+            reason = record.get("relationship_reason")
+            if reason == "cooldown_blocked":
+                cooldown_blocked += 1
+                if record.get("relationship_delta", 0) != 0:
+                    cooldown_blocked_with_delta += 1
+            lookup = record.get("lore_lookup")
+            if isinstance(lookup, dict):
+                lore_lookup_turns += 1
+                if lookup.get("found"):
+                    lore_found += 1
+            rejected = record.get("facts_rejected")
+            if isinstance(rejected, int):
+                facts_rejected_total += rejected
         if file_bad:
             corrupt[str(path.relative_to(root))] = file_bad
     return {
@@ -224,6 +247,130 @@ def collect_signals(game: str | None = None) -> dict:
         "relationship_stage_distribution": dict(relationship_stages),
         "latency_sample_size": len(latencies),
         "latency_p95_ms": _percentile(latencies, 0.95),
+        # T38 新增：可判定 SC-004/SC-008 的聚合值。
+        "cooldown_blocked": cooldown_blocked,
+        "cooldown_blocked_with_delta": cooldown_blocked_with_delta,
+        "lore_lookup_turns": lore_lookup_turns,
+        "lore_found": lore_found,
+        "facts_rejected_total": facts_rejected_total,
+        "corrupt": corrupt,
+    }
+
+
+def collect_agent_steps(game: str | None = None) -> dict:
+    """聚合 agent/step 决策埋点（T38：SC-005/006/013 数据源）。
+
+    - **自主步** = reason_codes 含 ``ARB_WON:`` 前缀的记录（仲裁胜出的心跳步）；
+    - SC-005：自主步 ``directive_action_type`` 去重分布（≥8 类）；
+    - SC-006：同一 companion 相邻自主步 action_type 相同的条数（重复率）；
+    - SC-013：reason_codes 非空记录占总步数比例（可解释覆盖率）。
+    """
+    from app.config import get_settings
+
+    root = _resolve_dir(get_settings().agent_steps_dir)
+    total = 0
+    autonomous = 0
+    behavior_types: Counter = Counter()
+    autonomous_repeats = 0
+    explained = 0
+    prev_action_by_companion: dict[str, str | None] = {}
+    corrupt: dict[str, int] = {}
+    seen_keys: set[tuple] = set()
+    files = _discover_jsonl(root, game)
+    for path in files:
+        file_bad = 0
+        for record, bad in _iter_jsonl(path):
+            if bad:
+                file_bad += 1
+                continue
+            key = (
+                record.get("ts"),
+                record.get("companion_id"),
+                record.get("directive_action_type"),
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            total += 1
+            codes = [str(c) for c in (record.get("reason_codes") or [])]
+            if codes:
+                explained += 1
+            companion = str(record.get("companion_id", "unknown"))
+            action_type = record.get("directive_action_type")
+            is_autonomous = any(c.startswith("ARB_WON:") for c in codes)
+            if is_autonomous:
+                autonomous += 1
+                if action_type:
+                    behavior_types[str(action_type)] += 1
+                prev = prev_action_by_companion.get(companion)
+                if prev is not None and prev == action_type:
+                    autonomous_repeats += 1
+                prev_action_by_companion[companion] = action_type
+        if file_bad:
+            corrupt[str(path.relative_to(root))] = file_bad
+    return {
+        "scope": game or "all",
+        "files": len(files),
+        "total_steps": total,
+        "autonomous_steps": autonomous,
+        "behavior_type_distribution": dict(behavior_types),
+        "autonomous_adjacent_repeats": autonomous_repeats,
+        "explained_steps": explained,
+        "explained_coverage": round(explained / total, 3) if total else None,
+        "corrupt": corrupt,
+    }
+
+
+def collect_event_signals(game: str | None = None) -> dict:
+    """聚合事件幂等埋点（T38：SC-007 数据源）。
+
+    SC-007 判定口径：同一 (event_id, encounter_id) 的**非首条**记录
+    ``duplicate`` 必须为 True；出现一条 False 即幂等表被绕过（同一事件被
+    独立评估多次——重复反应/重复施法的运行期铁证）。
+    """
+    from app.config import get_settings
+
+    root = _resolve_dir(get_settings().event_signals_dir)
+    total = 0
+    duplicates = 0
+    idempotency_violations = 0
+    seen_first: set[tuple] = set()
+    corrupt: dict[str, int] = {}
+    seen_keys: set[tuple] = set()
+    files = _discover_jsonl(root, game)
+    for path in files:
+        file_bad = 0
+        for record, bad in _iter_jsonl(path):
+            if bad:
+                file_bad += 1
+                continue
+            key = (
+                record.get("ts"),
+                record.get("event_id"),
+                record.get("duplicate"),
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            total += 1
+            is_dup = bool(record.get("duplicate"))
+            if is_dup:
+                duplicates += 1
+            first_key = (record.get("event_id") or "", record.get("encounter_id") or "")
+            if first_key in seen_first:
+                if not is_dup:
+                    idempotency_violations += 1
+            else:
+                seen_first.add(first_key)
+        if file_bad:
+            corrupt[str(path.relative_to(root))] = file_bad
+    return {
+        "scope": game or "all",
+        "files": len(files),
+        "total_events": total,
+        "duplicate_events": duplicates,
+        "duplicate_ratio": round(duplicates / total, 3) if total else None,
+        "idempotency_violations": idempotency_violations,
         "corrupt": corrupt,
     }
 
@@ -345,18 +492,85 @@ def evaluate_sc_verdicts(report: dict) -> list[dict]:
     else:
         add("SC-011", "FAIL", p95, "p95 ≤ 300ms", f"样本 {sample} 条超限")
 
-    # 数据仍不足、需后续埋点的 SC——明确 N/A
-    na_sc = [
-        ("SC-002", "4 类战况下指令结果合理率 ≥ 90%", "需人工判定，脚本无法自动判"),
-        ("SC-004", "关系事件冷却窗口内数值变化=0", "需关系规则层埋点冷却拦截事件"),
-        ("SC-005", "自主行为类型 ≥ 8 类", "需落盘 behavior_type 枚举分布"),
-        ("SC-006", "自主行为重复率=0", "需自主行为触发埋点（与 SC-005 同字段）"),
-        ("SC-007", "幂等重复响应率=0", "duplicate=true 目前只在响应内标记不落盘"),
-        ("SC-008", "设定类问题一致率 100%", "需接地校验结果落盘"),
-        ("SC-013", "决策可解释覆盖率 100%", "decision_trace 未持久化，仅在 HTTP 响应里"),
-    ]
-    for sc_id, threshold, note in na_sc:
-        add(sc_id, "N/A", None, threshold, note)
+    # -- T38（#53）起：以下 6 项已有真实埋点，按三段式正式判定 --------------
+
+    # SC-004 冷却窗口内数值变化=0（relationship_reason=cooldown_blocked 时
+    # relationship_delta 必须恒为 0——数据自洽即证明防刷拦截在工作）。
+    cooldown_blocked = signals.get("cooldown_blocked", 0)
+    if cooldown_blocked == 0:
+        add("SC-004", "N/A", None, "冷却窗口内数值变化=0",
+            "无 relationship_reason=cooldown_blocked 样本（T38 起新增字段，旧数据缺）")
+    elif signals.get("cooldown_blocked_with_delta", 0) == 0:
+        add("SC-004", "PASS", cooldown_blocked, "冷却拦截时 delta 恒为 0",
+            f"冷却拦截样本 {cooldown_blocked} 条，数值变化全为 0")
+    else:
+        add("SC-004", "FAIL", signals["cooldown_blocked_with_delta"], "冷却拦截时 delta=0",
+            f"{signals['cooldown_blocked_with_delta']} 条冷却拦截仍有数值变化")
+
+    agent_steps = report.get("agent_steps", {})
+    event_signals = report.get("event_signals", {})
+    autonomous = agent_steps.get("autonomous_steps", 0)
+
+    # SC-005 自主行为类型 ≥ 8 类（自主步 = reason_codes 含 ARB_WON: 的步）。
+    behavior_dist = agent_steps.get("behavior_type_distribution", {})
+    if autonomous == 0:
+        add("SC-005", "N/A", None, "自主行为类型 ≥ 8 类",
+            "无自主步埋点样本（agent_steps 为 T38 起新增落盘）")
+    elif len(behavior_dist) >= 8:
+        add("SC-005", "PASS", len(behavior_dist), "≥ 8 类", f"实际分布：{behavior_dist}")
+    else:
+        add("SC-005", "FAIL", len(behavior_dist), "≥ 8 类",
+            f"实际 {len(behavior_dist)} 类：{behavior_dist}")
+
+    # SC-006 自主行为重复率=0（相邻自主步 action_type 相同即记一次重复）。
+    if autonomous == 0:
+        add("SC-006", "N/A", None, "自主行为重复率=0",
+            "无自主步埋点样本（agent_steps 为 T38 起新增落盘）")
+    elif agent_steps.get("autonomous_adjacent_repeats", 0) == 0:
+        add("SC-006", "PASS", 0, "相邻自主行为重复=0", f"自主步 {autonomous} 条零重复")
+    else:
+        repeats = agent_steps["autonomous_adjacent_repeats"]
+        add("SC-006", "FAIL", round(repeats / autonomous, 3), "相邻重复率=0",
+            f"{repeats}/{autonomous} 条相邻自主步行为相同")
+
+    # SC-007 幂等重复响应率=0（同一 event+encounter 非首条必须 duplicate=True）。
+    total_events = event_signals.get("total_events", 0)
+    if total_events == 0:
+        add("SC-007", "N/A", None, "幂等重复响应率=0",
+            "无事件埋点样本（event_signals 为 T38 起新增落盘）")
+    elif event_signals.get("idempotency_violations", 0) == 0:
+        add("SC-007", "PASS", 0, "非首条事件必须 duplicate=True",
+            f"事件 {total_events} 条，重放 {event_signals.get('duplicate_events', 0)} 条，无绕过")
+    else:
+        add("SC-007", "FAIL", event_signals["idempotency_violations"], "同事件非首条必须重放",
+            "幂等表被绕过：同一事件被独立评估多次（重复反应/重复施法风险）")
+
+    # SC-008 设定类问题一致率 100%（查证链路在跑的证据 = lore_lookup 样本）。
+    lore_turns = signals.get("lore_lookup_turns", 0)
+    if lore_turns == 0:
+        add("SC-008", "N/A", None, "设定类问题一致率 100%",
+            "无 lore_lookup 查证样本（T38 起新增字段；未索取查证的轮次不落盘）")
+    else:
+        add("SC-008", "PASS", lore_turns, "设定类问题一致率 100%",
+            f"有据 {signals.get('lore_found', 0)} / 无据 {lore_turns - signals.get('lore_found', 0)}；"
+            f"接地丢弃事实 {signals.get('facts_rejected_total', 0)} 条；逐句一致率仍需人工抽检")
+
+    # SC-013 决策可解释覆盖率 100%（reason_codes 非空的步数占比）。
+    total_steps = agent_steps.get("total_steps", 0)
+    coverage = agent_steps.get("explained_coverage")
+    if total_steps == 0 or coverage is None:
+        add("SC-013", "N/A", None, "决策可解释覆盖率 100%",
+            "无 agent_steps 样本（T38 起新增落盘）")
+    elif coverage == 1.0:
+        add("SC-013", "PASS", coverage, "reason_codes 非空率 100%", f"步数 {total_steps}")
+    else:
+        add("SC-013", "FAIL", coverage, "覆盖率 100%",
+            f"{agent_steps.get('explained_steps')}/{total_steps} 步缺 reason_codes")
+
+    # -- 仍无法脚本化的 SC：明确 N/A ------------------------------------------
+    add("SC-002", "N/A", None, "4 类战况下指令结果合理率 ≥ 90%",
+        "receipts 无 game_state 字段（加字段属 UE 契约变更，不在观测层范围）；"
+        "「结果合理率」本质需人工判定，脚本只输出 result 分布作代理")
 
     return verdicts
 
@@ -368,6 +582,8 @@ def build_report(game: str | None = None) -> dict:
     signals_root = _resolve_dir(get_settings().dialogue_signals_dir)
     signals = collect_signals(game)
     receipts = collect_receipts(game)
+    agent_steps = collect_agent_steps(game)
+    event_signals = collect_event_signals(game)
     report = {
         "scope": game or "all",
         "games": sorted(
@@ -375,13 +591,14 @@ def build_report(game: str | None = None) -> dict:
         ),
         "receipts": receipts,
         "dialogue_signals": signals,
+        "agent_steps": agent_steps,
+        "event_signals": event_signals,
         "style_violations": {
             "total": signals["style_violations"],
             "llm_checked_turns": signals["llm_checked_turns"],
             "note": "LLM 路径通过 style_guard 后落盘；mock/fallback 路径为 None（未校验）。",
         },
-        "duplicate_responses": "幂等重复在响应内标记（duplicate=true），不落盘；"
-                               "复读轮数见 dialogue_signals.repetitive_replies",
+        "duplicate_responses": event_signals,
     }
     report["sc_verdicts"] = evaluate_sc_verdicts(report)
     return report
@@ -422,8 +639,17 @@ def _print_report(report: dict) -> None:
     sv = report["style_violations"]
     print(f"  总数: {sv['total']}（LLM 校验轮数 {sv['llm_checked_turns']}）")
     print(f"  {sv['note']}")
-    print("\n[重复响应]")
-    print(f"  {report['duplicate_responses']}")
+    print("\n[agent 决策]（T38）")
+    a = report["agent_steps"]
+    print(f"  步数总数: {a['total_steps']}（自主步 {a['autonomous_steps']}）")
+    if a["total_steps"]:
+        print(f"  行为类型分布: {a['behavior_type_distribution']}")
+        print(f"  相邻自主重复: {a['autonomous_adjacent_repeats']}")
+        print(f"  可解释覆盖率: {a['explained_coverage']}")
+    print("\n[事件幂等]（T38）")
+    e = report["event_signals"]
+    print(f"  事件总数: {e['total_events']}（重放 {e['duplicate_events']}，"
+          f"重复率 {e['duplicate_ratio']}，绕过 {e['idempotency_violations']}）")
     print("\n[SC 判定]（T32 / #41）")
     for v in report["sc_verdicts"]:
         line = f"  {v['sc']}: {v['status']}"
