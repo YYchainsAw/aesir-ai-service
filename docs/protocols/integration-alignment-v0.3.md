@@ -1,126 +1,77 @@
-# NPC ↔ UE 联调对齐表（v0.3 基线）
+# NPC与UE联调指南
 
-> 本文件是 T18（Issue #31）的**联调配置收口**：固定两仓版本、端口、ID、分流口径，
-> 给出能力/表现 ID 对照表与验收矩阵，并记录实测启动与 health 结果。
-> 协议字段定义见 [NPC 服务契约 v0.3](npc-contract-v0.3.md)；文中接口样例为
-> **2026-10-08 对运行中实例的实测抓取**。
+> 当前说明按2026-10-19服务源码`a2dd426`整理。这里维护启动、接入检查和历史样例边界；字段以[NPC契约v0.3](npc-contract-v0.3.md)、[v0.2战术](combat-tactical-protocol-v0.2.md)、[v0.1订单/对话](ue-protocol-contract-v0.1.md)为准。需求与真实验收见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
 
----
+## 当前实例与版本
 
-## 1. 版本基线（两仓固定）
+| 实例 | 默认地址 | 接入边界 |
+| --- | --- | --- |
+| NPC本服务 | `http://127.0.0.1:8011` | `python -m scripts.run_server`读取Settings；与UE两个Subsystem的现有默认值对齐 |
+| Boss RL独立服务 | `http://127.0.0.1:8012` | 独立进程，不共用NPC启动命令；部署与研究见[RL入口](../../rl/README.md) |
+| 第二游戏样例 | 自行指定，如8002 | `AESIR_GAME_ID=demo-vn`，独立进程与端口，不能混用当前游戏目录 |
 
-| 仓库 | 提交 | 说明 |
-|------|------|------|
-| `YYchainsAw/aesir-ai-service` | `75ac7a3`（本任务完成时以收尾提交为准） | NPC Python 服务，分支 `develop-dyh` |
-| `YYchainsAw/AesirWarden` | `facba39` | UE 工程（联调核查起点） |
-
-> 后续联调以两仓 main/develop 最新提交复核；本表记录的是验收时刻的核查基线。
-
-## 2. 实例、端口与启动记录（实测 2026-10-08）
-
-| 实例 | 进程 | 默认端口 | UE 侧指向（代码默认值） | 联调口径 |
-|------|------|----------|--------------------------|----------|
-| NPC 服务 | `aesir-ai-service`（本仓库） | **8011**（`AESIR_SERVICE_PORT`，[config.py](../../app/config.py)；FIX-10 起默认从 8000 改为 8011） | `CompanionChatSubsystem` / `CommandServiceSubsystem` 均为 `http://127.0.0.1:8011` | **两端默认值已对齐 8011**：Python 默认端口改为 8011 匹配 UE 两 Subsystem 代码默认值，UE 侧零改动（FIX-01 先外置端口，FIX-10 收口默认值方向） |
-| Boss 服务 | Boss RL `serve.py`（独立实例） | **8012** | `AesirBossPolicyClientComponent` = `http://127.0.0.1:8012` | 与 NPC **分开部署**，互不占用端口 |
-
-**启动命令（实测）**
-
-```bash
-# NPC 服务（仓库根目录，.env 已配置 LLM）
-./.venv/Scripts/python.exe -m scripts.run_server          # 默认 127.0.0.1:8011（FIX-10 起）
-./.venv/Scripts/python.exe -m scripts.run_server --port 8002   # 指定端口（如 demo-vn 第二实例）
+```powershell
+.\.venv\Scripts\python -m scripts.run_server --reload
+curl.exe http://127.0.0.1:8011/health
 ```
 
-**health 实测（2026-10-08，端口 8000；2026-10-15 起带 service_commit）**
+默认8011自FIX-10对齐；环境或`--port`可覆盖。不要直接运行未传端口的uvicorn后又访问8011。配置变更重启服务，操作细节见[启动指南](../guides/getting-started.md)。
 
-```json
-// GET /health → 200
-{
-  "status": "ok",
-  "service": "aesir-ai-service",
-  "protocol_version": "0.3",
-  "service_commit": "335acb6"
-}
-```
+`/health`当前返回status、service、protocol_version=0.1及service_commit。commit为运行进程读取后缓存的short SHA，非Git环境为unknown；不能用本机当前HEAD替代服务返回，也不能用health版本替代每端点版本。一次联调记录服务commit、UE代码/构建、地图/资产、后端、配置、两端地址和实际时间，不把历史端口或样本复制成当前结果。
 
-> `service_commit` 为运行时 git short SHA（T21 / #34 新增）；UE 侧启动时打一次即可确认当前跑的是哪个 commit。非 git 环境返回 `"unknown"`。
+## 按交互选择入口
 
-## 3. ID 与分流约定
+| 交互 | 请求入口 | UE接收后做什么 |
+| --- | --- | --- |
+| 文字/语音闲聊 | companion/chat、chat/stream、chat/voice | 文本和表现ID按响应展示，流式以meta为权威；语音闲聊不用voice/command |
+| 旧文本/语音订单 | commands/parse、voice/command | 显式提供当前能力目录；返回v0.1判别联合，先核验再登记 |
+| 战斗上下文指令 | tactical/command，或agent/step携带text与combat | 按对应DecisionAction或DirectiveEnvelope解释，不混用两种信封 |
+| 非战斗协作/心跳 | agent/step带text/不带text | action只有none/directive；无动作保持本地活动，不能当故障强执行 |
+| 事实事件 | world/events；旧combat/events仍兼容 | 同一事实重试复用event_id，回放动作另做执行去重 |
+| 执行反馈 | tactical/executions | 只报告实际阶段/原因；202及accepted不当动作完成 |
+| 调试和记忆清理 | console/state、memory、memory/reset、ui | 指定当前注册角色；reset不重建角色，部分失败如实处理 |
 
-- `game_id = aesir`（一进程一游戏，`AESIR_GAME_ID`）；单 NPC：`companion_id = companion.alice`；
-  玩家 `party.player`；未登记/跨游戏 `companion_id` 一律 404，**不回退默认角色**。
-- 分流（详见契约 §1）：闲聊/语音 → chat 链路；战斗指令 → `/v1/tactical/command`；
-  心跳 → `/v1/agent/step`；游戏事实事件 → `/v1/world/events`；执行结果 → `/v1/tactical/executions`。
-- 基础语音与文本进入约定链路：`/v1/voice/command`（WAV → ASR → 同一指令/对话分流）、
-  `/v1/speech/transcribe`（纯转写）已可用，UE `ParseVoiceCommand` 已对接。
+一进程一游戏；角色、目标和能力来自本次有效上下文，非施法可不含技能，需要技能时必须获准，数量尚未冻结。旧语音默认目录、v0.2逐角色校验及回执game_id绑定未完全覆盖，见[实现差距](npc-contract-v0.3.md#7-当前实现差距)。接口存在不等于这些保护都已在UE生效。
 
-## 4. 能力 ID 对照表与演示目标
+## 接入顺序与通过条件
 
-Python 声明全集（[capability.yaml](../../data/games/aesir/capability.yaml)）vs
-UE 实现（`TacticalOrderComponent::SupportedAbilityIds`，AesirWarden@facba39）：
+以下从旧UE集成指南合并有效步骤，按风险推进；每步都记录实际结果，不预勾完成。
 
-| ability_id | Python 声明 | UE 实现 | 状态 | 联调行为 |
-|------------|:----------:|:------:|------|----------|
-| `ability.alice.basic_attack` | ✓ | ✓ | **启用** | 正常下发执行 |
-| `ability.alice.explosion` | ✓ | ✓ | **启用（演示目标）** | 正常下发执行 |
-| `ability.alice.quick_heal` | ✓ | ✗ | 未制作 | UE `ValidateOrder` 拒绝（「队友能力目录不包含」）→ 回执 `rejected` |
-| `ability.alice.major_heal` | ✓ | ✗ | 未制作 | 同上 |
-| `ability.alice.shield` | ✓ | ✗ | 未制作 | 同上 |
+| 顺序 | 检查场景 | 通过条件 |
+| --- | --- | --- |
+| 1 服务可达 | 正常/服务关闭/地址错；核对health与端点版本 | 正确地址和commit可定位；失败有原因且UE主线程不被网络阻塞 |
+| 2 纯文本订单 | v0.1五类golden、未知type/非法字段；同request_id回显 | UE按支持的类型解析，unsupported明确拒绝，不由HTTP200推定可执行 |
+| 3 执行前七项 | 版本→角色存在/可控/存活→已实现类型→能力目录→目标可解析→有效期/优先级→触发时目标/冷却/资源/距离/忙碌 | 任一失败不动作且可关联原因；普通日常无技能不被误拒绝 |
+| 4 世界身份 | 战斗结束、重试/返回后释放旧回包；重复请求或回执 | 旧游玩/遭遇/请求不污染当前世界，重复动作仅执行一次；服务缓存不替代UE检查 |
+| 5 上下文战术 | 同一句治疗/爆发意图在不同快照；无技能/冷却/目标失效 | 合法建议经UE当前状态复核；不可执行清楚拒绝，不绕过GAS制造伤害 |
+| 6 首个动作闭环 | 用实际已制作能力完成一次建议→UE启动/实际结果→回执 | 指令/订单ID与事实关联，接收、启动、命中/完成不混写；没有真实结果就不报告完成 |
+| 7 语音 | 先mock验证上传，再用faster_whisper；空音频/转写失败/含糊文本 | 失败可改文本；语音使用当前角色/目录，不用默认Alice目录冒充授权；按约定WAV格式检查 |
+| 8 心跳/事件 | 超频/过期/禁打断/无候选；同事件并发/跨端点重放/重启 | 建议或none符合场景；重复不重复计分/动作；如实说明1024项内存缓存与重启限制 |
+| 9 查询/重置 | 指定角色与未知角色；注入持久记忆清理失败 | 未知角色拒绝；清目标记忆保留人格/关系/其他角色，失败可能会话已清，不能假称回滚 |
+| 10 故障/构建 | LLM/ASR/存储失败、服务离线、Windows目标运行 | 本地游戏仍可结算/重试/菜单/退出；API、UE执行及Windows包分别有证据 |
 
-- **演示能力目标：`ability.alice.explosion`**（UE 已实现、Python 可决策、可端到端演示；核查起点 basic_attack/explosion 均已核对）。
-- **未制作能力口径**：Python 侧按当前策略仍可能决策治疗/护盾（实测 `tactical/command` 曾下发 `major_heal`，见契约 §3 样例 2），
-  此时由 **UE 本地校验拒绝并上报 `rejected` 回执**，服务端据回执落盘，不重复强推；
-  能力声明（Python 全集）与 UE 实现（2 项）的差异以本表为准，UE 新增能力后同步更新两边。
+能力资产以实际UE目录为准。2026-10-08核查起点UE`facba39`曾登记basic_attack/explosion为制作项，治疗/护盾尚未制作；这不是2026-10-19每份本地工程的当前能力清单。重新核对实际DataAsset与SupportedAbilityIds，不由Python声明全集推断UE有实现，也不从heartbeat成功推断战斗施法已通。
 
-## 5. 表现 / 行为 / 事件 ID 对照
+## 性能采样与正式验收
 
-| 类别 | Python 声明（capability.yaml） | UE 侧状态 |
-|------|-------------------------------|-----------|
-| 情绪 `emotion.*` | 9 项（bright/excited/pleased/concerned/shy/playfully_annoyed/serious/thoughtful/neutral） | 映射表待 UE 侧确认（YYchainsAw）；未映射 ID 应由 UE 兜底为 neutral 表现 |
-| 动作 `gesture.*` | 10 项（cheerful_idle/small_wave/enthusiastic_nod/think/look_away/fold_arms/step_closer/nod/look_around/ready_weapon） | 同上 |
-| 表情 `face.*` | 9 项（bright_smile/excited/gentle_smile/concerned/shy/playfully_annoyed/serious/thoughtful/neutral） | 同上 |
-| 行为 behaviors | 11 项（follow/move_to/observe/inspect/interact/pickup/rest/wait/express/self_talk/alert_player） | UE 当前支持 Follow / CastAbility / HoldAbility 及 `when: state_entered` 触发结构，其余按未制作处理 |
-| 战斗事件 | 6 项（player_hp_critical/boss_stun_near/boss_stunned/boss_enraged/companion_mp_low/boss_defeated） | 由 UE 战斗系统上报，逐事件联调核对 |
-| 生活事件 | 6 项（region_first_entered/weather_changed/gift_given/companion_recovered/player_protected_companion/promise_kept） | `gift_given` 已实测通路（契约 §4 样例），其余随 UE 上报核对 |
+SDD的战斗P95<3秒、自主判定P95<1秒（无产出<100毫秒）、纯规则<100毫秒是需求口径；SC-011在T33/FIX-04另定义规则指令“UE输入到NPC开始可见响应”的P95≤300毫秒。它们边界不同，分别采集，不相互替代。
 
-## 6. 验收矩阵（端点 × 状态 × 实测）
+- SC-011起点t0为UE确认文本输入/发出语音请求，终点t1为UE收到响应且首次实际动作/语音/动画开始；两端打戳，另记服务处理分段，避免把仅HTTP返回当NPC开始。
+- 既有T33计划为同一遭遇至少30条、文本与语音各半，覆盖不同意图；固定机器/地图/构建/后端并保存每个原始t1−t0、失败/超时样本。治疗等未制作能力不能伪造执行样本，先闭合可测意图及条件。
+- LLM生成回复单独统计，不混进规则SC-011；规则P95与端到端目标都需注明计时边界。少量历史HTTP耗时不是当前正式P95。
+- metrics_report的PASS包含覆盖/采集代理，不自动等于SC需求成立。完整记忆正确率、语气、隔离和UE执行需对应人工/运行材料；当前生产对话记录未自动填充latency_ms，不能承诺再聊一轮就得到SC-011结果。
 
-| 链路 | 协议版本 | 状态 | 实测样例（2026-10-08，端口 8000） |
-|------|----------|------|-----------------------------------|
-| 文本对话 `POST /v1/companion/chat` | 0.1 | 已实现·启用 | 200 / 2328.8ms（LLM，`source: "llm"`，关系阶段 distant/疏远） |
-| 玩家战斗指令 `POST /v1/tactical/command` | 0.2 | 已实现·启用 | 200 / 19.3ms（rule，actionable；reason_codes 含 PLAYER_HP_CRITICAL） |
-| 心跳自主行为 `POST /v1/agent/step` | 0.3 | 已实现·启用 | 200 / 31.8ms（自主 `observe` 指令，`expires.before_seconds=10.0`） |
-| 世界事件 `POST /v1/world/events` | 0.3 | 已实现·启用 | 200 / 27.5ms（gift_given，relationship_delta=3） |
-| 执行回执·单条 `POST /v1/tactical/executions` | 0.2 | 已实现·启用 | 202 / 4.1ms（落盘 `executions/aesir/20261008.jsonl`） |
-| 执行回执·批量（v0.3） | 0.3 | 已实现·启用 | 202 / 3.5ms（count=2） |
-| 语音指令 `/v1/voice/command`、转写 `/v1/speech/transcribe` | 0.1 | 已实现·启用 | mock / faster_whisper 链路测试覆盖 |
-| 未登记/跨游戏角色 | — | 拒绝（设计行为） | 404 / 19.3ms，不回退 |
-| 请求体违规 | — | 拒绝（设计行为） | 422 / 1.5ms（`extra="forbid"`） |
-| L0 游戏访问完整链路 / 未声明事件 | — | 拒绝（S4 门控） | 403 结构化 `reason_code`（demo-vn 实测，见 #38 验收记录） |
-| 治疗/护盾等未制作能力下发 | — | 未制作·UE 拒绝 | UE `ValidateOrder` 失败 → `rejected` 回执（§4 口径） |
-| 调试台 `GET /v1/console/state` `/ui` | 0.3 | 已实现·启用 | 单页 HTML + 状态 JSON |
+## 历史实测与适用范围
 
-## 7. 响应时间 / SC-011 采样口径（T33 定稿 / FIX-04）
+保留旧对齐记录的日期和环境：服务核查起点`75ac7a3`、UE`facba39`；2026-10-08运行实例端口8000，后续FIX-10将当前默认改8011。以下为当时记录的单次HTTP样本，本轮未重新运行、不升级成当前全部能力验收。
 
-> SC-011 原文：战斗场景下从玩家发出指令到 NPC 开始响应的等待时间，玩家可感知为「即时」。
-> 本节为 T33（FIX-04 / Issue #42）定稿口径，替代原「人工评估 ≥95%」软口径。
+| 当时链路 | 记录结果 | 可以说明什么 |
+| --- | --- | --- |
+| companion/chat | 200，2328.8ms，source=llm | 当时LLM对话样本 |
+| tactical/command | 200，19.3ms，规则actionable，PLAYER_HP_CRITICAL | 返回候选，不证明UE治疗执行 |
+| agent/step | 200，31.8ms，自主observe | 当时API心跳样本，不证明UE全部行为已接通 |
+| world/events | 200，27.5ms，gift_given，delta=3 | 当时事件/关系API路径 |
+| executions单条/批量 | 202，4.1/3.5ms | 当时落盘受理，不证明动作结果真实 |
+| 未登记角色/违规结构/L0门控 | 404/422/403 | 对应当时具体端点和样本，不推广为所有模型统一门禁 |
 
-- **采样点（两端打戳）**：
-  - 起点 `t0`：UE 玩家确认输入（`ParseCommand` 请求发出 / 语音 `ParseVoiceCommand` 请求发出）的本地时间戳；
-  - 终点 `t1`：UE 收到 `OnCommandParsed` / `OnTacticalResolved` 回调且 NPC 开始表现（首个可见动作/语音/动画触发）的本地时间戳；
-  - 服务端分段：请求到达 → 响应发出的耗时由日志/`X-Request-Id` 关联核对，用于区分「网络+排队」与「服务决策」。
-- **样本**：同一场 boss 遭遇战内混合采样 **≥ 30 次**玩家指令（文本与语音各半，覆盖普攻/技能/治疗/跟随意图），
-  记录每次 `t1 - t0` 与服务端耗时。
-- **硬指标（正式通过口径）**：
-  - **规则链路（tactical/command）p95 ≤ 300ms**：玩家感知「即时」的硬指标。实测基线 ≈20ms 级（本地回环），300ms 为留足网络+UE 表现余量的上限。
-  - **LLM 生成式回复单独统计**：不纳入 SC-011 p95 判定（生成耗时受模型服务波动影响，实测 ≈2.3s），另行按「可接受等待」口径评估。
-  - 采样 **≥ 30 次**且 p95 达标 → SC-011 通过；p95 不达标或样本不足 → 不通过，需定位是「网络+排队」还是「服务决策」段超时。
-- **历史测试数量按 commit 标注**：本仓 CHANGELOG 每个里程碑条目均带「测试锚点 N passed + M skipped @ commit」，验收时按提交号对齐。
-
-## 8. 同步记录
-
-- SDD / todo / 开发日志的旧状态已随本任务同步：
-  [todo.md](../planning/todo.md) EXT-04 标记完成、[game-design-doc v0.2 §6.5](../planning/game-design-doc-v0.2.md) 同步勾选、
-  [CHANGELOG](../../CHANGELOG.md) 新增 T18 里程碑、[开发日志 2026-10-08](../logs/2026-10-08.md) §8。
-- 范围边界（Issue #31）：本任务只收口现有服务与当前 UE 能力；端口、批量回执、多角色路由不重新开发；
-  不新增对话 RL、流式 ASR/VAD 与未确认技能。
+后续记录按[复现手册](../guides/repro.md)保存实际输入/输出、版本和范围。课程模型、服务测试、真实LLM样本、UE指令执行与正式性能各自标状态，不把历史API样本当组装后的最终演示。两仓实现/需求差异先登记再修复，不改写过去记录使其看起来已经验收。

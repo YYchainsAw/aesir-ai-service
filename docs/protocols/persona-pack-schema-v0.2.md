@@ -4,6 +4,8 @@
 > 的字段口径与版本规则。实现对照：`app/services/companion/persona_pack_loader.py`、
 > `persona_pack_validator.py`、`profile_repository.py`。
 >
+> 2026-10-19按源码`a2dd426`校对；本轮不修改资产或校验代码。需求主文为[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
+>
 > **版本纪律**：字段的新增/重命名/语义变化属于破坏性变更，必须升级
 > `manifest_version` / `profile_version` / `revision` 并在本文件登记变更记录。
 
@@ -44,7 +46,7 @@ data/
 | `profile_version` | str | 是 | 人格数据契约版本，目录包为 `"0.2"`（旧单文件为 `"0.1"`） |
 | `companion_id` | str | 是 | 角色标识，须与目录名一致 |
 | `game_id` | str | 是 | 归属游戏；必须与当前游戏档案 `game_id` 完全一致，否则拒绝加载 |
-| `requires_capability` | str | 是 | 最低能力档 `L0`/`L3`；高于游戏档案 `capability_level` 时拒绝加载（未知等级按 -1 处理同样拒绝） |
+| `requires_capability` | str | 是 | 最低能力档 `L0`/`L3`；高于游戏档案等级时拒绝；规范值仅L0/L3，当前rank比较未全面拒绝未知requires_capability，见末节差距 |
 | `checksum` | str \| null | 否 | S5 资产守卫占位；非 null 时必须是字符串 |
 
 ## 3. 数据文件 → 顶层字段映射
@@ -61,7 +63,7 @@ data/
 | presentation.yaml | `allowed_emotion_ids` / `allowed_gesture_ids` / `allowed_facial_expression_ids` / `ue_mapping_contract` |
 | abilities.yaml | 不展开，放入 `abilities`（`ability_ids` / `behavior_ids`） |
 
-各键的内部结构与旧单文件 YAML（profile_version 0.1）一致，见 SDD v1.0 与人格配置注释。
+各键的内部结构与旧单文件 YAML（profile_version 0.1）一致，见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)与人格配置注释。
 注意：`identity.game_name` 已废弃，游戏名以 `manifest.game_id` 为准。
 
 ## 4. capability.yaml（游戏能力档案）
@@ -116,14 +118,14 @@ domains:
 | 链路 | L0 | L3 |
 |------|----|----|
 | 对话（`/v1/companion/*`）、记忆、关系、调试台 | ✅ 可用 | ✅ 可用 |
-| 世界事件 `/v1/world/events` | 仅放行档案 `events` 声明的事件类型 | ✅ 全量 |
+| 世界事件 `/v1/world/events` | 仅放行档案`events`声明的类型 | 同样须在档案声明内，并非无限制全量 |
 | `/v1/commands/parse`、`/parse-command` | ⛔ 403 | ✅ |
 | `/v1/tactical/resolve` / `/command` / `/executions` | ⛔ 403 | ✅ |
 | `/v1/combat/events`、`/v1/agent/step` | ⛔ 403 | ✅ |
 
 - 拒绝为显式 403，响应体带结构化原因：`reason_code`（`CAPABILITY_LEVEL_INSUFFICIENT` /
   `EVENT_NOT_DECLARED`）、`feature`、`game_id`、`capability_level`、`required`/`event_type`；
-  不静默降级、不产生越界下发。未知能力等级按 -1 处理，门控功能同样拒绝。
+  这些端点等级拒绝不静默降级。当前游戏等级未知时L3门控按不足处理；不代表每个资产requires_capability和每个旧语音入口已有完全相同检查。
 - 行为级（directives.yaml 逐 action_type）门控仍在后续迭代；当前门控粒度为端点链路。
 
 ## 6. 现有档案实例
@@ -136,3 +138,12 @@ domains:
 ## 7. 变更记录
 
 - **0.2（2026-10-08）**：首版发布。S2 目录化结构定稿；`game_name` 由 `identity` 上移 `manifest.game_id`；新增游戏档案选择（`AESIR_GAME_ID`）与 demo-vn 样例。
+
+
+## 8. 当前校验与运行边界
+
+- `PersonaPackValidator`比较manifest.game_id、等级大小及场景/事件/表现/能力子集；manifest_version/profile_version并非都由此强制为固定Literal。未知requires_capability的rank为-1，可能通过等级比较，这是待修实现差距，不能声称已全面拒绝非法等级。
+- checksum当前仅检查字符串或null，不校验文件内容或签名；目录优先和旧YAML兼容均须检查归属，不能从包目录隔离推断所有旧接口均隔离。
+- directives.yaml中的`combat/movement/interaction/social/routine`是行为目录分类；运行DirectiveEnvelope.domain则为`combat/exploration/camp/conversation/idle`场景，二者不是同一枚举。
+- 行为声明不代表已在UE实现；每次调用只允许当前角色/上下文获准能力，UE仍复核目标、冷却、距离和状态。普通非施法可无技能，需要技能时必须授权，具体技能数量未冻结。
+- 端点L3门控和游戏事件门控已有实现；旧语音/解析、v0.2逐角色检查及回执game_id绑定仍有差距，见[NPC契约](npc-contract-v0.3.md#7-当前实现差距)。本页不为补齐说明新增实际门禁或协议字段。

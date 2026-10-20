@@ -1,151 +1,54 @@
-# Aesir AI Service — LLM 联调指南
+# LLM、语音与数据流
 
-本文说明如何把命令解析从规则后端（`rule`）切换到 **LLM 后端（OpenAI 兼容，默认 DeepSeek）**，并做真实联调。联调通过后，任意自然语言指令都能解析为 UE 可校验的 `TacticalOrder`。
+> 2026-10-19按`a2dd426`整理。本页说明如何选择后端、哪些内容会发送/保存和失败如何反馈；不承诺任意自然语言都能正确执行。启动方式见[本机启动](getting-started.md)，类型见[契约入口](../protocols/npc-contract-v0.3.md)。
 
-> 与规则后端的关键区别：规则只认固定 5 句；LLM 后端能接住任意说法，识别不了或出错时**自动回退到规则解析器**，UE 永不收到非法 order。
+## 选择要切换的后端
 
----
+| 配置 | 默认 | 作用 |
+| --- | --- | --- |
+| AESIR_PARSER_BACKEND | rule | v0.1订单解析；llm失败回退规则，无法识别仍可recognized=false |
+| AESIR_INTENT_BACKEND | rule | tactical/command及agent文本意图；只解释想做什么，具体动作仍由规则/目录与UE校验 |
+| AESIR_COMPANION_BACKEND | mock | 非战斗人格对话；llm失败可回退角色候选回复，source=fallback |
+| AESIR_ASR_BACKEND | mock | mock或本机faster_whisper；与LLM后端不是一个开关 |
+| AESIR_TACTICAL_POLICY | rule | rl仅占位；选择rl不代表NPC战术已经接入Boss PPO |
 
-## 0. 前置条件
-
-- 已安装服务依赖：`.\.venv\Scripts\python -m pip install -r requirements.txt`
-- 已有一个有效的 DeepSeek API key（在 [platform.deepseek.com](https://platform.deepseek.com) 申请）
-
----
-
-## 1. 配置 `.env`
-
-项目根目录新建 `.env`（该文件已被 `.gitignore` 忽略，**不会进版本库**）：
+.env仅放本机配置，不提交真实密钥。复制.env.example后填写实际使用的后端。支持OpenAI兼容接口，但默认Settings的LLM地址/模型/密钥为空，需要显式配置，不把DeepSeek示例说成代码内置后端。
 
 ```ini
-# 命令解析后端切到 LLM
 AESIR_PARSER_BACKEND=llm
-
-# 战术指令意图解析切到 LLM（/v1/tactical/command 组合端点）
 AESIR_INTENT_BACKEND=llm
-
-# DeepSeek（OpenAI 兼容）。换 Qwen/Ark 只需改下面两项
+AESIR_COMPANION_BACKEND=llm
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
+LLM_API_KEY=<仅在本机填写，不提交>
 LLM_TIMEOUT_SECONDS=15
-
-# 你的真实 key（必填）
-LLM_API_KEY=sk-xxxxxx
 ```
 
-> 初次可先 `copy .env.example .env`，再按上面补 `LLM_API_KEY`。
+以上DeepSeek仅为兼容后端配置示例，不代表本轮已联网验证。替换后端仍需核对URL、模型、凭据、结构化输出和超时。改.env后重启`python -m scripts.run_server`；get_settings不缓存进程环境不等于.env文件即时重载。
 
----
+## 失败与可判定结果
 
-## 2. 快速联调脚本
+- 解析LLM返回不合法结构/未授权ID、超时或配置缺失时回退规则；规则也不理解时返回澄清或recognized=false，不能据“有回退”保证玩家命令必执行。
+- 对话LLM经人格/表达和事实检查；非流式可重试后回退mock候选。流式在首delta前失败可回退；已输出后中断以error结束，不把半段当完整回复，具体见[v0.1 SSE](../protocols/ue-protocol-contract-v0.1.md#附录-a-陪伴对话-sse-流式端点v01-附加扩展2026-09-15)。
+- 共享LLM熔断默认连续失败5次、恢复窗口60秒；这是LLM配置，不是Boss三错切BT。当前熔断状态与各调用路径降级要按实际响应/观测核对。
+- 服务只给建议，UE仍检查角色、目标、能力、当前游玩、冷却、距离、忙碌及有效期。合法结构不是实际启动/命中/完成；磁盘、策略或配置等错误也不因解析层回退而全部被保证消除。
 
-用一行 Python 验证（终端中文显示若有乱码是编码问题，数据本身正确）：
+## 实际数据发送与保存
 
-```python
-# 文件：scripts/llm_smoke.py 或直接 python -c
-from app.services.parsers.command_parser import parse_command
-
-for text in [
-    "艾莉，等 Boss 血量低于一半就开大",   # 规则里没有的新指令
-    "艾莉，敌人超过三个就先撤",           # 规则里没有的新指令
-    "艾莉，撤退并优先保命",               # 已知指令
-]:
-    r = parse_command(text)
-    print(text, "=>", r.recognized, "|", r.order.intent if r.order else r.message)
-```
-
----
-
-## 3. 通过 HTTP 接口联调
-
-先起服务（保持窗口运行）：
-
-```powershell
-.\.venv\Scripts\python -m uvicorn app.main:app --reload
-```
-
-用 `Invoke-RestMethod` 调（PowerShell 里 `curl` 是别名，勿用）。正式接口为契约 v0.1 的 `/v1/commands/parse`（携带能力目录；目录缺省时新指令可能因 ID 越界被拒）：
-
-```powershell
-Invoke-RestMethod -Method Post http://127.0.0.1:8011/v1/commands/parse `
-  -ContentType "application/json" `
-  -Body '{"protocol_version":"0.1","request_id":"1fad2e69-4a2d-4308-ad4f-2f8abb338b89","text":"艾莉，等 Boss 血量低于一半就开大","context":{"catalog_revision":"dev-001","locale":"zh-CN","agents":[{"id":"companion.alice","ability_ids":["ability.alice.explosion","ability.alice.basic_attack"]}],"target_selectors":["encounter.primary_hostile","party.player"],"state_tags":["state.stunned","state.phase_two"]}}'
-```
-
-> 新指令能返回合法 `order`（如 `conditional_cast`）即联调通过。
->
-> 遗留别名 `POST /parse-command` 只传 `text`，服务端回填默认能力目录，也可用于快速自测：
->
-> ```powershell
-> Invoke-RestMethod -Method Post http://127.0.0.1:8011/parse-command `
->   -ContentType "application/json" `
->   -Body '{"text":"艾莉，等 Boss 血量低于一半就开大"}'
-> ```
-
----
-
-## 4. 预期结果（本次实测）
-
-| 输入 | intent | 说明 |
+| 数据 | 当前实现路径 | 保留/清理边界 |
 | --- | --- | --- |
-| 艾莉，等 Boss 血量低于一半就开大 | `conditional_cast` | 规则认不出，LLM 成功解析 |
-| 艾莉，敌人超过三个就先撤 | `retreat` | 新指令成功 |
-| 艾莉，撤退并优先保命 | `retreat` | 已知指令 |
+| 指令文本和当前目录 | LLM订单解析把玩家文本、角色/能力/目标/状态目录放入配置后端的chat/completions请求；意图解析也发送文本与适用角色约束 | 不因服务监听127.0.0.1就认定未外发；实际后端及允许字段在启用时列明 |
+| 对话文本与人格 | LLM对话发送当前输入、人格/表达/能力约束，及实际检索到的长期记忆、印象、近期会话和适用工具结果 | 不把服务本地reset当后端数据删除；远端保留规则需按实际部署确认 |
+| 会话窗口 | 传session_id时内存维护近期轮次与情绪 | 不传仅关闭该窗口，不关闭长期记忆/关系/信号；目标角色reset清会话 |
+| 长期记忆/印象 | 正常对话提取主题/有依据事实；显著声明可逐字入档案，世界事实可写经历 | 按game/角色持久化；reset清目标记忆但不清人格/关系。持久失败可能部分完成 |
+| 对话信号 | 正常完成轮次默认尝试追加完整player_text/reply_text和观测字段到data/runtime/dialogue_signals/<game>/<角色>.jsonl | 当前没有专门启用开关或自动保留期限；写失败不阻塞回复；memory/reset不清这些日志 |
+| 执行回执 | 按game/UTC天追加JSONL，用于排查和后续数据筛选 | 当前只追加、不验证阶段真伪；不自动用于训练，memory/reset也不清回执 |
+| 音频 | 现有入口读入内存，mock或本机faster_whisper处理；该路径未显式保存原始音频文件 | 不把“未写音频”扩张成“转写文本也未保存”；新增远端ASR时需重新说明发送与保留 |
 
-延迟约 0.6–1.4s/次（取决于网络与模型）。
+本地存储/信号可能包含个人对话，不能把“默认只摘要”当现实现状。当前没有自动脱敏、用户级删除或远端清除保证；允许上下文、后端和保留策略未决定时保留未决项，不凭文档整理新增已获授权的承诺。人格包及游戏作用域也不是面向公网的完整账户/鉴权方案。
 
----
+本表依据dialogue_service、dialogue_signals、llm_dialogue_service和共享client的静态数据流；本轮未读取密钥、抓取真实出站请求或核实任何后端供应商政策。
 
-## 5. 回退与安全行为
+## 联调时留什么
 
-- **LLM 输出不合法 / 网络失败 / 未配置 key** → facade 捕获后回退到规则解析器，指令不会被丢弃。
-- `recognized=false`（LLM 也不确定）→ 规则解析器最终兜底。
-- 所有输出经 `TacticalOrder` 白名单校验（`TypeAdapter`），越界字段一律拒绝，UE 校验不会崩。
-
----
-
-## 6. 常见问题
-
-- **`curl : 无法绑定参数 Headers`**：PowerShell 里 `curl` 是 `Invoke-WebRequest`，请改用 `Invoke-RestMethod` 或 `curl.exe`。
-- **服务连不上**：确认先启动了 `uvicorn`；`/parse-command` 只接受 POST，浏览器直接访问会 405。
-- **一直 `recognized=false`**：检查 `.env` 里 `AESIR_PARSER_BACKEND=llm` 且 `LLM_API_KEY` 已填；服务需重启（`--reload` 会自动）。
-- **换厂商**：改 `LLM_BASE_URL` / `LLM_MODEL` 即可，代码无需变动。
-
----
-
-## 7. 密钥安全
-
-- `LLM_API_KEY` 只写进被 `.gitignore` 忽略的 `.env`，**绝不提交到仓库、不写进文档/测试**。
-- 若密钥曾在不可信环境（录屏/转发）出现过，建议在 DeepSeek 控制台轮换一次。
----
-
-## 8. v0.2 战术指令的 LLM 意图解析
-
-组合端点 `POST /v1/tactical/command` 的意图解析也支持 LLM 后端：在 `.env` 加
-`AESIR_INTENT_BACKEND=llm`（默认 `rule`）。与上面命令解析同一套回退模式——LLM
-输出严格 JSON 的 `TacticalIntent`（`intent_id` 受 7 值白名单约束），配置缺失、
-网络失败、输出非法时自动回退规则解析器，`source` 字段标记实际来源
-（`rule` / `llm` / `rule_fallback`），UE 端可据此做降级观测。
-
-> 注：v0.2 的 `/v1/tactical/resolve` 当前为纯规则策略（`source` 固定 `rule`），
-> 不经 LLM；LLM 接入策略层待后续规划（届时将新增后端选型配置）。
-
-## 9. LLM 熔断配置（T084 / FR-041）
-
-所有通过工厂创建的 LLM 客户端共享同一个熔断器。当 LLM 连续失败达到阈值时，熔断器进入 OPEN 状态，在恢复窗口内直接拒绝新的 LLM 调用，避免把外部故障拖垮本地服务；各链路已有的规则/mock fallback 会自动生效。
-
-```ini
-# 连续失败阈值，达到后进入 OPEN（默认 5）
-AESIR_LLM_CIRCUIT_FAILURE_THRESHOLD=5
-# OPEN 状态持续时间（秒），之后进入 HALF_OPEN 试恢复（默认 60）
-AESIR_LLM_CIRCUIT_RECOVERY_SECONDS=60
-
-# 调用超时（秒），与熔断配套使用
-LLM_TIMEOUT_SECONDS=15
-```
-
-- CLOSED：正常调用；成功重置失败计数，失败累计。
-- OPEN：拒绝调用并抛出 `LLMClientError`，业务层走 fallback；持续 `recovery_seconds` 后进入 HALF_OPEN。
-- HALF_OPEN：放行下一次调用；成功则关闭，失败则重新 OPEN。
-
-调试/测试可用 `app.services.llm.factory.get_llm_circuit_breaker()` 获取共享实例查看 `state` 或调用 `reset()`。
+先在无私密输入下检查规则/mock，再显式启用所需真实后端。记录服务commit、配置项名称（密钥隐藏）、输入/目录、source、原因码、是否降级和实际UE结果，按[复现手册](repro.md)区分API样本与完整执行证据。分享前检查文本、记忆与日志；凭据若已暴露，应由持有人处理撤销或轮换，不把轮换操作写成已完成。

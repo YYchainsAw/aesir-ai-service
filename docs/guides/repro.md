@@ -1,94 +1,59 @@
-# NPC 联调复现手册（T21 / #34）
+# 联调复现与证据范围
 
-> 目标：UE 侧不读 Python 代码即可确认「当前跑的是哪个 commit、走的是哪条后端链路、响应长什么样」。
+> 2026-10-19按`a2dd426`整理。目标是使另一个成员能确定运行版本、输入、后端及结果；本页不声称本轮已启动服务或执行运行测试。启动见[本机指南](getting-started.md)，UE操作顺序与正式SC-011见[联调指南](../protocols/integration-alignment-v0.3.md)。
 
-## 1. 版本锚点
+## 先固定运行实例
 
-启动服务后，UE 侧第一步打 `/health`：
+在服务终端记录run_server实际地址；另取health，不用本机HEAD替代运行实例：
 
-```bash
-curl http://127.0.0.1:8011/health
+```powershell
+curl.exe http://127.0.0.1:8011/health
 ```
 
-返回：
-```json
-{
-  "status": "ok",
-  "service": "aesir-ai-service",
-  "protocol_version": "0.1",
-  "service_commit": "335acb6"
-}
-```
+当前health响应为status=ok、service=aesir-ai-service、protocol_version=0.1和service_commit。commit是进程读取后缓存的short SHA；非Git环境为unknown。health不是所有端点的统一API版本，agent/step/world用0.3、tactical用0.2、对话/旧订单用0.1。
 
-- `protocol_version`：协议大版本（与 `npc-contract-v0.3.md` 对齐）
-- `service_commit`：**运行时 git short SHA**（T21 新增），与 CHANGELOG 测试锚点对齐
-- 非 git 环境（打包分发）返回 `"unknown"`，不阻塞
+每次正式复现至少记：实际日期、两仓提交/构建、地图与资产、当前游戏/角色、后端名称、地址/端口、配置版本、输入/快照、返回状态/source/reason_codes、UE实际阶段及证据位置。密钥不写入记录，私人文本/音频先按分享范围处理。
 
-## 2. 后端三态对照（Mock / LLM / Fallback）
+## 后端三态分开记录
 
-同一句玩家输入「你好」在三种后端下的响应差异：
+| 场景 | 触发与响应 | 如何解释 |
+| --- | --- | --- |
+| Mock/规则 | companion_backend=mock或解析rule | 用于本地路径核对，不能作真实LLM/ASR通过 |
+| LLM | 显式配置对应llm后端；对话source=llm | 记录真实模型/配置、降级与实际延迟，仅覆盖该样本 |
+| Fallback | 对话模型失败回角色候选，source=fallback；解析失败回规则，source=rule_fallback | 不混淆两个接口的来源枚举；耗时可能已包含失败等待，不能承诺必小于5毫秒 |
 
-| 维度 | Mock（默认） | LLM | Fallback（LLM 故障回退） |
-|---|---|---|---|
-| 环境变量 | `AESIR_COMPANION_BACKEND=mock` | `AESIR_COMPANION_BACKEND=llm` | LLM 路径自动触发，无需手动切 |
-| 触发条件 | 默认启动 | 显式切 llm | LLMClientError（超时/风格重试两次失败） |
-| 响应来源 | YAML fallback 候选池 | 真实 LLM 生成 | YAML 候选池（同 mock） |
-| `source` 字段 | `"mock"` | `"llm"` | `"fallback"` |
-| `style_violations` | `null`（未校验） | `[]` 或非空数组 | `null`（未校验） |
-| 耗时基线 | < 5ms（本地 YAML） | ≈2.3s（实测 2026-10-08） | < 5ms |
-| 落盘路径 | `data/runtime/dialogue_signals/<game>/<companion>.jsonl` | 同左 | 同左 |
+style_violations及其他可选观测按实际返回/日志记录。是否存在字段不单独证明表达合格；有delta而无meta的中断轮次不当完整对话。
 
-### 实测样本（从落盘 JSONL 摘录）
+既有记录在2026-10-08的8000实例采到LLM对话约2328.8毫秒、规则战术约19.3毫秒等HTTP样本，见[历史矩阵](../protocols/integration-alignment-v0.3.md#历史实测与适用范围)。这些日期与端口保留，不能改成当前8011重测，也不是当前P95或UE开始响应的证据。
 
-**LLM 路径**（`data/runtime/dialogue_signals/aesir/companion.alice.jsonl`，2026-10-08）：
-```json
-{
-  "source": "llm",
-  "player_text": "你好，艾莉",
-  "reply_text": "你好，旅行者。今天天气不错，要出发的话我随时可以走。",
-  "emotion_id": "emotion.bright",
-  "style_violations": []
-}
-```
+## 按目的运行工具
 
-**Fallback 路径**（`data/runtime/dialogue_signals/demo-vn/companion.narrator.jsonl`，2026-10-08）：
-```json
-{
-  "source": "fallback",
-  "player_text": "你好",
-  "reply_text": "你好。",
-  "emotion_id": "emotion.neutral",
-  "style_violations": []
-}
-```
+| 工具 | 命令 | 结果边界 |
+| --- | --- | --- |
+| 终端对话 | `.\.venv\Scripts\python -m scripts.chat_console` | 可检查人格/会话；会产生正常记忆和完整文本信号记录 |
+| 假UE流程 | `.\.venv\Scripts\python -m scripts.command_service.mock_ue_flow` | 先启动服务；HTTP/回执演示可写运行数据，不等于实际UE角色执行 |
+| 记忆持久化演示 | `.\.venv\Scripts\python -m scripts.demo_memory_persistence` | 按脚本选定的隔离/数据目录检查，不能拿演示替真实角色删除验收 |
+| 事后统计 | `.\.venv\Scripts\python -m scripts.metrics_report` | 汇总既有日志，PASS含采集/覆盖代理，不直接判定全部SC需求通过 |
+| 自动测试 | `.\.venv\Scripts\python -m pytest` | 记录具体commit及实际输出；单元/API测试不等于真实后端、UE或正式性能验收 |
 
-## 3. 一键复现脚本
+不在文档中预填执行人/日期或当前PASS数量。脚本参数以其实际--help和实现为准；真实LLM/ASR另需网络/模型和可用配置。本轮文档修订未执行这些操作。
 
-| 脚本 | 用途 | 启动命令 |
-|---|---|---|
-| `start.bat` | 一键起服务 / 进 REPL | `start.bat` / `start.bat chat` |
-| `scripts/chat_console.py` | 终端对话 REPL（流式） | `.venv/Scripts/python -m scripts.chat_console` |
-| `scripts/command_service/mock_ue_flow.py` | 「假 UE」全链路演示（chat → parse → resolve → combat → executions → 心跳 → world） | `.venv/Scripts/python -m scripts.command_service.mock_ue_flow` |
-| `scripts/metrics_report.py` | 事后统计落盘 JSONL → SC 判定 | `.venv/Scripts/python -m scripts.metrics_report` |
+## 数据去哪、怎样清理
 
-## 4. 预发状态索引（按 ID 查落盘）
+| 数据 | 当前位置/关联 | 限制 |
+| --- | --- | --- |
+| 对话信号 | data/runtime/dialogue_signals/<game_id>/<companion_id>.jsonl | 正常轮次默认尝试存完整player_text/reply_text，写失败不保证保存；不是仅摘要 |
+| 执行回执 | data/runtime/command_service/executions/<game_id>/<UTC日期>.jsonl，按order_id关联 | 仅追加；调用方game_id尚未绑定当前游戏，不把目录分区当入口授权 |
+| 记忆/关系 | data/memory和data/relationship的游戏/角色分区 | memory/reset清目标会话及长期记忆，保留人格/关系/信号/回执；持久失败可能部分完成 |
+| 世界事件 | HTTP响应和有限幂等缓存 | 无独立持久事件日志；需要复查时保存实际请求/响应，进程缓存不作永久事实账本 |
+| 请求关联 | 各端点实际body及适用观测字段 | 部分端点没有UUID/统一请求头；不能假定所有响应都有同一种X-Request-Id |
 
-| 维度 | 落盘位置 | 查询方式 |
-|---|---|---|
-| `game_id` | `data/runtime/dialogue_signals/<game_id>/` | 一级子目录 |
-| `companion_id` | `.../<game_id>/<companion_id>.jsonl` | 文件名 |
-| `order_id` | `data/runtime/command_service/executions/<game_id>/<YYYYMMDD>.jsonl` | 逐行 `order_id` 字段 |
-| `event_id` | 世界事件无独立落盘，仅 HTTP 响应 | 见 `npc-contract-v0.3.md` §6 |
-| `request_id` | 关联日志与响应 | HTTP 响应头 / body `request_id` |
+不传session_id仍可访问/写入长期数据。LLM还可能发送人格、记忆、近期历史和工具结果，见[数据流说明](llm-integration.md)；本地reset不证明外部后端已删除数据。角色A reset后应核对A清理结果、B不变、人格/关系不变及失败返回，不假设全有全无。
 
-## 5. 版本字段矩阵（各端点对照）
+## 正式验收与采集代理
 
-| 端点 | `protocol_version` | `policy_revision` | `persona_revision` | `service_commit` |
-|---|---|---|---|---|
-| `/health` | ✅ | — | — | ✅（T21 新增） |
-| `/v1/agent/step` | ✅ | ✅ | ✅ | 走 `/health` 查 |
-| `/v1/tactical/resolve` `/command` | ✅ | ✅ | ✅ | 走 `/health` 查 |
-| `/v1/companion/chat` | ✅ | — | ✅ | 走 `/health` 查 |
-| `/v1/commands/parse` | ✅ | — | — | 走 `/health` 查 |
+需求验收按[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)的UC/BR/NFR/AT，模型/追踪另行审查。metrics_report可报告是否有样本、来源/阶段覆盖、重复率等；两个角色都聊过不能证明隔离，memory_cited>0不证明记忆引用正确，覆盖三个关系阶段不证明语气区分成立。
 
-> `service_commit` 只在 `/health` 暴露一次，UE 侧启动时打一次即可，无需每个请求都查。
+SC-011需UE输入到NPC实际开始表现的两端时戳、至少30次文本/语音混合样本及已确定条件；生产对话record_turn_signal当前未填latency_ms，不能靠再聊一轮自动补齐。端点单次HTTP耗时、模型推理耗时、UE执行延迟分别报告，失败/超时也保留，未采集继续标未验收。
+
+课程材料中的AI预审和图源导出同样不是人工语义接受；完整提示或同伴审查缺失时如实写缺口。跨端协议/未制作能力/保留策略未关闭前，不用一次演示把它们批量标成完成。
