@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，847 passed + 2 skipped**（T48/#65 信号映射守卫后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T49 SC-009 历史/本次拆分（#66）
+
+SC-009 此前把全部历史 rejected/expired/cancelled 回执都算成「越界下发」FAIL，但 2026-10-19 联调日的 4 条拒绝是 UE 拒绝未制作能力的真实反馈，不是测试缺陷。本轮：collect_receipts 按 received_at 日期拆分今日/历史非执行回执；SC-009 verdict 今日零越界仅历史有记录 → PASS（note 注明历史性质），今日有越界 → FAIL。实测 SC-009 从 FAIL(4) 变为 PASS(0 今日 / 4 历史)。测试 847→848。
 
 ## 2026-10-21 — T48 对话信号→关系事件映射守卫（#65）
 

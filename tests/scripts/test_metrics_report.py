@@ -227,17 +227,35 @@ def test_sc009_pass_when_no_rejections(isolated_dirs):
     assert v["metric"] == 0
 
 
-def test_sc009_fail_on_rejected_or_expired(isolated_dirs):
-    """出现 rejected/expired/cancelled → SC-009 FAIL。"""
+def test_sc009_fail_on_today_rejected_or_expired(isolated_dirs):
+    """T49/#66：今日出现 rejected/expired/cancelled → SC-009 FAIL。"""
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).date().isoformat()
     receipts_root, _ = isolated_dirs
     _write(receipts_root / "d.jsonl", [
-        _receipt("o1", "executed"), _receipt("o2", "rejected"),
-        _receipt("o3", "expired"),
+        _receipt("o1", "executed"),
+        _receipt("o2", "rejected", received_at=f"{today}T00:00:00+00:00"),
+        _receipt("o3", "expired", received_at=f"{today}T01:00:00+00:00"),
     ])
     report = mr.build_report()
     v = _verdict_map(report)["SC-009"]
     assert v["status"] == "FAIL"
-    assert v["metric"] == 2  # rejected 1 + expired 1
+    assert "今日" in v["metric"]
+
+
+def test_sc009_pass_when_only_historical_rejections(isolated_dirs):
+    """T49/#66：仅历史 rejected/expired（今日零越界）→ SC-009 PASS，note 说明历史性质。"""
+    receipts_root, _ = isolated_dirs
+    _write(receipts_root / "d.jsonl", [
+        _receipt("o1", "executed"),
+        _receipt("o2", "rejected", received_at="2026-10-08T00:00:00+00:00"),
+        _receipt("o3", "expired", received_at="2026-10-19T00:00:00+00:00"),
+    ])
+    report = mr.build_report()
+    v = _verdict_map(report)["SC-009"]
+    assert v["status"] == "PASS"
+    assert "历史" in v["note"]
+    assert "今日" in v["metric"]
 
 
 def test_sc010_pass_when_no_fallback(isolated_dirs):
