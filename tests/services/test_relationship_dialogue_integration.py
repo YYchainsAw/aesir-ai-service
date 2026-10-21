@@ -101,7 +101,7 @@ def test_warm_signal_raises_relationship(monkeypatch) -> None:
 
 
 def test_dialogue_cooldown_blocks_rapid_repeat(monkeypatch) -> None:
-    """对话专属冷却（默认 300 秒）：连点第二句不再计分（防刷）。"""
+    """对话专属冷却（T45/#62：默认 120 秒）：连点第二句不再计分（防刷）。"""
     first = _chat_with_signal(monkeypatch, "warm", "谢谢你陪我。")
     second = _chat_with_signal(monkeypatch, "warm", "真的很感谢你。")
     assert first.relationship_delta == 1
@@ -129,7 +129,7 @@ def test_none_and_mock_paths_do_not_move_relationship(monkeypatch) -> None:
 
 
 def test_several_warm_exchanges_cross_into_neutral(monkeypatch) -> None:
-    """校准断言（半天~一天一档）：约 5 轮真诚交流跨入 neutral(25)。"""
+    """校准断言（T45/#62 后陪伴感可感知节奏）：约 5 轮真诚交流跨入 neutral(25)。"""
 
     def _warm_round(i: int) -> None:
         monkeypatch.setenv("AESIR_COMPANION_BACKEND", "llm")

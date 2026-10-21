@@ -681,13 +681,16 @@ def _build_system_prompt(
     lines += [
         "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, reply_topics, relationship_signal, salient.",
         'relationship_signal: rate the EMOTIONAL QUALITY of what the PLAYER said in this '
-        'message — not your own tone. "warm" if they showed genuine care, gratitude, or '
-        'friendly warmth; "deep" if they solemnly opened up, entrusted something to you, '
-        'apologized, or expressed real feeling; "cold" if they were dismissive, impatient, '
-        'or brushed you off; "hurtful" if they maliciously belittled, threatened, or '
-        'deliberately hurt you. "none" for ordinary conversation — the vast majority of '
-        'turns MUST be "none"; when in doubt, choose "none" (a missed signal costs far '
-        'less than a wrong one, because it moves a persistent relationship score).',
+        'message — not your own tone. "warm" if they showed any friendly warmth — including '
+        'genuine care, gratitude, cheerful mood, friendly teasing, or kind acknowledgements '
+        '("今天很开心""谢谢你""有你在真好" are all warm); "deep" if they solemnly opened '
+        'up, entrusted something to you, apologized, or expressed real vulnerability; '
+        '"cold" if they were dismissive, impatient, or brushed you off; "hurtful" if they '
+        'maliciously belittled, threatened, or deliberately hurt you. "none" only for '
+        'neutral factual questions, mechanical commands, or small talk with no emotional '
+        'color. Bias toward "warm" for friendly messages — a gentle over-count of +1 is far '
+        'better than a companion who feels ignored after minutes of kind conversation. '
+        'Stay strict on "deep"/"cold"/"hurtful" (those carry bigger deltas).',
         'reply_topics: list of 1-3 short Chinese topic words (2-6 chars, concrete nouns '
         'only) that YOUR OWN reply this turn actually talked about; empty list if your '
         'reply had no concrete topic. These become fuzzy impressions of what you care '

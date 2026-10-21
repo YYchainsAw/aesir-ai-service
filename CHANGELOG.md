@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T44/#61 自主行为目录扩充后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T45/#62 关系节奏调参后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T45 关系值上升节奏调参（#62）
+
+实测 12 轮正向对话只 scored 1 次（+1），关系值 26→27 几乎不动。两处瓶颈叠加：对话冷却 300s 过严（连聊 10 分钟被拦 5 次）+ LLM prompt 明确「when in doubt choose none」宁漏勿滥。本轮：(1) 对话冷却 300s→120s（事实事件冷却 60s 不变）；(2) LLM prompt 放宽 warm 判定——「今天很开心」「谢谢你」「有你在真好」等友好表达应稳定给 warm，deep/cold/hurtful 保持严格（delta 更大）。日上限 15/天不变。预期：30 分钟有效对话内关系值从 neutral 推到 friendly（50 分）。测试 846 持平（仅 config + prompt 文案调整 + 测试断言同步）。
 
 ## 2026-10-21 — T44 自主行为目录扩充（#61）
 
