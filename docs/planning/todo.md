@@ -6,21 +6,30 @@
 | --- | --- | --- |
 | EXT-01 | 真实玩家输入→解析→UE 接收→实际启动/命中/完成→回执闭环；Alice/Bruno 技能声明与 UE 可执行能力逐项对照 | 服务端返回 200、接收回执或临时心跳通道均不代表技能已完成；按实际能力拒绝越界，不擅自冻结技能数量 |
 | EXT-02 | Boss 冻结候选部署身份校验、无重训独立 PPO 评估入口、逐局输出、UE 同条件 BT 对照与故障回退复测 | 当前候选为 schema4/sim005/reward003 seed1；900 局属于选模；旧队友“2/3达标”不能作 Boss 上线依据，见 [RL 说明](../../rl/README.md) |
-| EXT-03 / OUT-05 | 对话 RL 导演层是否立项（#54 / T39） | 仍待批准；现有信号可分析，不能据此启用在线学习或自演化人格 |
-| EXT-07 | 流式 ASR / VAD 是否纳入范围，空音频、过短或噪声的反馈话术，以及真人 WAV 的质量和时延评估（#56 / T41） | 无真人录音样本时只记录 Mock/桩测试；不宣称真实 ASR 质量达标 |
-| EXT-08 | 读档、快进、跨存档、服务重启的时间与状态恢复口径（#57 / T42） | 第二步身份/生命周期部分见[已批准实施计划](step-02-identity-scope-plan.md)与[v0.4草案](../protocols/npc-scope-contract-v0.4-draft.md)；同档长期状态保留等已于2026-10-21批准，具体实现按Issue验收，不以本步替代#57全部时间/衰减范围，不能仅由文件布局推断规则 |
+| EXT-03 / OUT-05 | 对话RL导演层是否立项（#54 / T39） | 仍待批准；现有信号可分析，不能据此启用在线学习或自演化人格 |
+| EXT-07 | 已采纳外部ASR转接；供应商适配、音频门禁、文本兜底和真人时延待验，VAD/流式转写/TTS/播放打断后置（#56 / T41） | 见BR-DEP-05、V1～V4及AT-EVO-03/04；mock/本机Whisper不代替正式外部ASR，供应商/声音/保留与播出门槛启用前记录 |
+| EXT-08 | 读档、快进、跨存档及服务重启恢复（#57 / T42）；持久同步与离线队列继续后续实现 | 已批准的同档长期状态保留、v0.4显式绑定/相对时效/重置epoch已有服务端子集，见[第二步计划](step-02-identity-scope-plan.md)与[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)；不以此替代#57全部时间/衰减范围或BR-DEP-03/04/06的数据库同步目标 |
 | FIX-02 | UE 敌人血条 MaxHealth=0 防护 | 跨仓检查与 PIE 验证；不以 Python 文档判已修复 |
 | FIX-03 | UE Alice 跟随目标的 PlayerController / Pawn 位置语义 | 在当前 UE 工程复测，按实际目标修正 |
 | FIX-06 | UE 输入 Context 重叠是否导致误触发 | 在当前关卡与输入资产复测 |
 | FIX-07 后续 / T35 [#44](https://github.com/YYchainsAw/aesir-ai-service/issues/44) | PIE 试玩后的熔断/节流参数调优及生效源核对 | 既有任务完成了默认值登记，未完成真实试玩调参；NPC LLM 默认5次/60秒与Boss连续3错切BT分别处理 |
 | EXT-09 / FIX-09 后续 / T32 [#41](https://github.com/YYchainsAw/aesir-ai-service/issues/41) | 指标代理与正式 SC 结论分离，补正式采样和证据 | 脚本 PASS 只可能证明当前代理；记忆正确率、语气区别、角色隔离、故障不中断均需对应验收材料。SC-001~013 验收埋点补齐（#53 / T38）已于 2026-10-20 完成，6 项 N/A 升为脚本可判定，实测 SC-005 FAIL 暴露自主行为多样性不足 |
 | FIX-04 采集 / T33 [#42](https://github.com/YYchainsAw/aesir-ai-service/issues/42) | SC-011 的 UE 输入至 NPC 首次实际表现采样，区分规则/LLM、文本/语音 | 既有 p95≤300ms/≥30次为已记录口径，运行验收仍待；生产对话没有传 `latency_ms`，不能等待新聊天就宣告采样完整，见[联调对齐表](../protocols/integration-alignment-v0.3.md) |
-| API-GAP（本轮静态发现） | 回执game_id由请求自选、未绑定当前实例；extra、version、UUID约束在各请求模型间不统一 | 按实际模型列明差异，需明确拒绝/兼容规则后修正与复测；不把规范文字写成校验已经存在 |
+| API-GAP（legacy静态发现） | 旧回执game_id及extra/version/UUID校验差异仍属legacy兼容；v0.4已统一严格作用域与已发布指令关联 | 新旧入口分开核对；UE接入和生产身份另验，不把旧schema差距概括为scoped仍无保护 |
 | MODEL-GAP（本轮静态发现） | 回执仅追加，无完成状态机、乱序合并和跨版directive_id/order_id完整关联；REQ-06指定历史决策查询尚未闭合 | 收到/accepted不等于执行完成；需记录实际阶段、身份与查询边界，不能由JSONL文件存在推断闭环 |
 | DATA-GAP（本轮静态发现） | 默认对话日志保留完整输入/回复，与NFR只摘要目标不一致；记忆清理范围和部分失败状态需明确 | 先确认保留/清除策略及目标范围；不宣称关闭或摘要化已生效，关系档案不因清记忆自动清除 |
+| DEP-01 | 远程HTTPS、生产认证与事务存储迁移；复用v0.4开发主体/存档授权和默认关闭legacy门禁 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
+| DEP-02 | 版本同步、跨重启持久去重、离线队列与冲突；复用已实现memory_epoch屏障 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
+| DEP-03 | 外部ASR、模型可信发布/下载回滚、生产守护及容量采样 | DEP-REQ-04/05/06/08；AT-DEP-07/09/10；只记录真实运行证据 |
+| EVO-01 | 请求生命周期、旧代取消、逻辑命令幂等与UE真实反馈；关联认证作用域和事务结果 | D1/D2/D4、G3/G4、C1/C2；先对齐协议/样例；AT-EVO-01/02/07/09，原EXT-01/MODEL-GAP不因此关闭 |
+| EVO-02 | 上下文来源、事件合并/过期、分阶段追踪及按键→外部ASR→文本最小链路 | D3、G1/G2、C4、V1；AT-EVO-03/05/10和AT-DEP-07；沿用纯心跳规则及无主动推送 |
+| EVO-03 | 记忆来源/纠错权限、持久确认和离线补拉；扩展现有epoch屏障到同步恢复 | M2/M3/M4、C3；依赖EVO-01；AT-EVO-06来源部分、08/09及AT-DEP-04～06/12 |
+| EVO-04 | 后置VAD/TTS有序播放/打断与索引按需读对照 | V2/V3/V4、M1；已采纳待实施，供应商/参数和播出门槛先记录；AT-EVO-04/06/10，不阻塞当前游戏执行闭环 |
 
 原 CODE-01～05/07 已有实现与历史回归；CODE-06 的“双重场景推导”经核查不存在，CODE-08 的关系冷却漂移已修复，策略启动时固化属明确边界（T20 / [#33](https://github.com/YYchainsAw/aesir-ai-service/issues/33)、T34 / [#43](https://github.com/YYchainsAw/aesir-ai-service/issues/43)）。不把它们继续列为当前缺陷。EXT-04/05/06/09 与 FIX-01/04/05/08/09 的已完成服务工作归入验证记录；其涉及 UE 实际表现或正式 SC 的余项按上表验收。
 
-2026-10-20 新增（均已由 GitHub 建账，此处仅留指针）：FIX-12 / style_guard 元语言词表口径定夺（[#55](https://github.com/YYchainsAw/aesir-ai-service/issues/55) / T40，待 26 轮真实对话回归）；Boss RL 第三种子重训（[#58](https://github.com/YYchainsAw/aesir-ai-service/issues/58) / T43，旁路，按评测选优保存 checkpoint）；M2 旧账核对（#17/#18/#29/#30，训练早已完成但 issue 仍开放，逐项核对关闭或补验收证据）。S5 外部人格包守卫（#39 / T30）已于 2026-10-20 完成，见 CHANGELOG 与验证记录。
+2026-10-20新增（均已由GitHub建账，此处仅留指针）：FIX-12/style_guard元语言词表口径（[#55](https://github.com/YYchainsAw/aesir-ai-service/issues/55)/T40，待26轮真实对话回归）；Boss第三种子重训（[#58](https://github.com/YYchainsAw/aesir-ai-service/issues/58)/T43，旁路按评测选优）；M2旧账核对（#17/#18/#29/#30，逐项核对关闭或补证据）。S5外部人格包守卫（#39/T30）已于2026-10-20完成，见CHANGELOG与验证记录。
 
-历史 SDD 的范围界限为单机、本地文件、UE 唯一世界权威、工具只读，不含多用户/账号同步、人格自演化、DB/MQ/公网部署，且 Boss RL 不并入 NPC `app` 服务；这段作为旧基线保留。2026-10-21 用户明确批准按“Boss 本地、队友语义与记忆云端”推进远程开发、云部署、玩家/存档隔离与数据库演进，顺序和验收见[六步开发方案](local-boss-cloud-companion-roadmap.md)，本轮先执行环境建立。15 项能力的原计划覆盖、运行位置与缓存/离线同步、VAD、外部 ASR、模型交付的待设计边界见[部署分工对照](ai-capability-placement.md)，不在本页另建任务状态。本文未宣称旧 SDD 已完成全部需求更新或上述功能已实现；UE 世界权威、工具只读、Boss/NPC 服务分离及人格自演化未获立项的边界继续成立。后续业务口径同步 REQ/BR/AT 与契约，日常任务状态仍只在 GitHub Issues 维护。
+历史SDD的单机、本地文件及无账号/DB/公网限定保留为旧基线。2026-10-21用户已采纳Boss本地、远程NPC、多个独立单机玩家的身份/存档隔离、缓存同步、外部ASR和模型分发；完整DEP规则见[部署指南](../guides/deployment.md)，15项位置与[六步开发方案](local-boss-cloud-companion-roadmap.md)保持对应。v0.4作用域子集已合入main，正式账号/数据库事务与离线同步仍待后续；多人联机战斗、通用账号产品、任意跨设备存档合并、人格自演化和Boss并入NPC仍不在范围。日常状态只在GitHub Issues维护。
+
+同日采纳的五方面20项机制及用例/FR/DEP映射见[交互演进计划](npc-interaction-evolution.md)。EVO批次是依赖划分；复用v0.4已有可信开发身份、绑定/epoch和有界内存幂等，取消/TTS/跨重启事务等完整目标和AT-EVO未由本轮运行验收。图源与PNG已通过MCP和Desktop同步，整组Word回填/排版结果由UE建模记录维护。

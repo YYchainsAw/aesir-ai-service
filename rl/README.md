@@ -52,6 +52,10 @@
 Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005.zip -Algorithm SHA256
 ```
 
+## 本地交付与版本发布
+
+2026-10-21用户采纳Boss冻结推理在玩家本机运行：初始程序、依赖、模型和材料随游戏交付，服务器提供可信版本清单和可选更新，训练与在线NPC服务分开调度。首期复用下述独立HTTP服务；ONNX/NNE为后续候选，当前无自动打包/下载/进程管理实现。清单需包含SHA、Schema/动作和游戏/推理运行时兼容性；签名验证、菜单阶段切换、失败回滚及断网行为只在[UE部署说明](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/02_Design_Doc/TDD/06_Deployment.md)维护，服务端要求见[部署指南](../docs/guides/deployment.md)。正式研究固定模型并关闭自动更新。
+
 ## 冻结策略 HTTP 服务
 
 独立推理接口已经存在，默认端口 `8012`，与 NPC 服务 `8011` 分开。模型到位且依赖齐全后启动：

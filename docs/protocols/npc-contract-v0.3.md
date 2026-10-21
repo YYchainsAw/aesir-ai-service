@@ -2,7 +2,11 @@
 
 > 2026-10-19按源码`a2dd426`校对。这里维护统一代理、世界事件、调试和回执的当前交界；需求目标见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。本轮只修文档，未改变schema或执行运行验收。
 
-云端身份、作用域与有效期的后续设计见[v0.4契约草案](npc-scope-contract-v0.4-draft.md)和[第二步实施计划](../planning/step-02-identity-scope-plan.md)，已于2026-10-21批准并完成开发分支服务端回归，配置/调用见[v0.4开发与交接](../guides/scoped-development.md)。旧入口仅在显式开发兼容模式开放，默认关闭。本页仍描述现有v0.3，不能直接向当前请求添加草案字段。
+云端身份、作用域与有效期见[v0.4契约](npc-scope-contract-v0.4-draft.md)和[第二步实施计划](../planning/step-02-identity-scope-plan.md)，已于2026-10-21批准并完成服务端实现及适用回归，随后合入main；配置/调用见[v0.4开发与交接](../guides/scoped-development.md)。旧入口仅在显式开发兼容模式开放，默认关闭。本页仍描述legacy v0.3，不能直接向旧请求添加scoped字段。
+
+2026-10-21新增[远程部署目标](../guides/deployment.md)：v0.4已有开发身份、玩家/存档作用域与重置epoch子集；正式账号/HTTPS、数据库事务、版本同步、外部ASR和模型分发仍须分别验收。下表保留旧schema及兼容事实，不以旧入口限制概括新版。
+
+同日采纳的[交互演进计划](../planning/npc-interaction-evolution.md)补轮次/取消、事件治理、TTS播放、来源记忆和持久幂等等完整目标。D1～C4及AT-EVO是计划/验收编号；新概念先核对v0.4已有字段，再按影响修改schema和golden，不向legacy请求混填。started/hit/completed、游标、TTS和取消等仍不因目标出现而成为当前API。
 
 ## 1. 端点与版本
 

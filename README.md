@@ -2,7 +2,9 @@
 
 AesirWarden 的 Python 配套服务。NPC 服务负责对话、记忆、关系、语音转写、行为建议和回执采集；Boss RL 在独立进程中训练和推理。UE 始终负责世界状态、技能合法性、实际执行和结果结算。
 
-## 启动 NPC 服务
+2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、外部ASR转接和模型版本发布。当前仍是单worker开发实现；v0.4已有作用域与生命周期子集，正式账号、数据库事务/同步和外部ASR另行实施。新增部署要求和验收见[部署指南](docs/guides/deployment.md)，不表示现代码可直接公网开放。
+
+## 开发环境启动 NPC 服务
 
 需要 Python 3.12+。在仓库根目录执行：
 
@@ -27,6 +29,7 @@ python -m venv .venv
 | 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
 | 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
 | 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/step-02-identity-scope-plan.md) · [v0.4契约草案](docs/protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
+| 正式部署、玩家隔离、缓存同步、ASR及模型分发 | [部署指南](docs/guides/deployment.md) |
 | 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
 | 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
 | 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
@@ -34,6 +37,7 @@ python -m venv .venv
 | 查当前需求、规则、异常和对象职责 | [NPC需求主文](docs/planning/aesir-agent-sdd-v1.1.md) |
 | 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/course-requirements-index.md) |
 | 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/todo.md) |
+| 实施已采纳的对话/语音/Agent/记忆/云端演进 | [交互演进计划](docs/planning/npc-interaction-evolution.md)，含UC映射、批次与新增验收 |
 | 训练或运行Boss PPO | [Boss RL说明](rl/README.md) |
 | 查真实联调和历史里程碑 | [验证记录](docs/logs/verification-records.md) · [CHANGELOG](CHANGELOG.md) |
 
@@ -46,7 +50,7 @@ python -m venv .venv
 
 `app` 不导入 `rl`，NPC服务可在未安装Gymnasium、SB3或Torch时运行。Boss HTTP推理已存在；UE运行接入、故障回退修复和正式BT/PPO对照分别验收。模型不随Git克隆分发，获取和身份核对见RL说明。
 
-协议v0.1、v0.2、v0.3按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作，回执当前只追加记录。
+新版scoped JSON使用v0.4，旧协议v0.1、v0.2、v0.3仅在显式legacy开发模式按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作，回执当前只追加记录。
 
 ## 检查改动
 
