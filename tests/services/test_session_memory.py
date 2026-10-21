@@ -57,7 +57,7 @@ def test_create_dialogue_reply_records_session_turns(monkeypatch) -> None:
     )
     assert response.session_id == "it-1"
 
-    history = store.history("it-1")
+    history = store.history("it-1", companion_id="companion.alice")
     assert len(history) == 1
     assert history[0].user_text == "今天过得怎么样？"
     assert history[0].reply_text == response.reply_text
@@ -65,4 +65,4 @@ def test_create_dialogue_reply_records_session_turns(monkeypatch) -> None:
     assert history[0].emotion_id == response.emotion_id
 
     ds.create_dialogue_reply(CompanionDialogueRequest(text="天气不错"))
-    assert len(store.history("it-1")) == 1  # 无 session_id 的请求不写入任何会话
+    assert len(store.history("it-1", companion_id="companion.alice")) == 1  # 无 session_id 的请求不写入任何会话

@@ -15,7 +15,13 @@ from __future__ import annotations
 import json
 import os
 import threading
+from contextlib import nullcontext
 from pathlib import Path
+
+from app.scoped.storage import (
+    checked_npc, guarded_commit, read_memory_document, scope_lock,
+    state_directory, write_memory_document,
+)
 
 from app.config import get_settings
 from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
@@ -74,7 +80,9 @@ class MemoryStore:
         self.npc_id = npc_id
         self.game_id = game_id
         # 多游戏隔离：路径为 <memory_root>/<game_id>/<npc_id>（B-01）
-        self._dir = Path(root or settings.memory_root) / game_id / npc_id
+        self._scope = checked_npc(npc_id, game_id)
+        self._root = root or settings.memory_root
+        self._dir = state_directory(self._root, game_id, npc_id)
         self._path = self._dir / "memory.json"
         self._short_term_limit = short_term_limit if short_term_limit is not None else settings.memory_short_term_limit
         self._summary_limit = summary_limit if summary_limit is not None else settings.memory_summary_limit
@@ -85,12 +93,16 @@ class MemoryStore:
             if self_reference_blacklist is not None
             else _load_self_reference_blacklist(npc_id)
         )
-        self._lock = threading.Lock()
+        self._lock = scope_lock(self._scope) if self._scope else threading.RLock()
         self._snapshot = MemorySnapshot()
 
     # -- 读取 ---------------------------------------------------------------
     def load(self) -> None:
         """从磁盘读回；损坏则隔离并清空（降级路径）。"""
+        if self._scope:
+            with self._lock:
+                self._epoch, self._snapshot = read_memory_document(self._scope, self._root)
+            return
         try:
             raw = self._path.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -111,6 +123,7 @@ class MemoryStore:
             return self._snapshot.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
+    @guarded_commit
     def record_mention(
         self,
         topics: list[str],
@@ -140,6 +153,7 @@ class MemoryStore:
             self._evict_impressions_locked()
             self._persist_locked()
 
+    @guarded_commit
     def migrate_verbatim_to_impressions(self) -> int:
         """一次性迁移：逐字玩家发言转为主题印象后从短期层移除。
 
@@ -252,6 +266,7 @@ class MemoryStore:
             i for i in self._snapshot.impressions if i.topic not in drop
         ]
 
+    @guarded_commit
     def append_short_term(self, entry: MemoryEntry) -> None:
         """会话内短期上下文：滚动窗口淘汰最旧。"""
         with self._lock:
@@ -259,6 +274,7 @@ class MemoryStore:
             self._snapshot.short_term = self._snapshot.short_term[-self._short_term_limit:]
             self._persist_locked()
 
+    @guarded_commit
     def record_experience(self, entries: list[MemoryEntry]) -> None:
         """共同经历：落盘时聚合为摘要条目（T026：事件触发，非逐条写盘）。
 
@@ -282,10 +298,12 @@ class MemoryStore:
             )
             self._persist_locked()
 
+    @guarded_commit
     def record_fact(self, entry: MemoryEntry) -> None:
         """长期档案：事实与承诺；承诺类（critical）不被淘汰（FR-008）。"""
         self.record_facts([entry])
 
+    @guarded_commit
     def record_facts(self, entries: list[MemoryEntry]) -> int:
         """批量写档案（一轮对话抽出的多条事实一次落盘），返回新增条数。
 
@@ -316,12 +334,14 @@ class MemoryStore:
             self._persist_locked()
             return added
 
+    @guarded_commit
     def clear(self) -> None:
         """清空该角色全部记忆（记忆重置，FR-010 / T029）。"""
         with self._lock:
             self._snapshot = MemorySnapshot()
             self._persist_locked()
 
+    @guarded_commit
     def drop_impressions(self, topics: set[str]) -> int:
         """按主题名移除印象条目，返回移除数（旧数据清洗用）。
 
@@ -367,6 +387,9 @@ class MemoryStore:
 
     def _persist_locked(self) -> None:
         """原子写入（tmp + rename）+ 单版本备份（.bak）。调用方须持锁。"""
+        if self._scope:
+            write_memory_document(self._scope, self._epoch, self._snapshot, self._root)
+            return
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -404,26 +427,33 @@ def get_memory_store(
     缓存按「角色 + 游戏 + 实际根目录」失效：配置的根目录变化（如测试切换
     AESIR_MEMORY_ROOT）或 game_id 变化时重建实例，避免读写到旧目录。
     """
-    effective_root = str(
-        Path(root if root is not None else get_settings().memory_root)
-        / game_id
-        / npc_id
-    )
-    cache_key = (npc_id, game_id, root)
+    npc_scope = checked_npc(npc_id, game_id)
+    effective_root = str(state_directory(root if root is not None else get_settings().memory_root, game_id, npc_id))
+    cache_key = (npc_id, game_id, root, npc_scope)
     # 读取对应人格包的角色自指黑名单，未找到角色时降级为空（B-05）
     self_reference_blacklist = _load_self_reference_blacklist(npc_id)
+    with scope_lock(npc_scope) if npc_scope else nullcontext():
+        with _stores_lock:
+            store = _stores.get(cache_key)
+            if store is None or str(store._dir) != effective_root:
+                store = MemoryStore(
+                    npc_id, game_id=game_id, root=root,
+                    self_reference_blacklist=self_reference_blacklist,
+                )
+                store.load()
+                _stores[cache_key] = store
+            elif npc_scope:
+                store.load()
+            return store
+
+
+def invalidate_scope(scope) -> None:
+    """重置已持久化后丢弃该归属的缓存，保留其他玩家和角色。"""
     with _stores_lock:
-        store = _stores.get(cache_key)
-        if store is None or str(store._dir) != effective_root:
-            store = MemoryStore(
-                npc_id,
-                game_id=game_id,
-                root=root,
-                self_reference_blacklist=self_reference_blacklist,
-            )
-            store.load()
-            _stores[cache_key] = store
-        return store
+        for key, store in list(_stores.items()):
+            if store._scope == scope:
+                del _stores[key]
+
 
 
 def _load_self_reference_blacklist(npc_id: str) -> frozenset[str] | None:

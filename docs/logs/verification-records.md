@@ -137,3 +137,29 @@ POST /v1/agent/step        → 200 ×28 （每3秒心跳）
 ## 2026-10-19文档整合
 
 本次工作只整合需求、入口、契约、模型视图和历史证据，清理重复旧稿与分散日志；未运行服务、测试、训练或UE验收，未修改模型权重和程序实现。历史769 passed+2 skipped保留为10-15末次全量记录，12 passed保留为10-19端口专项，不写成本次完整复跑结果。文档链接/模型静态检查和排版结果由本次交付说明记录；尚待人工或运行验收的部分不因文件整合而变为通过。
+
+<a id="scope-20261021"></a>
+## 2026-10-21 第二步v0.4服务端实现与回归
+
+用户批准计划后，在服务器 `/www/wwwroot/aesir-ai-service` 从 `main@93d9d6c` 创建 `feature/npc-scope-v04`；审批文档单独提交 `d720474`，随后实现新版入口、数据分区和生命周期。此次未修改UE工作区，也未连接UE。解释器为项目 `.venv/bin/python`，Python 3.12.15；单worker、本轮业务后端为rule/mock。
+
+2026-10-21 23:45（Asia/Shanghai）的适用核心回归：**1029 passed、1 skipped、7 warnings，28.24秒**。其中新版 `tests/scoped` 的190项通过；21个完整golden在模型测试内回读校验。命令为：
+
+```bash
+.venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q --tb=short --junitxml=data/runtime/remote-dev/verification/step2-pytest.xml
+```
+
+跳过项为未安装可选faster-whisper的测试模块；7条是现有Starlette弃用提示。本轮不安装可选ML/RL，未执行需要NumPy/Torch的Boss推理/训练测试，不能将该命令称为所有可选功能的全量验证。保留此前848 passed+2 skipped等历史结果，不用不同环境的计数互相替换。
+
+| 验收范围 | 本轮证据及实测含义 |
+| --- | --- |
+| AT-SCOPE-01/02/04 | principal与UUID校验、双玩家/双存档/角色分区、完整session/run键、长期文件重载、legacy与scoped隔离 |
+| AT-SCOPE-03/11 | run/encounter CAS及ABA、并发唯一赢家、旧绑定拒绝、reset_runtime模拟服务实例替换；落盘epoch保持，不能当作正式发布重启演练 |
+| AT-SCOPE-05/06/09 | HTTP生成过程由线程事件阻塞，期间reset/end run/推进受控单调时钟，释放后409且没有迟到对话历史；缓存重放不刷新预算；旧epoch/遭遇拒绝 |
+| AT-SCOPE-07/08 | single-flight、稳定directive ID、冲突/窗口/容量、跨world/combat同版通道、receipt原scope/run/请求关联；未开始容量拒绝与开始后UNKNOWN分开 |
+| AT-SCOPE-10/12 | 17条旧入口严格门控、scoped未支持流式/语音明确404、console同版模型、21个golden以及适用核心回归 |
+| 部分提交失败 | 在session写入之后模拟信号写失败，返回UNKNOWN；同逻辑ID再次请求不重做副作用。此证据不表示具有多文件事务或自动回滚 |
+
+运行原始文件在服务器 `data/runtime/remote-dev/verification/step2-pytest.log`、`step2-pytest.xml`和`step2-pytest-result.json`，后者包含测试时间、命令、计数、源码SHA256和保留文件校验；这些运行产物不入Git。既有 `test_memory_degradation.py` 改动、`.python-version`与Linux锁文件的SHA256与实施前保存值全部一致，未混入第二步提交。
+
+开发实例仍在 `127.0.0.1:18011`，最终启动与健康/OpenAPI检查另存同目录 `step2-http-smoke.json`。该HTTP检查只证明环回服务能启动及路由可发现，不是UE连通、真实LLM/ASR效果、端到端延迟或正式多人服务验收。配置与UE后续清单见[v0.4开发与交接](../guides/scoped-development.md)。

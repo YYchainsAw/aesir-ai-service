@@ -13,6 +13,8 @@
 
 埋点是观测而非流程：任何写盘故障一律静默吞掉（同 dialogue_signals 纪律，
 绝不因埋点阻塞 agent/step 主流程）。
+
+v0.4 作用域请求的日志写入失败向外传播，由请求协调器记录未知提交结果。
 """
 
 from __future__ import annotations
@@ -22,10 +24,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import get_settings
+from app.scoped.context import current_scope
+from app.scoped.storage import signal_directory, signal_metadata, guarded_commit, unavailable
 
 _DEFAULT_GAME_ID = "aesir"
 
 
+@guarded_commit
 def record_agent_step(
     companion_id: str,
     *,
@@ -52,9 +57,12 @@ def record_agent_step(
             "observability_source": observability_source,
             "degraded": bool(degraded),
         }
-        root = Path(get_settings().agent_steps_dir) / game_id
+        root = signal_directory(get_settings().agent_steps_dir, game_id)
+        record.update(signal_metadata())
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001 - 埋点绝不阻塞 agent/step 主流程
+    except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞 agent/step 主流程
+        if current_scope():
+            raise unavailable() from error
         pass

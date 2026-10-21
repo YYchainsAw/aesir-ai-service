@@ -1,6 +1,6 @@
 # NPC身份与有效期契约v0.4草案
 
-> 2026-10-21，按服务器工作区 `main@93d9d6c` 的现有实现设计。**2026-10-21用户审查通过，进入分支实现；未经对应回归确认的入口仍不可当成已支持。** 本页对应[六步方案](../planning/local-boss-cloud-companion-roadmap.md)第二步；当前已支持格式仍见[v0.3契约](npc-contract-v0.3.md)。开发分支为 `feature/npc-scope-v04`，批准不代表已通过服务端或UE验收。
+> 2026-10-21，按服务器工作区 `main@93d9d6c` 的现有实现设计。**2026-10-21已按批准方案完成分支实现与适用服务端回归；UE接入待第三步验收。** 本页对应[六步方案](../planning/local-boss-cloud-companion-roadmap.md)第二步；当前已支持格式仍见[v0.3契约](npc-contract-v0.3.md)。开发分支为 `feature/npc-scope-v04`，实际结果见[验证记录](../logs/verification-records.md#scope-20261021)；文件名保留draft便于既有链接兼容，不表示可以省略服务端/UE验收。
 
 ## 1. 范围与已批准决策
 
@@ -169,7 +169,7 @@ epoch不进入请求/事件去重键。试图保持同一request/event ID、换�
 | GET /v1/scoped/context、POST /runs/bind、/runs/end | 上下文发现与控制响应显式标0.4，按第3节解析可信归属与运行控制；不是账号注册/登录平台 |
 | POST /v1/scoped/encounters/control | 同版begin/end控制响应，绑定当前run并校验遭遇revision/预期ID，按第3节显式开始或结束遭遇 |
 | POST /v1/scoped/agent/step | 新请求/响应类型固定0.4，公共归属/绑定/epoch/timing完整回显；action保留none/directive，directive使用同版信封 |
-| POST /v1/scoped/world/events | 同版事实请求与响应；反应/关系信息保留明确含义，执行建议使用同一v0.4 directive，不直接嵌入旧v0.2 companion_action/DecisionAction |
+| POST /v1/scoped/world/events（/combat/events同版别名） | 同版事实请求与响应；反应/关系信息保留明确含义，执行建议使用同一v0.4 directive，不直接嵌入旧v0.2 companion_action/DecisionAction |
 | POST /v1/scoped/companion/chat | 非流式文本对话，新信封显式0.4并带request/run/epoch/timing；source仍区分mock/llm/fallback，不返回旧0.1响应冒充新格式 |
 | POST /v1/scoped/tactical/executions | 单条/批量信封和每条回执均显式0.4，检查原scope/run/动作关联；沿用accepted/executed/rejected/expired/cancelled的已有含义，accepted及202不表示动作完成，执行阶段细化留第三步 |
 | /v1/scoped/console/state、/memory、/memory/reset | 同版开发管理请求/响应使用相同主体/存档/角色范围；reset写操作也校验request/run/epoch，不能沿旧版仅companion_id跨玩家清理 |
@@ -220,7 +220,7 @@ legacy开发兼容模式把旧v0.1/v0.2/v0.3请求映射到显式固定、独立
 
 ## 8. 错误与处理顺序
 
-统一错误体使用 `detail.code`、可读message及适用的request_id；不返回其他玩家路径、记忆或运行绑定。以下为拟定原因码，不是当前服务已经返回的结果。
+统一错误体使用 `detail.code`、可读message及适用的request_id；不返回其他玩家路径、记忆或运行绑定。下列为v0.4边界原因码，实际服务端覆盖见本轮验证记录。
 
 | HTTP/原因码 | 情况与调用方处理 |
 | --- | --- |
@@ -231,6 +231,8 @@ legacy开发兼容模式把旧v0.1/v0.2/v0.3请求映射到显式固定、独立
 | 409 RUN_CAS_CONFLICT / ENCOUNTER_CAS_CONFLICT | 控制revision或预期run/遭遇不匹配；读取当前状态后由调用方决定，不盲目抢占 |
 | 409 MEMORY_EPOCH_STALE | 重置前上下文；不写旧结果，不仅换epoch后重用原ID |
 | 409 REQUEST_ID_CONFLICT / EVENT_ID_CONFLICT | ID相同但语义载荷不同 |
+| 409 DIRECTIVE_UNKNOWN / DIRECTIVE_MISMATCH | 未发布于当前归属/绑定的指令，或回执与原请求/遭遇/能力关联不符；不写回执 |
+| 409 REQUEST_IN_PROGRESS | 首次处理仍在进行，保留原逻辑请求ID并在原预算内查询；不得另发ID重做副作用 |
 | 409 SNAPSHOT_EXPIRED / REQUEST_EXPIRED | 已超过相对预算；新操作需新快照和新请求，不为旧动作续期 |
 | 422 INVALID_SCOPE_OR_TIMING | 非法UUID、超限/负数/非有限时效、缺字段或版本不匹配 |
 | 429 HEARTBEAT_RATE_LIMITED | 当前作用域/游玩的心跳过频，不影响另一玩家 |
@@ -256,3 +258,16 @@ legacy开发兼容模式把旧v0.1/v0.2/v0.3请求映射到显式固定、独立
 | AT-SCOPE-12 | 新schema/完整golden与适用核心回归保存真实版本/结果；只用服务端测试客户端和受控时钟，不把计划、Mock或服务端通过写成UE/真实LLM/ASR通过 |
 
 UE后续需要保存可信会话关联、save/run/encounter与请求ID，在换局时取消在途请求并使旧回调失效；记录首次发送单调时间，复核预算和当前能力后执行。第二步先交付该字段与生命周期清单，不在本轮测试UE连接或修改UE运行行为。
+
+
+## 10. 分支实现细节与交接
+
+开发入口见[v0.4开发与交接](../guides/scoped-development.md)。新请求/响应已形成独立Pydantic模型与完整golden，OpenAPI按同版response_model声明；console GET无逻辑写请求时request_id为null，不伪造关联。`/v1/scoped/combat/events`与`/world/events`接受同一世界事件模型，共用逻辑操作及事件键。
+
+同一request_id缓存回放保留原指令ID与总预算。对于同一event_id但不同request_id，事实/反应可以重放，执行建议为空（action=none、duplicate=true），防止原建议被新首次发送时钟续期；捕获基准或语义冲突仍拒绝。reset作为无动作控制写入，允许同一逻辑reset回放其已产生的新epoch，但仅当该epoch仍当前，且绑定仍有效；另一reset发生后拒绝该旧结果。其他旧epoch业务仍在缓存回放前拒绝。
+
+兼容模式显式配置`AESIR_SCOPE_LEGACY_ENABLED=true`，旧请求的固定legacy归属沿用独立`root/game/companion`历史命名空间；scoped只访问含player/save的新路径，绝不自动迁移或认领旧数据。此处固定legacy命名空间不是生产玩家身份。默认关闭兼容；服务器现有环回开发配置显式开启。
+
+实现的时效预算上限120000毫秒，0预算立即过期；请求/事件去重默认各1024项、300秒保留，处理等待上限30秒。未开始的容量拒绝与开始后的UNKNOWN区分，窗口内结果不因满额被静默淘汰。当前回执关联内存上限4096项、保留300秒；控制状态上限4096个存档。单worker与进程内窗口限制不构成跨重启恰好一次保证。磁盘多文件部分写入不具事务性，UNKNOWN不能自动换ID重做。
+
+服务端实测与UE后续清单分别见[验证记录](../logs/verification-records.md#scope-20261021)和[开发与交接](../guides/scoped-development.md#4-验证与ue后续交接)。

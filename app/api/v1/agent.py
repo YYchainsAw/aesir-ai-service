@@ -68,6 +68,9 @@ _heartbeat_lock = threading.Lock()
 
 
 def _heartbeat_too_soon(companion_id: str, min_interval: float) -> bool:
+    from app.scoped.storage import runtime_key
+
+    companion_id = runtime_key(companion_id)
     now = time.monotonic()
     with _heartbeat_lock:
         last = _last_heartbeat.get(companion_id)

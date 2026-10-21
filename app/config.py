@@ -8,6 +8,9 @@
 缓存会吞掉这些变化。
 """
 
+from typing import Literal
+from uuid import UUID
+
 from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +36,12 @@ class Settings(BaseSettings):
     # 并把人格注册表限制在 data/personas/<game_id>/ 之下。跨游戏角色请求返回 404，
     # 不回退默认角色、不混用另一游戏能力。多游戏并存时按游戏各起一个实例（独立端口）。
     game_id: str = "aesir"
+
+    # -- v0.4 归属边界（单 worker；生产认证在第四步接入）-------------------
+    scope_identity_backend: Literal["disabled", "development"] = "disabled"
+    scope_dev_player_id: UUID | None = None
+    scope_dev_save_ids: list[UUID] = Field(default_factory=list)
+    scope_legacy_enabled: bool = False  # 仅开发兼容；独立旧目录，不能读取 scoped 状态
 
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm

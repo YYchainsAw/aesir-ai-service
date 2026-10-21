@@ -29,7 +29,7 @@
 
 ## 第二步：明确接口身份、作用域与有效期
 
-2026-10-21 本步细化为[实施计划](step-02-identity-scope-plan.md)与[v0.4契约草案](../protocols/npc-scope-contract-v0.4-draft.md)，已于2026-10-21经用户审查通过，进入 `feature/npc-scope-v04` 分支实现；现有v0.3与新版入口分别验收。
+2026-10-21 本步细化为[实施计划](step-02-identity-scope-plan.md)与[v0.4契约草案](../protocols/npc-scope-contract-v0.4-draft.md)，已于2026-10-21经用户审查通过，在 `feature/npc-scope-v04` 完成服务端实现与1029 passed+1 skipped的适用核心回归；现有v0.3与新版入口分别验收，UE连接仍后置。详见[开发与交接](../guides/scoped-development.md)及[验证记录](../logs/verification-records.md#scope-20261021)。
 
 - 区分可信玩家身份、存档、一次游玩/对话会话、遭遇、世界快照、请求、指令和回执的标识及生命周期。玩家身份在开放多人前与认证主体绑定，不能仅相信客户端自报。
 - 记忆和关系归属采用 `game + player + save + npc`；会话、遭遇用于短期状态和时效，不能代替存档身份。读档、重新进入与服务重启后的保留/重置规则写入契约。

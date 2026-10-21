@@ -27,6 +27,8 @@ def _isolate_backends(monkeypatch: pytest.MonkeyPatch) -> None:
     需要真实 LLM 后端的测试在自己的测试内 monkeypatch 覆盖即可
     （monkeypatch 在 autouse fixture 之后执行，总是生效）。
     """
+    # 旧协议回归显式进入开发兼容模式；scoped HTTP 测试自行关闭。
+    monkeypatch.setenv("AESIR_SCOPE_LEGACY_ENABLED", "true")
     monkeypatch.setenv("AESIR_COMPANION_BACKEND", "mock")
     monkeypatch.delenv("AESIR_PARSER_BACKEND", raising=False)
 

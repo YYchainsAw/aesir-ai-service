@@ -21,6 +21,8 @@ T083 风格校验结果（``style_violations``）也落入本埋点，供运行�
 
 埋点是观测而非流程：任何写盘/检测故障一律静默吞掉（同 FR-011 纪律，
 绝不因埋点阻塞对话主流程）。
+
+v0.4 作用域请求的日志写入失败向外传播，由请求协调器记录未知提交结果。
 """
 
 from __future__ import annotations
@@ -31,6 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import get_settings
+from app.scoped.context import current_scope
+from app.scoped.storage import signal_directory, signal_metadata, guarded_commit, unavailable
 
 # 玩家负面反馈模式（记错/编造/复读的玩家侧表述——实测日志出现过的形态）。
 _NEGATIVE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
@@ -113,6 +117,7 @@ def topic_continued(current_text: str, previous_text: str | None) -> bool | None
 _DEFAULT_GAME_ID = "aesir"
 
 
+@guarded_commit
 def record_turn_signal(
     companion_id: str,
     session_id: str | None,
@@ -202,9 +207,12 @@ def record_turn_signal(
             record["lore_lookup"] = lore_lookup
         if facts_rejected is not None:
             record["facts_rejected"] = facts_rejected
-        root = Path(get_settings().dialogue_signals_dir) / game_id
+        root = signal_directory(get_settings().dialogue_signals_dir, game_id)
+        record.update(signal_metadata())
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001 - 埋点绝不阻塞对话主流程
+    except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞对话主流程
+        if current_scope():
+            raise unavailable() from error
         pass

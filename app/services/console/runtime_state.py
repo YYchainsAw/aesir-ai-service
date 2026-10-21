@@ -9,6 +9,8 @@
 import threading
 from dataclasses import dataclass
 
+from app.scoped.storage import runtime_key, guarded_commit
+
 _MAX_TRACKED = 64
 
 
@@ -23,9 +25,11 @@ _lock = threading.Lock()
 _observations: dict[str, RuntimeObservation] = {}
 
 
+@guarded_commit
 def record_observation(companion_id: str, *, scene: str | None = None,
                        emotion_id: str | None = None, last_seen: str = "") -> None:
     """更新某角色的最近观测（只更新给出的字段）。"""
+    companion_id = runtime_key(companion_id)
     with _lock:
         obs = _observations.get(companion_id) or RuntimeObservation()
         if scene is not None:
@@ -42,6 +46,7 @@ def record_observation(companion_id: str, *, scene: str | None = None,
 
 def get_observation(companion_id: str) -> RuntimeObservation:
     """读取最近观测（无记录返回空观测，不虚构）。"""
+    companion_id = runtime_key(companion_id)
     with _lock:
         obs = _observations.get(companion_id)
         return obs or RuntimeObservation()

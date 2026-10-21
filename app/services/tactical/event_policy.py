@@ -13,6 +13,9 @@
 且位于幂等检查之后（FR-033 / SC-007）。
 """
 
+from app.scoped.context import current_scope
+from app.scoped.storage import runtime_key, guarded_commit
+
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
@@ -350,6 +353,8 @@ def _resolve(
     评估在锁内进行：生活事件的关系计分是副作用，若挪到锁外，并发重试可能
     在两次查表之间都未命中而重复计分（SC-007）。
     """
+    if current_scope():
+        key = (runtime_key(key[0]), *key[1:])
     with _seen_events_lock:
         cached = _seen_events.get(key)
         if cached is not None:
@@ -403,6 +408,7 @@ def _combat_response(
     )
 
 
+@guarded_commit
 def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
     """按事件类型分发；与 resolver 一样保持可解释的决策表结构。
 
@@ -568,6 +574,7 @@ def _relationship_stage_display(stage: str) -> str:
     return get_stage_display_name(stage)
 
 
+@guarded_commit
 def handle_world_event(request: WorldEventRequest) -> WorldEventResponse:
     """世界事件统一入口（FR-032~FR-034）：战斗类与生活类共用一张幂等表。
 

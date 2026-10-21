@@ -1,6 +1,6 @@
 # 第二步：身份、作用域与有效期实施计划
 
-> 2026-10-21，方案版本 `scope-plan-v1`，状态：2026-10-21用户审查通过，进入实现。静态基线为服务器 `main@93d9d6c`。DEC-SCOPE-01～03及六项工作包已获批准；开发分支为 `feature/npc-scope-v04`。批准不表示新协议已实现或服务端/UE验收已通过。
+> 2026-10-21，方案版本 `scope-plan-v1`，状态：2026-10-21用户审查通过，分支实现及适用服务端回归已完成，UE待验。静态基线为服务器 `main@93d9d6c`。DEC-SCOPE-01～03及六项工作包已获批准；开发分支为 `feature/npc-scope-v04`。批准不表示新协议已实现或服务端/UE验收已通过。
 
 本页细化[六步开发方案](local-boss-cloud-companion-roadmap.md)第二步，遵循[部署分工](ai-capability-placement.md)的 AI-DEP-07/10/11/15。字段、错误和生命周期以[v0.4契约草案](../protocols/npc-scope-contract-v0.4-draft.md)为单一来源；[v0.3契约](../protocols/npc-contract-v0.3.md)继续描述当前实现。日常完成状态只在 GitHub 维护，本页列工作包、依赖和验收，不另存完成勾选。
 
@@ -85,10 +85,13 @@ Boss推理、KI-01/KI-06、ONNX/NNE和Windows发行仍在第五步/UE主线，�
 | DEP2-05 | [#72 约束逻辑请求重试事件去重与结果关联](https://github.com/YYchainsAw/aesir-ai-service/issues/72) | DEP2-01、DEP2-02、DEP2-03、DEP2-04 |
 | DEP2-06 | [#73 接入新版兼容门控并完成服务端回归与交接](https://github.com/YYchainsAw/aesir-ai-service/issues/73) | DEP2-01、DEP2-02、DEP2-03、DEP2-04、DEP2-05 |
 
-里程碑和Issue为待审计划，不预设完成时间，不改动既有M2/M3/M5/N2/N3里程碑状态或责任分工。上述工作包与GitHub链接一一对应；#57只作关联来源，仍保留其原范围。
+里程碑和Issue已获批准，按真实证据推进，不预设完成时间，不改动既有M2/M3/M5/N2/N3里程碑状态或责任分工。上述工作包与GitHub链接一一对应；#57只作关联来源，仍保留其原范围。
 
 用户已审查通过。本轮在服务器clone `/www/wwwroot/aesir-ai-service` 核对并保留现有改动，已从确认后的 `main@93d9d6c` 创建 `feature/npc-scope-v04` 开发分支。远端main已核对与基线一致，按Issue依赖推进；不使用 `codex` 前缀，不重置/清理既有工作区，也不把已有环境/测试改动混写成第二步实现。文档与实现分别提交，提交/推送范围按审查结论执行。
 
 ## 7. 本轮证据边界
 
 规划轮完成了源码/文档静态核对、GitHub里程碑与Issue、UTF-8/链接/JSON样例/编号/格式检查。2026-10-21用户批准后进入分支实现；实现与实际回归结果分别追加，不用批准代替验收。UE连接仍按用户要求后置。
+
+
+本轮实现交付与使用方式见[v0.4开发与交接](../guides/scoped-development.md)，真实命令、1029 passed+1 skipped的适用核心回归及190项scoped结果见[验证记录](../logs/verification-records.md#scope-20261021)。GitHub状态记录审查/合并进度，不能把分支测试通过理解为main已合并或UE已执行。

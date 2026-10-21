@@ -94,3 +94,8 @@ ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机�
 本页本轮未执行上述命令。历史669通过/2跳过等数字属于当时提交，不承诺当前总数；真实ASR、LLM、UE执行、Windows包和正式P95均需各自记录。metrics_report的覆盖代理不自动等于需求验收通过，详见[复现与验收](repro.md)。
 
 常见问题：401/模型不可用检查配置并重启；缺faster-whisper仅安装所需语音依赖；端口不通核对run_server实际打印地址与UE配置；PowerShell别名curl导致参数错误时使用curl.exe或Invoke-RestMethod。完整字段不要在本页另建一套，回到对应契约查。
+
+
+## v0.4身份与旧协议开发兼容
+
+新版JSON入口默认拒绝匿名；旧业务入口默认关闭。固定开发身份、存档授权、显式run绑定与旧客户端兼容配置见[v0.4开发与交接](scoped-development.md)。开发服务器现有`.env`已显式配置兼容模式，仅供环回远程开发；`/health`不要求业务身份。

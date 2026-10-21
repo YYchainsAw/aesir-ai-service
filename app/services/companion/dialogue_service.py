@@ -3,6 +3,8 @@
 import zlib
 from collections.abc import Iterator
 
+from app.scoped.storage import guarded_commit
+
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
     CompanionDialogueResponse,
@@ -36,7 +38,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     game_id = profile.game_name.lower()
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
-    history = memory.history(request.session_id) if request.session_id else ()
+    history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
 
     memories = _recall(request.companion_id, game_id=game_id)
     impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
@@ -107,7 +109,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     game_id = profile.game_name.lower()
 
     memory = get_session_memory(get_settings().dialogue_history_turns)
-    history = memory.history(request.session_id) if request.session_id else ()
+    history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
 
     memories = _recall(request.companion_id, game_id=game_id)
     impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
@@ -260,6 +262,7 @@ def _lookup_signal(result) -> dict | None:
     }
 
 
+@guarded_commit
 def _record_turn(
     request: CompanionDialogueRequest,
     response: CompanionDialogueResponse,
@@ -293,7 +296,7 @@ def _record_turn(
     本轮注入 prompt 的印象主题（埋点用，见 ``dialogue_signals``）。
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
-    prior_history = memory.history(request.session_id) if request.session_id else ()
+    prior_history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
     _note_runtime(request, response)
     if request.session_id:
         # 情绪一并落窗口：下一轮把它作为「当前心情」注入，情绪才有惯性
@@ -303,6 +306,7 @@ def _record_turn(
             request.text,
             response.reply_text,
             emotion_id=response.emotion_id,
+            companion_id=request.companion_id,
         )
     if topics is None:
         topics = extract_topics(request.text)

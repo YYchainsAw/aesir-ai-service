@@ -14,6 +14,9 @@ import json
 import os
 import threading
 from pathlib import Path
+from contextlib import nullcontext
+
+from app.scoped.storage import checked_npc, state_directory, scope_lock, guarded_commit, unavailable
 
 from app.config import get_settings
 from app.schemas.relationship import RelationshipState
@@ -41,9 +44,10 @@ class RelationshipStore:
         self.npc_id = npc_id
         self.game_id = game_id
         # 多游戏隔离：路径为 <relationship_root>/<game_id>/<npc_id>（S1）
-        self._dir = Path(root or settings.relationship_root) / game_id / npc_id
+        self._scope = checked_npc(npc_id, game_id)
+        self._dir = state_directory(root or settings.relationship_root, game_id, npc_id)
         self._path = self._dir / "relationship.json"
-        self._lock = threading.Lock()
+        self._lock = scope_lock(self._scope) if self._scope else threading.RLock()
         self._state = RelationshipState(value=settings.relationship_initial, stage="")
 
     # -- 读取 ---------------------------------------------------------------
@@ -55,6 +59,8 @@ class RelationshipStore:
             self._fallback_to_backup_or_initial()
             return
         except OSError as error:
+            if self._scope:
+                raise unavailable() from error
             raise RelationshipStoreError(f"关系文件不可读：{self._path}") from error
 
         try:
@@ -62,6 +68,8 @@ class RelationshipStore:
             state = RelationshipState.model_validate(data)
         except (json.JSONDecodeError, ValueError):
             # 保留损坏现场（.corrupt），尝试备份，否则回退初值
+            if self._scope:
+                raise unavailable()
             self._quarantine()
             self._fallback_to_backup_or_initial()
             return
@@ -72,6 +80,7 @@ class RelationshipStore:
             return self._state.model_copy(deep=True)
 
     # -- 写入 ---------------------------------------------------------------
+    @guarded_commit
     def apply_event(
         self,
         event_type: str,
@@ -97,6 +106,7 @@ class RelationshipStore:
                 self._persist_locked()
             return new_state.model_copy(deep=True), delta, reason
 
+    @guarded_commit
     def reset(self) -> None:
         """关系重置（调试/新周目）：回初值并清空留痕。"""
         with self._lock:
@@ -114,16 +124,20 @@ class RelationshipStore:
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
         except OSError as error:
+            if self._scope:
+                raise unavailable() from error
             raise RelationshipStoreError(f"关系目录不可创建：{self._dir}") from error
 
         payload = json.dumps(self._state.model_dump(mode="json"), ensure_ascii=False, indent=2)
         tmp = self._path.with_suffix(".json.tmp")
         try:
             tmp.write_text(payload, encoding="utf-8")
-            if self._path.exists():
+            if self._path.exists() and not self._scope:
                 os.replace(self._path, self._path.with_suffix(".json.bak"))
             os.replace(tmp, self._path)
         except OSError as error:
+            if self._scope:
+                raise unavailable() from error
             raise RelationshipStoreError(f"关系写入失败：{self._path}") from error
 
     def _quarantine(self) -> None:
@@ -159,19 +173,20 @@ def get_relationship_store(
 
     缓存按「角色 + game_id + 实际根目录」失效：配置根目录变化时重建实例。
     """
-    effective_root = str(
-        Path(root if root is not None else get_settings().relationship_root)
-        / game_id
-        / npc_id
-    )
-    cache_key = (npc_id, game_id, root)
-    with _stores_lock:
-        store = _stores.get(cache_key)
-        if store is None or str(store._dir) != effective_root:
-            store = RelationshipStore(npc_id, game_id=game_id, root=root)
-            store.load()
-            _stores[cache_key] = store
-        return store
+    npc_scope = checked_npc(npc_id, game_id)
+    effective_root = str(state_directory(root if root is not None else get_settings().relationship_root, game_id, npc_id))
+    cache_key = (npc_id, game_id, root, npc_scope)
+    with scope_lock(npc_scope) if npc_scope else nullcontext():
+        with _stores_lock:
+            store = _stores.get(cache_key)
+            if store is None or str(store._dir) != effective_root:
+                store = RelationshipStore(npc_id, game_id=game_id, root=root)
+                store.load()
+                _stores[cache_key] = store
+            elif npc_scope:
+                store.load()
+            return store
+
 
 
 def reset_relationship_stores() -> None:
