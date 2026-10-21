@@ -160,6 +160,9 @@ POST /v1/agent/step        → 200 ×28 （每3秒心跳）
 | AT-SCOPE-10/12 | 17条旧入口严格门控、scoped未支持流式/语音明确404、console同版模型、21个golden以及适用核心回归 |
 | 部分提交失败 | 在session写入之后模拟信号写失败，返回UNKNOWN；同逻辑ID再次请求不重做副作用。此证据不表示具有多文件事务或自动回滚 |
 
-运行原始文件在服务器 `data/runtime/remote-dev/verification/step2-pytest.log`、`step2-pytest.xml`和`step2-pytest-result.json`，后者包含测试时间、命令、计数、源码SHA256和保留文件校验；这些运行产物不入Git。既有 `test_memory_degradation.py` 改动、`.python-version`与Linux锁文件的SHA256与实施前保存值全部一致，未混入第二步提交。
+运行原始文件在服务器 `data/runtime/remote-dev/verification/step2-pytest.log`、`step2-pytest.xml`和`step2-pytest-result.json`，后者包含测试时间、命令、计数、源码SHA256和保留文件校验；这些运行产物不入Git。既有 `test_memory_degradation.py` 修正、`.python-version`与Linux锁文件的SHA256与实施前保存值全部一致。第一步留下的Linux测试可移植性修正以独立提交 `cb05cfa` 保留，未混入第二步实现提交 `ba3740c`；版本/锁文件仍保持原有未提交状态。
 
 开发实例仍在 `127.0.0.1:18011`，最终启动与健康/OpenAPI检查另存同目录 `step2-http-smoke.json`。该HTTP检查只证明环回服务能启动及路由可发现，不是UE连通、真实LLM/ASR效果、端到端延迟或正式多人服务验收。配置与UE后续清单见[v0.4开发与交接](../guides/scoped-development.md)。
+
+
+干净检出复核：在临时detached worktree `cb05cfa` 使用同一项目解释器重新执行上述适用核心命令，**1029 passed、1 skipped、7 warnings，29.20秒**，不依赖服务器其余未提交文件或开发`.env`。JUnit、日志和含commit/真实app模块路径的结果分别为`step2-clean-pytest.xml`、`step2-clean-pytest.log`、`step2-clean-pytest-result.json`；临时检出已清理。仓库当前未配置GitHub Actions检查，本轮自动验证在服务器运行，PR保持草稿待审查。
