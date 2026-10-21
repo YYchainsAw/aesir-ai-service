@@ -50,3 +50,6 @@ data/runtime/uvicorn_console*.log
 
 # 会话日志（2026-10-19：logs 仅本地留存，取消入库；历史 10 篇已 git rm --cached）
 docs/logs/
+
+# 测试待办 backlog（2026-10-20：本地测试规划，不入版本库）
+docs/test-backlog/

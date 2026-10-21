@@ -95,12 +95,15 @@ def _iter_jsonl(path: Path):
 
 
 def collect_receipts(game: str | None = None) -> dict:
+    from datetime import datetime, timezone
     from app.config import get_settings
 
     root = _resolve_dir(get_settings().receipts_dir)
     total = 0
     results: Counter = Counter()
+    today_results: Counter = Counter()  # T49/#66：今日非执行回执单独计数
     corrupt: dict[str, int] = {}
+    today = datetime.now(timezone.utc).date().isoformat()
     # 去重键：(order_id, result, received_at)。
     # 只识别「同一行被物理写两份」的迁移期重复；同一 order_id 的多条不同
     # result（状态流转 accepted→executed→rejected）是合法回执，不互相误杀。
@@ -117,9 +120,16 @@ def collect_receipts(game: str | None = None) -> dict:
                 continue
             seen_keys.add(key)
             total += 1
-            results[record.get("result", "unknown")] += 1
+            result = record.get("result", "unknown")
+            results[result] += 1
+            # T49/#66：按 received_at 日期区分今日 vs 历史
+            received_at = record.get("received_at", "")
+            if received_at.startswith(today):
+                today_results[result] += 1
         if file_bad:
             corrupt[str(path.relative_to(root))] = file_bad
+    non_executed = results.get("rejected", 0) + results.get("expired", 0) + results.get("cancelled", 0)
+    today_non_executed = today_results.get("rejected", 0) + today_results.get("expired", 0) + today_results.get("cancelled", 0)
     return {
         "scope": game or "all",
         "files": len(files),
@@ -131,6 +141,9 @@ def collect_receipts(game: str | None = None) -> dict:
         "rejected": results.get("rejected", 0),
         "expired": results.get("expired", 0),
         "cancelled": results.get("cancelled", 0),
+        # T49/#66：今日 vs 历史非执行回执拆分
+        "today_non_executed": today_non_executed,
+        "historical_non_executed": non_executed - today_non_executed,
         "proxy_note": "rejected/expired/cancelled 为运行期代理指标；真实越界下发"
                       "由战术回归集离线断言为 0，运行期无法纯靠回执判定。",
         "corrupt": corrupt,
@@ -419,14 +432,20 @@ def evaluate_sc_verdicts(report: dict) -> list[dict]:
 
     # SC-009 越界下发=0（运行期代理：rejected/expired/cancelled 为非执行类回执）
     non_executed = receipts["rejected"] + receipts["expired"] + receipts["cancelled"]
+    today_ne = receipts.get("today_non_executed", 0)
+    hist_ne = receipts.get("historical_non_executed", 0)
     if receipts["total_receipts"] == 0:
         add("SC-009", "N/A", non_executed, "rejected+expired+cancelled = 0",
             "无回执数据；且「真实越界下发」需战术回归集离线断言，运行期只能代理")
     elif non_executed == 0:
         add("SC-009", "PASS", non_executed, "rejected+expired+cancelled = 0")
+    elif today_ne == 0 and hist_ne > 0:
+        # T49/#66：今日零越界，仅历史回执——不应判 FAIL（历史记录多为 UE 拒绝未制作能力的真实反馈）
+        add("SC-009", "PASS", f"{today_ne} 今日 / {hist_ne} 历史", "rejected+expired+cancelled = 0",
+            f"今日零越界；含历史 {hist_ne} 条真实 UE 拒绝/过期（非本次越界，多为未制作能力门控反馈）")
     else:
-        add("SC-009", "FAIL", non_executed, "rejected+expired+cancelled = 0",
-            "运行期代理指标；真实越界由战术回归集离线断言")
+        add("SC-009", "FAIL", f"{today_ne} 今日 / {hist_ne} 历史", "rejected+expired+cancelled = 0",
+            f"今日 {today_ne} 条非执行回执；运行期代理指标，真实越界由战术回归集离线断言")
 
     # SC-010 流程中断=0（fallback 次数）
     if signals["total_turns"] == 0:

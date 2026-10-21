@@ -101,7 +101,7 @@ def test_warm_signal_raises_relationship(monkeypatch) -> None:
 
 
 def test_dialogue_cooldown_blocks_rapid_repeat(monkeypatch) -> None:
-    """对话专属冷却（默认 300 秒）：连点第二句不再计分（防刷）。"""
+    """对话专属冷却（T45/#62：默认 120 秒）：连点第二句不再计分（防刷）。"""
     first = _chat_with_signal(monkeypatch, "warm", "谢谢你陪我。")
     second = _chat_with_signal(monkeypatch, "warm", "真的很感谢你。")
     assert first.relationship_delta == 1
@@ -129,7 +129,7 @@ def test_none_and_mock_paths_do_not_move_relationship(monkeypatch) -> None:
 
 
 def test_several_warm_exchanges_cross_into_neutral(monkeypatch) -> None:
-    """校准断言（半天~一天一档）：约 5 轮真诚交流跨入 neutral(25)。"""
+    """校准断言（T45/#62 后陪伴感可感知节奏）：约 5 轮真诚交流跨入 neutral(25)。"""
 
     def _warm_round(i: int) -> None:
         monkeypatch.setenv("AESIR_COMPANION_BACKEND", "llm")
@@ -162,3 +162,27 @@ def test_relationship_failure_keeps_dialogue_alive(monkeypatch) -> None:
     assert response.reply_text
     assert response.relationship_delta == 0
     reset_relationship_stores()
+
+
+def test_signal_to_event_mapping_is_complete() -> None:
+    """T48/#65 守卫：LLM schema 每个非 none 信号必须有映射，且映射事件在 policy 中存在。
+
+    防止有人给 LLM schema 加新信号却忘了更新映射表，导致信号被静默吞掉
+    （返回 no_signal，delta=0）。
+    """
+    from app.services.companion.dialogue_service import _DIALOGUE_RELATIONSHIP_EVENTS
+    from app.services.relationship.policy import get_policy
+
+    # LLM schema 的 relationship_signal Literal 值
+    llm_signals = {"none", "warm", "deep", "cold", "hurtful"}
+
+    # none 故意不映射（不计分）；其余必须全部映射
+    mapped = set(_DIALOGUE_RELATIONSHIP_EVENTS.keys())
+    assert mapped == llm_signals - {"none"}, \
+        f"LLM 信号 {llm_signals - mapped - {'none'}} 未映射到关系事件"
+
+    # 每个映射事件必须在 relationship_policy.yaml 中登记
+    policy = get_policy()
+    for signal, event_type in _DIALOGUE_RELATIONSHIP_EVENTS.items():
+        assert event_type in policy.events, \
+            f"信号 {signal} 映射到 {event_type}，但该事件不在 relationship_policy.yaml 中"

@@ -402,8 +402,8 @@ def test_relationship_signal_is_exposed_and_prompt_asks_for_it() -> None:
     assert service.last_relationship_signal == "deep"
     prompt = stub.system_prompt
     assert "relationship_signal: rate the EMOTIONAL QUALITY" in prompt
-    # 宁漏勿滥：绝大多数轮次必须是 none——误判比漏判伤关系
-    assert 'MUST be "none"' in prompt
+    # T45/#62：warm 宽容（友好消息倾向给 warm），deep/cold/hurtful 仍严格
+    assert 'Bias toward "warm"' in prompt
 
 
 def test_relationship_signal_defaults_to_none_and_rejects_invalid_values() -> None:

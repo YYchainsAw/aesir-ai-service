@@ -72,10 +72,11 @@ def test_dialogue_event_deltas_are_calibrated() -> None:
 
 
 def test_dialogue_cooldown_is_stricter_than_world_events() -> None:
-    """对话专属冷却（默认 300 秒 > 事实事件 60 秒）：对话每轮都发生，须更严。
+    """对话专属冷却（代码层显式传 300s > 事实事件 60s）：对话每轮都发生，须更严。
 
-    61 秒后的重复 warm 仍被拦（事实事件此时已可计分，见
-    ``test_cooldown_window_dedup``）；301 秒后才放行。
+    本用例用 300s 参数验证冷却机制本身（不读 config 默认值——config 默认值
+    T45/#62 已从 300s 调到 120s）。61 秒后的重复 warm 仍被拦（事实事件此时
+    已可计分，见 ``test_cooldown_window_dedup``）；301 秒后才放行。
     """
     state = _state()
     state, _ = apply_relationship_event(state, "dialogue_warm_exchange", T0)

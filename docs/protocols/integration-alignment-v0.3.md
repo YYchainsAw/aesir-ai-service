@@ -33,6 +33,47 @@ curl.exe http://127.0.0.1:8011/health
 
 一进程一游戏；角色、目标和能力来自本次有效上下文，非施法可不含技能，需要技能时必须获准，数量尚未冻结。旧语音默认目录、v0.2逐角色校验及回执game_id绑定未完全覆盖，见[实现差距](npc-contract-v0.3.md#7-当前实现差距)。接口存在不等于这些保护都已在UE生效。
 
+## 端点×版本×必填字段速查表（T47/#64）
+
+> 实测踩坑汇总：UE 侧若用同一结构体复用，必踩 422。每个端点的 `protocol_version`
+> 是**字符串字面量**，不能混用；`world_context.scene` 枚举不含 `night`/`dungeon`
+> （夜间属于 `world_time.time_of_day`，不是 scene）。
+
+| 端点 | protocol_version | 必填字段 | 常见 422 踩坑 |
+| --- | --- | --- | --- |
+| `POST /v1/agent/step` | `"0.3"` | `request_id`（UUID）、`companion_id`、`world_context` | 传 `"0.2"` → 422；`text: ""` 不是心跳，是 422 |
+| `POST /v1/world/events` | `"0.3"` | `request_id`（字符串，非 UUID）、`companion_id`、`event.event_id`、`event.event_type`（枚举）、`event.occurred_at`、`event.sequence`（单调递增 int）、`world_context` | `event_type` 拼错（如 `low_hp_warning` → 应为 `player_hp_critical`）；缺 `sequence`；payload 字段名是 `details` 不是 `payload` |
+| `POST /v1/tactical/command` | `"0.2"` | `request_id`、`companion_id`、`text`、`combat_context` | 传 `"0.3"` → 422（本端点仍是 v0.2）；`combat_context` 缺 `mode: "combat"` / `encounter_id` / `boss` / `ability_states` → 422 |
+| `POST /v1/companion/chat` | 无版本字段 | `companion_id`、`text` | — |
+| `POST /v1/tactical/executions` | 每条回执 `"0.2"` | `order_id`、`encounter_id`、`result` | 信封本身无 `protocol_version` 字段；`result` 枚举仅 `accepted/executed/rejected/expired/cancelled` |
+
+### `world_context.scene` 合法值
+
+`combat` / `exploration` / `camp` / `conversation` / `idle`——**没有 `night`**。
+夜间属于 `world_time.time_of_day`（`morning/noon/evening/night`），天气属于
+`world_time.weather`（`clear/rain/snow/storm/fog`）。
+
+### `combat_context` 必填字段（tactical/command 专用）
+
+```json
+{
+  "snapshot_id": "...",
+  "captured_at": "...",
+  "encounter_id": "encounter.demo.001",
+  "mode": "combat",
+  "player": {"id": "party.player", "hp_percent": 80, "distance_to_boss_m": 12.0},
+  "companion": {"id": "companion.alice", "hp_percent": 90, "mp_percent": 5, "ability_states": {"ability.alice.shield": "ready"}},
+  "boss": {"id": "encounter.primary_hostile", "hp_percent": 100, "state_tags": []}
+}
+```
+
+缺 `mode` / `encounter_id` / `boss` / `ability_states` 任一字段 → 422。
+
+### 版本统一路线
+
+`tactical/command` 仍是 v0.2，`agent/step` 与 `world/events` 是 v0.3。长期目标是
+把 tactical/command 也升到 v0.3 统一信封，但这涉及 UE 侧结构体改造，不在本轮范围。
+
 ## 接入顺序与通过条件
 
 以下从旧UE集成指南合并有效步骤，按风险推进；每步都记录实际结果，不预勾完成。

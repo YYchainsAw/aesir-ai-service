@@ -245,6 +245,35 @@ def generate_candidates(
             )
         )
 
+    # 日常自主：跟随玩家（exploration/camp/idle 未在跟随状态时）——探索域的默认自主行为
+    if "follow" in allowed and ctx.companion.current_behavior != "following":
+        candidates.append(
+            BehaviorCandidate(
+                behavior="follow",
+                category="routine_autonomy",
+                priority=allowed["follow"].priority,
+                target_id=None,
+                trigger_source="not_following",
+                reason_codes=["FOLLOW_PLAYER"],
+                payload={},
+            )
+        )
+
+    # 日常自主：恶劣天气表情反应（雨/雪/雾/风暴 → express）
+    weather = ctx.world_time.weather
+    if "express" in allowed and weather in {"rain", "snow", "storm", "fog"}:
+        candidates.append(
+            BehaviorCandidate(
+                behavior="express",
+                category="routine_autonomy",
+                priority=allowed["express"].priority,
+                target_id=None,
+                trigger_source=f"weather_{weather}",
+                reason_codes=["WEATHER_CHANGE", weather.upper()],
+                payload={"weather": weather},
+            )
+        )
+
     # 日常自主：低血量休整（camp/idle 才有 rest）
     if ctx.companion.hp_percent < 40 and "rest" in allowed:
         candidates.append(

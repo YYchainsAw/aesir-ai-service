@@ -2,7 +2,31 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-20，843 passed + 2 skipped**（T38/#53 埋点补齐后）。此前末次全量记录为 2026-10-15 的 769 passed + 2 skipped、2026-10-19 端口专项 12 passed——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T49 SC-009 历史/本次拆分（#66）
+
+SC-009 此前把全部历史 rejected/expired/cancelled 回执都算成「越界下发」FAIL，但 2026-10-19 联调日的 4 条拒绝是 UE 拒绝未制作能力的真实反馈，不是测试缺陷。本轮：collect_receipts 按 received_at 日期拆分今日/历史非执行回执；SC-009 verdict 今日零越界仅历史有记录 → PASS（note 注明历史性质），今日有越界 → FAIL。实测 SC-009 从 FAIL(4) 变为 PASS(0 今日 / 4 历史)。测试 847→848。
+
+## 2026-10-21 — T48 对话信号→关系事件映射守卫（#65）
+
+实测「直接调关系规则层用 warm_sentiment 返回 unknown_event」的根因：对话层有一层映射 `_DIALOGUE_RELATIONSHIP_EVENTS`（warm/deep/cold/hurtful → dialogue_warm_exchange 等），但映射表无守卫——如果有人给 LLM schema 加新信号却忘了更新映射，信号会被静默吞掉（返回 no_signal，delta=0）。审查结论：当前映射完整（4/4 事件在 policy 中存在，none 故意不映射）。新增守卫测试 `test_signal_to_event_mapping_is_complete`，防止未来新增信号时漏映射。测试 846→847。
+
+## 2026-10-21 — T47 契约版本速查表（#64，纯文档）
+
+实测踩坑汇总：UE 侧若用同一结构体复用各端点，必踩 422。在 integration-alignment-v0.3.md 新增「端点×版本×必填字段速查表」：agent/step 与 world/events 是 v0.3、tactical/command 仍是 v0.2、executions 每条回执 v0.2；列出各端点必填字段与常见 422 踩坑（scene 无 night、combat_context 缺 mode/encounter_id/boss/ability_states）。长期目标 tactical/command 升 v0.3 统一信封，涉及 UE 侧结构体改造，不在本轮范围。
+
+## 2026-10-21 — T46 lore 知识库补世界观（#63）
+
+实测问「我们现在所在的地方叫什么名字」→ TOOL_NO_RESULT，艾莉只能打太极。按 lore 纪律「只收设计文档已确立的事实，不编造」，从 combat-tactical-protocol-v0.2 和 persona.yaml 提取 4 条可追溯条目：Boss 暴怒状态（state.enraged）、Boss 被击败（boss_defeated 事件）、艾莉性格与动机（persona.background）、战斗事件类型清单（6 种 event_type）。地名/阵营/艾莉出身背景等设计文档未确立的内容刻意留空——保持「无据可查时明确不确定」的 SC-008 验收路径。lore revision 002→003。测试 846 持平。
+
+## 2026-10-21 — T45 关系值上升节奏调参（#62）
+
+实测 12 轮正向对话只 scored 1 次（+1），关系值 26→27 几乎不动。两处瓶颈叠加：对话冷却 300s 过严（连聊 10 分钟被拦 5 次）+ LLM prompt 明确「when in doubt choose none」宁漏勿滥。本轮：(1) 对话冷却 300s→120s（事实事件冷却 60s 不变）；(2) LLM prompt 放宽 warm 判定——「今天很开心」「谢谢你」「有你在真好」等友好表达应稳定给 warm，deep/cold/hurtful 保持严格（delta 更大）。日上限 15/天不变。预期：30 分钟有效对话内关系值从 neutral 推到 friendly（50 分）。测试 846 持平（仅 config + prompt 文案调整 + 测试断言同步）。
+
+## 2026-10-21 — T44 自主行为目录扩充（#61）
+
+实测 SC-005 FAIL 根因不是 YAML 注册行为数（已有 11 类），而是 `generate_candidates` 仅在特殊条件下产出候选：follow/express 已注册但从不产出，探索域默认退化为 observe 兜底。本轮补两条默认自主生成规则——(1) companion 未在 following 状态时产出 follow 候选（follow 优先级 20→30，确保探索域默认自主胜出）；(2) 雨/雪/雾/风暴天气产出 express 候选。冒烟实测行为类型数从 1 类（仅 observe）升至 6 类（follow/express/inspect/observe/rest/wait），真实游戏时间积累后还会触发 self_talk/pickup/alert_player。测试 843→846。
 
 ## 2026-10-20 — T38 SC 验收埋点补齐（#53）
 
