@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T46/#63 lore 知识库补世界观后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T47/#64 契约速查表后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T47 契约版本速查表（#64，纯文档）
+
+实测踩坑汇总：UE 侧若用同一结构体复用各端点，必踩 422。在 integration-alignment-v0.3.md 新增「端点×版本×必填字段速查表」：agent/step 与 world/events 是 v0.3、tactical/command 仍是 v0.2、executions 每条回执 v0.2；列出各端点必填字段与常见 422 踩坑（scene 无 night、combat_context 缺 mode/encounter_id/boss/ability_states）。长期目标 tactical/command 升 v0.3 统一信封，涉及 UE 侧结构体改造，不在本轮范围。
 
 ## 2026-10-21 — T46 lore 知识库补世界观（#63）
 
