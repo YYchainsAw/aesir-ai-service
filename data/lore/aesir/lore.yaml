@@ -8,7 +8,7 @@
 # 「遗迹是谁建的」）刻意留空，它正是「查不到 → 明确不确定」这条验收路径的
 # 用例，不能为了显得知识库充实而现编一段设定。
 
-revision: lore-002
+revision: lore-003
 
 entries:
   - id: lore.companion.alice
@@ -43,3 +43,39 @@ entries:
       Boss 的眩晕值由玩家的攻击累积，接近积满时它会露出破绽；积满后进入
       短暂眩晕，这是集中输出的窗口。眩晕结束后它回到常规状态。
     source: "game-design-doc §3.3"
+
+  - id: lore.boss.enraged
+    topic: Boss 暴怒
+    keywords: [boss, 暴怒, 狂暴, enraged, 危险, 状态]
+    content: >-
+      Boss 在战斗中可能进入暴怒（enraged）状态，此时它的攻击会更猛烈；
+      艾莉会提醒玩家注意，需要谨慎应对。
+    source: "combat-tactical-protocol-v0.2 §6.1 state_tags: state.enraged"
+
+  - id: lore.boss.defeated
+    topic: Boss 被击败
+    keywords: [boss, 击败, 胜利, 战斗结束, 打赢]
+    content: >-
+      Boss 被击败（boss_defeated）意味着本场战斗胜利结束，艾莉会存活下来
+      一起庆祝；这也是战斗分工里最理想的结果。
+    source: "combat-tactical-protocol-v0.2 §6.1 event_type: boss_defeated"
+
+  - id: lore.alice.personality
+    topic: 艾莉的性格与动机
+    keywords: [性格, 动机, 背景, 为什么, 活泼, 在意, 关心]
+    content: >-
+      艾莉是天赋出众的魔法使用者，喜欢主动探索新鲜事物，也愿意在旅途中
+      带动气氛。她并不害怕表达观点，但被玩家认真关心或直接称赞时，常会
+      用嘴硬和玩笑掩饰短暂的慌乱。她对玩家怀有未明说的好感，但仍会尊重
+      玩家的选择与边界。
+    source: "companion.alice/persona.yaml identity.background + core_traits"
+
+  - id: lore.combat.events
+    topic: 战斗中会发生什么
+    keywords: [战斗, 事件, 战况, 玩家危险, 艾莉缺蓝, 突发]
+    content: >-
+      战斗中常见的战况变化：玩家血量告急（player_hp_critical）、Boss 眩晕
+      值接近积满（boss_stun_near）、Boss 进入眩晕（boss_stunned）、Boss 暴怒
+      （boss_enraged）、艾莉蓝量不足（companion_mp_low）、Boss 被击败
+      （boss_defeated）。艾莉会在这些时刻主动给出提示或支援。
+    source: "combat-tactical-protocol-v0.2 §6.1 event_type 枚举"

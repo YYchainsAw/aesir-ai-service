@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T45/#62 关系节奏调参后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T46/#63 lore 知识库补世界观后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T46 lore 知识库补世界观（#63）
+
+实测问「我们现在所在的地方叫什么名字」→ TOOL_NO_RESULT，艾莉只能打太极。按 lore 纪律「只收设计文档已确立的事实，不编造」，从 combat-tactical-protocol-v0.2 和 persona.yaml 提取 4 条可追溯条目：Boss 暴怒状态（state.enraged）、Boss 被击败（boss_defeated 事件）、艾莉性格与动机（persona.background）、战斗事件类型清单（6 种 event_type）。地名/阵营/艾莉出身背景等设计文档未确立的内容刻意留空——保持「无据可查时明确不确定」的 SC-008 验收路径。lore revision 002→003。测试 846 持平。
 
 ## 2026-10-21 — T45 关系值上升节奏调参（#62）
 
