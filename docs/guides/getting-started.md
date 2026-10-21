@@ -76,6 +76,8 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8011/v1/companion/chat' -C
 
 ## 语音和外部后端
 
+部署目标见 [AI-DEP-12/13 分工对照](../planning/ai-capability-placement.md)：采集/PTT、采用时的 VAD 与播放在 UE 本地；初期文本优先，正式 ASR 优先评估服务器调用外部服务。下面仍说明当前已支持的 `mock`／`faster_whisper`，外部 ASR 尚无适配，不新增未实现的配置值。
+
 ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机能力配置AESIR_ASR_MODEL/DEVICE/COMPUTE_TYPE/LANGUAGE。首次下载模型可能联网，运行需已有模型和依赖，不能把mock通过当真实语音已验收。
 
 传输约定16kHz/单声道/16-bit PCM WAV。命令上传字段为file、context_json；闲聊与纯转写字段为audio。当前没有统一大小/时长/WAV头门禁，失败按实际响应处理，保留文本入口。不要在教程或测试记录中放密钥、私人对话和未脱敏音频。

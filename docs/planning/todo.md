@@ -23,4 +23,4 @@
 
 2026-10-20 新增（均已由 GitHub 建账，此处仅留指针）：FIX-12 / style_guard 元语言词表口径定夺（[#55](https://github.com/YYchainsAw/aesir-ai-service/issues/55) / T40，待 26 轮真实对话回归）；Boss RL 第三种子重训（[#58](https://github.com/YYchainsAw/aesir-ai-service/issues/58) / T43，旁路，按评测选优保存 checkpoint）；M2 旧账核对（#17/#18/#29/#30，训练早已完成但 issue 仍开放，逐项核对关闭或补验收证据）。S5 外部人格包守卫（#39 / T30）已于 2026-10-20 完成，见 CHANGELOG 与验证记录。
 
-其他范围界限沿用 SDD：单机、本地文件、UE 唯一世界权威、工具只读、不做多用户/账号同步、人格自演化、DB/MQ/公网部署，不将 Boss RL 并入 NPC `app` 服务。新增业务口径先写 REQ/BR/AT；不把课程建模修正或文档整理当作额外功能批准。
+历史 SDD 的范围界限为单机、本地文件、UE 唯一世界权威、工具只读，不含多用户/账号同步、人格自演化、DB/MQ/公网部署，且 Boss RL 不并入 NPC `app` 服务；这段作为旧基线保留。2026-10-21 用户明确批准按“Boss 本地、队友语义与记忆云端”推进远程开发、云部署、玩家/存档隔离与数据库演进，顺序和验收见[六步开发方案](local-boss-cloud-companion-roadmap.md)，本轮先执行环境建立。15 项能力的原计划覆盖、运行位置与缓存/离线同步、VAD、外部 ASR、模型交付的待设计边界见[部署分工对照](ai-capability-placement.md)，不在本页另建任务状态。本文未宣称旧 SDD 已完成全部需求更新或上述功能已实现；UE 世界权威、工具只读、Boss/NPC 服务分离及人格自演化未获立项的边界继续成立。后续业务口径同步 REQ/BR/AT 与契约，日常任务状态仍只在 GitHub Issues 维护。

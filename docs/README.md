@@ -7,6 +7,8 @@
 | 现在要解决的问题 | 阅读入口 |
 | --- | --- |
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/getting-started.md) |
+| 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
+| 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/repro.md) |
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/llm-integration.md) |
 | 指令在源码中怎样处理 | [命令处理导读](guides/command-execution.md) |

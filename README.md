@@ -22,6 +22,8 @@ python -m venv .venv
 | 我现在要做什么 | 入口 |
 | --- | --- |
 | 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
+| 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
+| 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
 | 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
 | 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
 | 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
@@ -47,9 +49,9 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest
+.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py -q
 ```
 
-测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
+上述为无需 ML/RL 依赖的核心回归；完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
 
 日常任务只维护一个状态来源，文档保留规则、依赖与验收定义。修改接口字段时同步schema、契约与golden样例；修改业务规则时同步需求、图和追踪，未决定的技能数量或跨端阶段协议继续列为未决。

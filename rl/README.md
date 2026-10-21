@@ -2,6 +2,8 @@
 
 `rl/boss/` 训练、评估和部署 Boss 高层动作策略，使用 MaskablePPO；NPC 服务 `app/` 不导入它。模拟器规则基线 `RuleBossPolicy` 与 UE 的 `BT_AesirBoss` 是不同实现，模拟器成绩不能直接代表 UE 实战。
 
+部署目标见[15 项能力分工](../docs/planning/ai-capability-placement.md)（`placement-v1`，AI-DEP-01/02/14/15）及[六步方案第五步](../docs/planning/local-boss-cloud-companion-roadmap.md)：源码可在服务器开发，冻结推理发行到玩家电脑；训练/正式评估与在线 NPC 服务隔离。本页既有模型身份/接口说明不表示 Windows 包、自动模型更新、独立 PPO 评估或 UE 验收已经完成。
+
 ## 运行入口
 
 以下命令在仓库根目录执行。安装 RL 依赖后，可运行规则基线评估；`--episodes` 是每种玩家画像的局数，三种画像各 20 局即总计 60 局。

@@ -2,6 +2,8 @@
 
 > 当前说明按2026-10-19服务源码`a2dd426`整理。这里维护启动、接入检查和历史样例边界；字段以[NPC契约v0.3](npc-contract-v0.3.md)、[v0.2战术](combat-tactical-protocol-v0.2.md)、[v0.1订单/对话](ue-protocol-contract-v0.1.md)为准。需求与真实验收见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
 
+> 部署目标更新（2026-10-21）：[15 项分工对照](../planning/ai-capability-placement.md)已明确 Boss 本地、队友语义与长期状态云端；下表 `127.0.0.1` 是当前默认/开发接入地址，不表示正式 NPC 仍需随游戏本机运行。当前服务器开发实例及 SSH 转发见[远程开发指南](../guides/remote-development.md)；部署目标不自动改变任何现有协议字段或版本。
+
 ## 当前实例与版本
 
 | 实例 | 默认地址 | 接入边界 |
