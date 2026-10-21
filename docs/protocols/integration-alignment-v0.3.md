@@ -73,6 +73,8 @@ curl.exe http://127.0.0.1:8011/health
 
 ### 版本统一路线
 
+2026-10-21 补充：带玩家/存档作用域的云端入口拟采用[v0.4契约草案](npc-scope-contract-v0.4-draft.md)，已于2026-10-21批准；下述旧路线保留为历史目标，实际实现版本仍按上表。第二步先做服务端契约与模拟客户端验收，不要求现在修改UE或测试连接。
+
 `tactical/command` 仍是 v0.2，`agent/step` 与 `world/events` 是 v0.3。长期目标是
 把 tactical/command 也升到 v0.3 统一信封，但这涉及 UE 侧结构体改造，不在本轮范围。
 

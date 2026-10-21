@@ -24,6 +24,7 @@ python -m venv .venv
 | 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
 | 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
 | 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
+| 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/step-02-identity-scope-plan.md) · [v0.4契约草案](docs/protocols/npc-scope-contract-v0.4-draft.md)（已批准、实现中） |
 | 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
 | 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
 | 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
