@@ -58,7 +58,10 @@ def _last_record(tmp_path) -> dict:
 
 def test_autonomous_heartbeat_is_recorded(monkeypatch, tmp_path):
     monkeypatch.setenv("AESIR_AGENT_STEPS_DIR", str(tmp_path))
-    response = client.post("/v1/agent/step", json=_step_payload())
+    payload = _step_payload()
+    # 显式设为已跟随，避免 follow 默认自主胜出（T44/#61）；本用例聚焦 notable→inspect 落盘。
+    payload["world_context"]["companion"]["current_behavior"] = "following"
+    response = client.post("/v1/agent/step", json=payload)
     assert response.status_code == 200
     record = _last_record(tmp_path)
     assert record["companion_id"] == "companion.alice"

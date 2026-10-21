@@ -54,8 +54,20 @@ def _bypass_heartbeat(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_heartbeat_emits_autonomous_directive() -> None:
-    """T054：探索场景 + notable 篝火 → 自主行为产出指令（US3 核心路径）。"""
-    response = client.post("/v1/agent/step", json=_step_payload())
+    """T054：探索场景 + notable 篝火 → 自主行为产出指令（US3 核心路径）。
+
+    companion 显式设为 current_behavior="following"，避免 follow 默认自主胜出
+    （T44/#61：未在跟随状态时 follow 是探索域默认自主行为）；本用例聚焦
+    notable 交互物 → inspect 指令路径。
+    """
+    payload = _step_payload()
+    payload["world_context"]["companion"] = {
+        "id": "companion.alice",
+        "hp_percent": 90,
+        "mp_percent": 70,
+        "current_behavior": "following",
+    }
+    response = client.post("/v1/agent/step", json=payload)
     assert response.status_code == 200
     body = response.json()
     assert body["request_id"] == _REQUEST_ID

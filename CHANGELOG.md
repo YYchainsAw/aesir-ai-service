@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-20，843 passed + 2 skipped**（T38/#53 埋点补齐后）。此前末次全量记录为 2026-10-15 的 769 passed + 2 skipped、2026-10-19 端口专项 12 passed——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T44/#61 自主行为目录扩充后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T44 自主行为目录扩充（#61）
+
+实测 SC-005 FAIL 根因不是 YAML 注册行为数（已有 11 类），而是 `generate_candidates` 仅在特殊条件下产出候选：follow/express 已注册但从不产出，探索域默认退化为 observe 兜底。本轮补两条默认自主生成规则——(1) companion 未在 following 状态时产出 follow 候选（follow 优先级 20→30，确保探索域默认自主胜出）；(2) 雨/雪/雾/风暴天气产出 express 候选。冒烟实测行为类型数从 1 类（仅 observe）升至 6 类（follow/express/inspect/observe/rest/wait），真实游戏时间积累后还会触发 self_talk/pickup/alert_player。测试 843→846。
 
 ## 2026-10-20 — T38 SC 验收埋点补齐（#53）
 

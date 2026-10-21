@@ -139,6 +139,60 @@ def test_candidates_default_observe_fallback() -> None:
     assert "observe" in behaviors
 
 
+def test_candidates_follow_when_not_following() -> None:
+    """探索/营地/空闲域未在跟随状态 → 产出 follow 候选（默认自主行为）。"""
+    ctx = _ctx(
+        scene="exploration",
+        world_time={"time_of_day": "noon", "weather": "clear"},
+        interactables=[],
+    )
+    candidates = generate_candidates(ctx)
+    follow = [c for c in candidates if c.behavior == "follow"]
+    assert follow, "未在跟随状态时应产出 follow 候选"
+    assert follow[0].category == "routine_autonomy"
+    assert follow[0].target_id is None
+    assert "FOLLOW_PLAYER" in follow[0].reason_codes
+
+
+def test_candidates_no_follow_when_already_following() -> None:
+    """companion.current_behavior == 'following' → 不重复产 follow（避免自循环）。"""
+    ctx = _ctx(
+        scene="exploration",
+        world_time={"time_of_day": "noon", "weather": "clear"},
+        companion={
+            "id": "companion.alice",
+            "hp_percent": 85,
+            "mp_percent": 40,
+            "current_behavior": "following",
+        },
+        interactables=[],
+    )
+    behaviors = {c.behavior for c in generate_candidates(ctx)}
+    assert "follow" not in behaviors
+
+
+def test_candidates_bad_weather_express() -> None:
+    """雨/雪/雾/风暴 → 产出 express 天气反应候选；晴天不产。"""
+    for weather in ("rain", "snow", "storm", "fog"):
+        ctx = _ctx(
+            scene="exploration",
+            world_time={"time_of_day": "noon", "weather": weather},
+            interactables=[],
+        )
+        candidates = generate_candidates(ctx)
+        express = [c for c in candidates if c.behavior == "express"]
+        assert express, f"天气 {weather} 应产出 express 候选"
+        assert express[0].payload == {"weather": weather}
+        assert "WEATHER_CHANGE" in express[0].reason_codes
+
+    sunny = _ctx(
+        scene="exploration",
+        world_time={"time_of_day": "noon", "weather": "clear"},
+        interactables=[],
+    )
+    assert "express" not in {c.behavior for c in generate_candidates(sunny)}
+
+
 def test_relationship_stage_gates_self_talk() -> None:
     """关系阶段调制：低阶段（distant）不产 self_talk，高阶段（close）产。"""
     ctx = _ctx(
