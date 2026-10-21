@@ -8,6 +8,8 @@ SC-007「幂等重复响应率 = 0」的脚本判定口径：同一 ``event_id``
 说明同一事件被独立评估了两次——幂等表被绕过，判 FAIL。
 
 埋点是观测而非流程：任何写盘故障一律静默吞掉（绝不阻塞事件主流程）。
+
+v0.4 作用域请求的日志写入失败向外传播，由请求协调器记录未知提交结果。
 """
 
 from __future__ import annotations
@@ -17,10 +19,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import get_settings
+from app.scoped.context import current_scope
+from app.scoped.storage import signal_directory, signal_metadata, guarded_commit, unavailable
 
 _DEFAULT_GAME_ID = "aesir"
 
 
+@guarded_commit
 def record_event_resolved(
     companion_id: str,
     *,
@@ -46,9 +51,12 @@ def record_event_resolved(
             "duplicate": bool(duplicate),
             "encounter_id": encounter_id,
         }
-        root = Path(get_settings().event_signals_dir) / game_id
+        root = signal_directory(get_settings().event_signals_dir, game_id)
+        record.update(signal_metadata())
         root.mkdir(parents=True, exist_ok=True)
         with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001 - 埋点绝不阻塞事件主流程
+    except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞事件主流程
+        if current_scope():
+            raise unavailable() from error
         pass

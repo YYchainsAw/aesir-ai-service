@@ -10,6 +10,9 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.scoped.context import current_scope
+from app.scoped.storage import signal_directory, signal_metadata, guarded_commit
+
 from app.schemas.tactical_execution import ExecutionReceipt
 
 
@@ -27,6 +30,7 @@ def append_receipt(
     return append_receipts([receipt], game_id=game_id, directory=directory)
 
 
+@guarded_commit
 def append_receipts(
     receipts: list[ExecutionReceipt],
     *,
@@ -43,13 +47,16 @@ def append_receipts(
     if not receipts:
         raise ValueError("receipts 不能为空列表")
 
-    target_dir = Path(directory) if directory is not None else Path(get_settings().receipts_dir) / game_id
+    if current_scope():
+        target_dir = signal_directory(directory or get_settings().receipts_dir, game_id)
+    else:
+        target_dir = Path(directory) if directory is not None else Path(get_settings().receipts_dir) / game_id
     now = datetime.now(timezone.utc)
     path = _day_file(target_dir, now)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         for receipt in receipts:
-            record = receipt.model_dump()
+            record = {**receipt.model_dump(), **signal_metadata()}
             if not record["received_at"]:
                 record["received_at"] = now.isoformat()
             f.write(json.dumps(record, ensure_ascii=False) + "\n")

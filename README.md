@@ -15,6 +15,8 @@ python -m venv .venv
 
 默认地址为 `http://127.0.0.1:8011`。打开 `/health` 检查运行提交，打开 `/docs` 查询当前接口。`scripts.run_server` 读取 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT`；直接运行未指定端口的 Uvicorn 会使用其自己的默认端口。修改 `.env` 或策略后重启服务。
 
+新版JSON入口默认要求可信身份，旧协议默认关闭。单机/环回开发的固定身份、旧协议兼容开关及调用顺序见[v0.4开发与交接](docs/guides/scoped-development.md)；不以客户端自报player_id代替身份。
+
 规则和 mock 模式不需要云端模型；启用 LLM 时会向配置后端发送文本及生成所需上下文。真实 ASR 需要可选依赖。安装、后端配置、数据流和复现步骤见下面的指南，不能由“服务在本机运行”推断没有外部调用。
 
 ## 从哪里看
@@ -24,6 +26,7 @@ python -m venv .venv
 | 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
 | 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
 | 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
+| 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/step-02-identity-scope-plan.md) · [v0.4契约草案](docs/protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
 | 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
 | 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
 | 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |

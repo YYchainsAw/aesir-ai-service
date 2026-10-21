@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — DEP2 NPC归属、生命周期与有效期（分支实现）
+
+按已批准的第二步计划，在 `feature/npc-scope-v04` 新增v0.4同版JSON边界、可信开发身份、玩家/存档/NPC状态分区、显式run/encounter CAS、记忆epoch重置屏障、单调预算、有限窗口single-flight与回执关联；旧协议须显式开启开发兼容模式。新增190项scoped测试和21个完整golden，适用核心回归1029 passed+1 skipped。未安装可选ML/RL、未调用真实LLM、未修改或连接UE。命令、证据与未验范围见[验证记录](docs/logs/verification-records.md#scope-20261021)，配置与接入见[开发指南](docs/guides/scoped-development.md)。
 
 ## 2026-10-21 — T49 SC-009 历史/本次拆分（#66）
 

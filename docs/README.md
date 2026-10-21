@@ -9,6 +9,8 @@
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/getting-started.md) |
 | 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
 | 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |
+| 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
+| 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/scoped-development.md) |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/repro.md) |
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/llm-integration.md) |
 | 指令在源码中怎样处理 | [命令处理导读](guides/command-execution.md) |
@@ -27,6 +29,7 @@
 | [v0.1订单与对话](protocols/ue-protocol-contract-v0.1.md) | 兼容文本/语音订单解析、陪伴对话与流式响应 |
 | [v0.2战术决策](protocols/combat-tactical-protocol-v0.2.md) | 战斗快照、上下文决策、战斗事件与执行回执 |
 | [v0.3代理入口](protocols/npc-contract-v0.3.md) | 心跳/文本主入口、世界事件、当前端点矩阵及回执兼容边界 |
+| [v0.4作用域草案](protocols/npc-scope-contract-v0.4-draft.md) | 身份、生命周期、时效与兼容边界；分支实现及服务端回归见验证记录 |
 | [人格包与游戏档案schema](protocols/persona-pack-schema-v0.2.md) | 数据资产格式；它的版本不等于API协议版本 |
 
 这些契约按职责并存，不能仅因编号较旧删除仍使用的协议。指南只维护步骤与说明，字段表链接上述契约；当前接口的交互文档由运行实例的`/docs`提供。

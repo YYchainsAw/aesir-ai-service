@@ -23,6 +23,8 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 
+from app.scoped.storage import runtime_key, guarded_commit
+
 from app.services.agency.behavior_catalog import BehaviorCandidate, get_agency_policy
 
 
@@ -44,14 +46,16 @@ class AutonomousThrottle:
         self._seen: "OrderedDict[tuple[str, str, str, str], float]" = OrderedDict()
         self._lock = threading.Lock()
 
+    @guarded_commit
     def admit(
         self, companion_id: str, candidate: BehaviorCandidate, now: float | None = None
     ) -> ThrottleDecision:
         """判定候选是否放行；放行同时登记（占用窗口计数）。"""
         if now is None:
             now = time.monotonic()
+        companion_key = runtime_key(companion_id)
         key = (
-            companion_id,
+            companion_key,
             candidate.behavior,
             candidate.target_id or "-",
             candidate.trigger_source,
@@ -64,7 +68,7 @@ class AutonomousThrottle:
             # 窗口内该角色已放行的不同键数量（去重窗口与计数窗口同长）
             admitted_in_window = sum(
                 1 for (cid, *_), ts in self._seen.items()
-                if cid == companion_id and (now - ts) < self._window
+                if cid == companion_key and (now - ts) < self._window
             )
             if admitted_in_window >= self._max_per_window:
                 return ThrottleDecision(False, ["MAX_PER_WINDOW_EXCEEDED"])

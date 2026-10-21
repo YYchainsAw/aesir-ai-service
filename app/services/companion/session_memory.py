@@ -11,6 +11,10 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 
+from app.scoped.context import current_scope
+from app.scoped.errors import ScopeError
+from app.scoped.storage import checked_npc, guarded_commit
+
 
 @dataclass(frozen=True)
 class DialogueTurn:
@@ -44,13 +48,23 @@ class SessionMemoryStore:
     def max_turns(self) -> int:
         return self._max_turns
 
+    def _key(self, session_id, companion_id):
+        scope = current_scope()
+        if scope is None:
+            return (companion_id, session_id)
+        checked_npc(companion_id or scope.npc.companion_id)
+        if str(session_id) != str(scope.session_id):
+            raise ScopeError(409, "SCOPE_MISMATCH", "Session does not match request scope")
+        return ("scoped", *scope.session_key)
+
     def history(
         self, session_id: str, companion_id: str | None = None
     ) -> tuple[DialogueTurn, ...]:
         """该角色该会话最近 N 轮（时间正序），无记忆时为空组。"""
         with self._lock:
-            return tuple(self._sessions.get((companion_id, session_id), ()))
+            return tuple(self._sessions.get(self._key(session_id, companion_id), ()))
 
+    @guarded_commit
     def record(
         self,
         session_id: str,
@@ -68,7 +82,7 @@ class SessionMemoryStore:
             return
         with self._lock:
             turns = self._sessions.setdefault(
-                (companion_id, session_id), deque(maxlen=self._max_turns)
+                self._key(session_id, companion_id), deque(maxlen=self._max_turns)
             )
             turns.append(
                 DialogueTurn(
@@ -81,8 +95,20 @@ class SessionMemoryStore:
 
         返回被清除的会话数。``companion_id=None`` 时清空未分区（旧链路）会话。
         """
+        scope = current_scope()
+        if scope:
+            checked_npc(companion_id or scope.npc.companion_id)
+            return self.clear_scope(scope.npc)
         with self._lock:
-            keys = [key for key in self._sessions if key[0] == companion_id]
+            keys = [key for key in self._sessions if len(key) == 2 and key[0] == companion_id]
+            for key in keys:
+                del self._sessions[key]
+            return len(keys)
+
+
+    def clear_scope(self, npc) -> int:
+        with self._lock:
+            keys = [key for key in self._sessions if key[:5] == ("scoped", *npc.key)]
             for key in keys:
                 del self._sessions[key]
             return len(keys)
@@ -98,3 +124,7 @@ def get_session_memory(max_turns: int) -> SessionMemoryStore:
     if _store.max_turns != max(0, max_turns):
         _store = SessionMemoryStore(max_turns)
     return _store
+
+
+def clear_scoped_sessions(npc) -> int:
+    return _store.clear_scope(npc)
