@@ -16,10 +16,12 @@ def test_unwritable_directory_raises_memory_error(tmp_path) -> None:
     （Windows 上 chmod 无法阻止目录内建文件）。
     """
     blocked = tmp_path / "blocked"
-    blocked.write_text("占位文件", encoding="utf-8")  # companion.alice/ 目录无法创建
-
     store = MemoryStore("companion.alice", root=str(blocked))
     store.load()
+    # 先完成空存储加载，再阻塞目录，确保本用例检查写入错误。
+    # Linux 在父路径已是文件时会于 load() 抛 NotADirectoryError；
+    # Windows 可能按文件不存在处理，不能依赖该平台差异。
+    blocked.write_text("占位文件", encoding="utf-8")
     with pytest.raises(MemoryStoreError):
         store.append_short_term(MemoryEntry(content="写不进去"))
 
