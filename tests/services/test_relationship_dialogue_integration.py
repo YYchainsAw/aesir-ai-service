@@ -162,3 +162,27 @@ def test_relationship_failure_keeps_dialogue_alive(monkeypatch) -> None:
     assert response.reply_text
     assert response.relationship_delta == 0
     reset_relationship_stores()
+
+
+def test_signal_to_event_mapping_is_complete() -> None:
+    """T48/#65 守卫：LLM schema 每个非 none 信号必须有映射，且映射事件在 policy 中存在。
+
+    防止有人给 LLM schema 加新信号却忘了更新映射表，导致信号被静默吞掉
+    （返回 no_signal，delta=0）。
+    """
+    from app.services.companion.dialogue_service import _DIALOGUE_RELATIONSHIP_EVENTS
+    from app.services.relationship.policy import get_policy
+
+    # LLM schema 的 relationship_signal Literal 值
+    llm_signals = {"none", "warm", "deep", "cold", "hurtful"}
+
+    # none 故意不映射（不计分）；其余必须全部映射
+    mapped = set(_DIALOGUE_RELATIONSHIP_EVENTS.keys())
+    assert mapped == llm_signals - {"none"}, \
+        f"LLM 信号 {llm_signals - mapped - {'none'}} 未映射到关系事件"
+
+    # 每个映射事件必须在 relationship_policy.yaml 中登记
+    policy = get_policy()
+    for signal, event_type in _DIALOGUE_RELATIONSHIP_EVENTS.items():
+        assert event_type in policy.events, \
+            f"信号 {signal} 映射到 {event_type}，但该事件不在 relationship_policy.yaml 中"

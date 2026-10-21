@@ -2,7 +2,11 @@
 
 记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
 
-最新全量锚点为 **2026-10-21，846 passed + 2 skipped**（T47/#64 契约速查表后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+最新全量锚点为 **2026-10-21，847 passed + 2 skipped**（T48/#65 信号映射守卫后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
+
+## 2026-10-21 — T48 对话信号→关系事件映射守卫（#65）
+
+实测「直接调关系规则层用 warm_sentiment 返回 unknown_event」的根因：对话层有一层映射 `_DIALOGUE_RELATIONSHIP_EVENTS`（warm/deep/cold/hurtful → dialogue_warm_exchange 等），但映射表无守卫——如果有人给 LLM schema 加新信号却忘了更新映射，信号会被静默吞掉（返回 no_signal，delta=0）。审查结论：当前映射完整（4/4 事件在 policy 中存在，none 故意不映射）。新增守卫测试 `test_signal_to_event_mapping_is_complete`，防止未来新增信号时漏映射。测试 846→847。
 
 ## 2026-10-21 — T47 契约版本速查表（#64，纯文档）
 
