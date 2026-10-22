@@ -166,3 +166,31 @@ POST /v1/agent/step        → 200 ×28 （每3秒心跳）
 
 
 干净检出复核：在临时detached worktree `cb05cfa` 使用同一项目解释器重新执行上述适用核心命令，**1029 passed、1 skipped、7 warnings，29.20秒**，不依赖服务器其余未提交文件或开发`.env`。JUnit、日志和含commit/真实app模块路径的结果分别为`step2-clean-pytest.xml`、`step2-clean-pytest.log`、`step2-clean-pytest-result.json`；临时检出已清理。仓库当前未配置GitHub Actions检查，本轮自动验证在服务器运行，PR保持草稿待审查。
+
+<a id="loop-20261022"></a>
+## 2026-10-22 第三步请求与执行反馈服务端回归
+
+用户授权继续第三步后，在服务器 `/www/wwwroot/aesir-ai-service` 从 `main@e96151b` 创建 `feature/npc-execution-loop`。跟踪为[DEP3里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/7)与#76～#80；范围以[实施计划](../planning/step-03-execution-loop-plan.md)和[闭环增量契约](../protocols/npc-loop-contract-v0.4.md)为准。项目解释器Python 3.12.15；未新增依赖或修改开发`.env`。
+
+2026-10-22 12:30（Asia/Shanghai）的适用核心回归：**1272 passed、1 skipped、7 warnings，36.47秒**。其中 `tests/scoped` 从190增至433项（新增243项），新增10个完整golden由模型测试回读。命令为：
+
+```bash
+.venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q --tb=short --junitxml=data/runtime/remote-dev/verification/step3-pytest.xml
+```
+
+跳过的是未安装可选faster-whisper的模块，7条为既有Starlette弃用提示。此命令只覆盖适用核心，不包括需要NumPy/Torch的Boss推理/训练或真实ASR；没有调用付费LLM、测试UE连接或修改UE工程。
+
+| 验收范围 | 本轮实测及限制 |
+| --- | --- |
+| AT-LOOP-01/03 | 线程事件控制同会话chat/agent文本FIFO与新历史、跨session全局限额、队列/状态容量、规则心跳旁路；非生产并发容量结论 |
+| AT-LOOP-02/05 | 排队/运行/先到取消、最终提交竞争、重复请求single-flight、旧绑定/epoch拒绝；取消不强杀供应商HTTP，不撤销已提交事实 |
+| AT-LOOP-04 | 真实兼容客户端配httpx.MockTransport核对剩余1.5秒→1.25秒timeout与较短供应商timeout；取消/过期/旧身份穿透intent fallback及熔断；真实网络/计费未验 |
+| AT-LOOP-06/07 | 同sequence冲突、无序号重复、终态后accepted不倒退、批内错误无追加；注入open/部分write/flush/fsync失败，订单unknown且该NPC/run后续指令/回执封锁；clear或重启不会修复磁盘 |
+| AT-LOOP-08 | 跟随引用快照玩家、等待不虚构目标、治疗/护盾/爆发保留ability关联；未满足眩晕及未知on_condition无动作；只验证服务建议，不能证明UE有对应技能或已执行 |
+| AT-LOOP-09 | 生命周期与已知指令原请求查询、未知ID错误、只读不返回payload/不续期；executed为UE自报，完整started/hit/completed及持久历史不在此账本 |
+| AT-LOOP-10 | 严格新增模型、10个golden、旧JSON兼容与核心回归；3次HTTP（原请求/同ID重试/新请求）对应3个HTTP尝试UUID、2个实际上游UUID，日志无测试玩家/回复/提示词/API key原文 |
+| 提交边界 | 受控时钟令coordinator最终写入后、外层校验前过期：HTTP503/状态unknown，历史仅写一次且重试不重做；区别于后续因过期拒绝回放已完成结果 |
+
+原始记录保存在服务器 `data/runtime/remote-dev/verification/step3-pytest.log`、`step3-pytest.xml`、`step3-pytest-result.json`；专项433项为`step3-scoped.xml`。结果JSON保留时间、命令、分支基线、源码SHA256和保留文件校验，最终提交另记于运行元数据。这些文件不入Git。`.env`、`.python-version`、`requirements-dev-linux-py312.lock`与实施前SHA256完全一致，后两者继续保持原未提交状态。
+
+当前仅服务端开发增量通过，第三步整体验收与EVO-01生产余项没有关闭。UE仍需完成输入/回调代际、动作去重与实际执行/回执、条件监听协议、断网兜底及SC-011真实端到端采样；正式认证、数据库事务、跨重启恢复和离线同步留第四步。[开发指南](../guides/scoped-development.md#loop-usage)维护操作清单。

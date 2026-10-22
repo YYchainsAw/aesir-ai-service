@@ -422,6 +422,23 @@ def _command_step(request: AgentStepRequest) -> AgentStepResponse:
         # 关系推动全部生效。指令不猜测执行的纪律不变（action 仍为 none）。
         return _chitchat_dialogue_step(request)
 
+    # The current JSON contract has no UE condition registration. Only the
+    # known stun condition can be satisfied by this exact snapshot; every
+    # other conditional intent must remain a clarification, never an action.
+    known_stun = intent.intent_id == "prepare_burst_on_stun"
+    stun_satisfied = bool(ctx.combat and "state.stunned" in ctx.combat.boss.state_tags)
+    if (known_stun and not stun_satisfied) or (intent.timing == "on_condition" and not (known_stun and stun_satisfied)):
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION,
+            request_id=request.request_id,
+            companion_id=request.companion_id,
+            action="none",
+            reply_text="暂时还不能登记条件指令，请在条件满足后重新告诉我。",
+            observability=_intent_observability(
+                request, source, ["CONDITION_NOT_SUPPORTED"], ctx.snapshot_id
+            ),
+        )
+
     from app.schemas.tactical_intent import COMBAT_INTENT_IDS
 
     if intent.intent_id in COMBAT_INTENT_IDS:
@@ -546,6 +563,8 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         )
 
     action = decision.action
+    if action.type in {"cast_ability", "follow"} and not (action.target_id or "").strip():
+        return _empty_response(request, ["NO_VALID_TARGET"])
     if action.type == "retreat":
         action_type = "retreat"
     elif action.type == "follow":
@@ -563,7 +582,11 @@ def _combat_command_step(request: AgentStepRequest, intent, source: str) -> Agen
         source="player_command",
         reason_codes=decision.reason_codes,
         policy_revision=_policy_revision(),
-        payload={"target_id": action.target_id or ""},
+        payload={
+            key: value
+            for key, value in {"target_id": action.target_id, "ability_id": action.ability_id}.items()
+            if value
+        },
         presentation=presentation,
     )
     if directive is None:
@@ -613,6 +636,10 @@ def _non_combat_command_step(request: AgentStepRequest, intent, source: str) -> 
     # 目标选择：有目标行为取快照中最近的可交互物（类型/距离按目录校验）
     payload: dict[str, str] = {}
     reasons = [f"INTENT:{intent.intent_id}", f"BEHAVIOR:{behavior}"]
+    if behavior == "follow":
+        if not ctx.player.id.strip():
+            return _empty_response(request, [*reasons, "NO_VALID_TARGET"])
+        payload["target_id"] = ctx.player.id
     if spec.allowed_kinds:
         candidates = [
             obj

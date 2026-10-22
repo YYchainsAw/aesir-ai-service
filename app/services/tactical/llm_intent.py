@@ -8,6 +8,7 @@ JSON 的 ``TacticalIntent``（``intent_id`` 受 ``Literal`` 白名单约束，�
 """
 
 from app.schemas.tactical_intent import TacticalIntent
+from app.scoped.errors import ScopeError
 from app.services.companion.profile_repository import (
     CompanionProfile,
     CompanionProfileError,
@@ -172,5 +173,7 @@ def parse_intent_with_source(
 
     try:
         return parse_text_to_intent_llm(text, client=client, profile=profile), "llm"
+    except ScopeError:
+        raise
     except Exception:
         return parse_text_to_intent(text, wake_words=wake_words), "rule_fallback"

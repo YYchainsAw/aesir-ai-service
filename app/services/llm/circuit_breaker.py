@@ -11,6 +11,8 @@ LLM 调用，避免把外部故障拖垮本地服务。OPEN 状态经过恢复�
 
 from __future__ import annotations
 
+from app.scoped.errors import ScopeError
+
 import threading
 import time
 from collections.abc import Iterator
@@ -122,6 +124,8 @@ class CircuitBreakerLLMClient:
                 user_prompt=user_prompt,
                 temperature=temperature,
             )
+        except ScopeError:
+            raise
         except Exception:
             self._breaker.record_failure()
             raise
@@ -147,6 +151,8 @@ class CircuitBreakerLLMClient:
                 user_prompt=user_prompt,
                 temperature=temperature,
             )
+        except ScopeError:
+            raise
         except Exception:
             self._breaker.record_failure()
             raise

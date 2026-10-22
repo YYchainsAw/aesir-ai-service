@@ -1,6 +1,7 @@
 """v0.4 JSON 边界：可信归属→显式绑定→预算/去重→共享业务→最终屏障。"""
 from dataclasses import dataclass
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -13,6 +14,9 @@ from app.scoped.idempotency import get_request_store, get_event_store
 from app.scoped.runtime import get_runtime
 from app.scoped.storage import commit_guard, memory_epoch, reset_memory
 from app.scoped.timing import TimingBudget, current_budget
+from app.scoped.requests import get_coordinator, final_commit
+from app.scoped.trace import request_trace
+from app.schemas.loop import ScopedCancelRequest, ScopedCancelResponse, ScopedRequestStatusResponse, ScopedDirectiveStateResponse
 from app.schemas.scoped import (
     BindRunRequest, EndRunRequest, EncounterControlRequest, ScopedAgentRequest,
     ScopedChatRequest, ScopedWorldEventRequest, ScopedExecutionRequest, ScopedResetRequest,
@@ -75,7 +79,7 @@ def _execute(request, principal, operation, action):
     scope = _scope(request, principal)
     timing = getattr(request, "timing", None)
     # 初次校验发生在占位前；最终校验在各副作用以及缓存回放前再次进行。
-    with use_scope(scope):
+    with use_scope(scope), request_trace(scope, operation, request.request_id):
         with commit_guard(scope):
             pass
         budget = TimingBudget(timing, has_snapshot=getattr(request, "world_context", None) is not None) if timing else None
@@ -84,17 +88,31 @@ def _execute(request, principal, operation, action):
             with commit_guard(scope):
                 pass
 
-        def invoke():
+        def business():
             try:
                 return action(scope)
             except HTTPException as error:
                 code = "HEARTBEAT_RATE_LIMITED" if error.status_code == 429 else "BUSINESS_REJECTED"
                 raise ScopeError(error.status_code, code, str(error.detail), request.request_id) from error
 
+        def invoke():
+            if operation in {"chat", "agent-step"}:
+                serial = operation == "chat" or request.text is not None
+                return get_coordinator().execute(
+                    scope, operation, request.request_id, business, serial=serial,
+                    budget=current_budget(), validate=validate,
+                )
+            return business()
+
         return get_request_store().execute(
             (*scope.key, operation, str(request.request_id)), request, invoke,
             validate=validate, timing=budget, request_id=request.request_id,
-            propagate_not_started=(operation == "event"),
+            propagate_not_started=(operation in {"event", "chat", "agent-step"}),
+            on_failure=(
+                lambda error: get_coordinator().failure_after_operation(
+                    scope, operation, request.request_id, error
+                )
+            ) if operation in {"chat", "agent-step"} else None,
         )
 
 
@@ -107,7 +125,8 @@ def _directive(scope, request, directive):
     expires = data["expires"]
     if budget and expires["type"] == "before_seconds":
         budget.limit_validity(int(expires["remaining_seconds"] * 1000))
-    registry.register(scope, request.request_id, data)
+    with commit_guard(scope), final_commit():
+        registry.register(scope, request.request_id, data)
     return data
 
 
@@ -279,3 +298,37 @@ def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(get
             if str(memory_epoch(scope.npc)) != result["memory_epoch"]:
                 raise ScopeError(409, "MEMORY_EPOCH_STALE", "Another reset superseded the original reset")
         return result
+
+
+
+def read_loop_scope(
+    save_id: UUID, companion_id: str, run_id: UUID, run_binding_id: UUID, service_instance_id: UUID,
+    memory_epoch_value: UUID = Query(alias="memory_epoch"), session_id: UUID | None = None,
+    encounter_id: UUID | None = None, principal: Principal = Depends(get_principal),
+):
+    return _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
+                        memory_epoch_value, session_id, encounter_id, principal)
+
+
+@router.post("/requests/cancel", response_model=ScopedCancelResponse)
+async def cancel_request(request: ScopedCancelRequest, principal: Principal = Depends(get_principal)):
+    # A short control path stays outside the worker-bound generation queue.
+    def cancel(scope):
+        with commit_guard(scope):
+            state = get_coordinator().cancel(scope, request.operation, request.target_request_id, request.reason_code)
+        fields = {key: state[key] for key in ("target_request_id", "operation", "state", "cancel_requested", "reason_code")}
+        return {**_base(scope, request.request_id), **fields}
+    return _execute(request, principal, "request-cancel", cancel)
+
+
+@router.get("/requests/{target_request_id}", response_model=ScopedRequestStatusResponse)
+async def request_status(target_request_id: UUID, operation: Literal["chat", "agent-step"],
+                         scope: RequestScope = Depends(read_loop_scope)):
+    with use_scope(scope), commit_guard(scope):
+        return {**_base(scope), **get_coordinator().status(scope, operation, target_request_id)}
+
+
+@router.get("/directives/{directive_id}", response_model=ScopedDirectiveStateResponse)
+async def directive_status(directive_id: UUID, scope: RequestScope = Depends(read_loop_scope)):
+    with use_scope(scope), commit_guard(scope):
+        return {**_base(scope), **registry.state(scope, directive_id)}

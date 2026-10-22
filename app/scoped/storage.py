@@ -132,10 +132,12 @@ def commit_guard(scope: RequestScope | None = None):
         return
     from app.scoped.runtime import get_runtime
     from app.scoped.timing import current_budget
+    from app.scoped.requests import check_current
     with get_runtime().guard(scope):
         with scope_lock(scope.npc):
             if memory_epoch(scope.npc) != scope.memory_epoch:
                 raise ScopeError(409, "MEMORY_EPOCH_STALE", "Memory was reset; refresh the NPC scope")
+            check_current(scope)
             for validator in tuple(_validators):
                 validator(scope)
             budget = current_budget()

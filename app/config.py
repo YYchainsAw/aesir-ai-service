@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     scope_dev_save_ids: list[UUID] = Field(default_factory=list)
     scope_legacy_enabled: bool = False  # 仅开发兼容；独立旧目录，不能读取 scoped 状态
 
+    # -- 第三步请求编排（单 worker，保留原请求预算）----------------------
+    scope_max_generation_concurrency: int = Field(default=2, ge=1, le=16)
+    scope_request_queue_limit: int = Field(default=16, ge=1, le=32)
+    scope_session_queue_limit: int = Field(default=4, ge=1, le=16)
+    scope_request_state_limit: int = Field(default=1024, ge=1, le=16384)
+    request_traces_dir: str = "data/runtime/request_traces"
+
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm
     companion_backend: str = "mock"             # mock | llm

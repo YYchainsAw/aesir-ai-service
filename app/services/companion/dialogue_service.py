@@ -4,6 +4,7 @@ import zlib
 from collections.abc import Iterator
 
 from app.scoped.storage import guarded_commit
+from app.scoped.hooks import final_generation_commit
 
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
@@ -263,6 +264,7 @@ def _lookup_signal(result) -> dict | None:
 
 
 @guarded_commit
+@final_generation_commit
 def _record_turn(
     request: CompanionDialogueRequest,
     response: CompanionDialogueResponse,

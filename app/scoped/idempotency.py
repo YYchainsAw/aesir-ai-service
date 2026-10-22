@@ -61,7 +61,8 @@ class IdempotencyStore:
     def execute(self, key: Hashable, payload: Any, operation: Callable[[], Any], *,
                 validate: Callable[[], Any] | None = None, timing: TimingBudget | None = None,
                 request_id=None, conflict_code: str = "REQUEST_ID_CONFLICT",
-                propagate_not_started: bool = False) -> Any:
+                propagate_not_started: bool = False,
+                on_failure: Callable[[Exception], Exception] | None = None) -> Any:
         if validate is not None:
             validate()
         fp = fingerprint(payload)
@@ -117,6 +118,14 @@ class IdempotencyStore:
                 entry.timing.check()
             cached_result = deepcopy(result)
         except Exception as error:
+            # An inner coordinator may already have committed irreversible facts
+            # before these outer validation/copy checks fail. Consult it outside
+            # the store lock so the lock order remains runtime/NPC -> token.
+            if on_failure is not None:
+                try:
+                    error = on_failure(error)
+                except Exception as callback_error:
+                    error = callback_error
             with self._condition:
                 entry.expires_at = self.clock() + self.retention_seconds
                 if propagate_not_started and isinstance(error, NotStartedError):

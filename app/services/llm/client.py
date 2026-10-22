@@ -13,6 +13,9 @@ from typing import Any, Protocol
 
 import httpx
 
+from app.scoped.hooks import scoped_upstream
+from app.scoped.requests import timeout_for_upstream, has_active_request
+
 
 class LLMClientError(RuntimeError):
     """LLM 配置、网络或响应格式出现问题时抛出。"""
@@ -66,6 +69,7 @@ class OpenAICompatibleLLMClient:
         except (ImportError, ValueError) as error:
             raise LLMClientError("Unable to initialize the configured LLM HTTP client.") from error
 
+    @scoped_upstream
     def generate_json(
         self,
         *,
@@ -83,11 +87,14 @@ class OpenAICompatibleLLMClient:
             "response_format": {"type": "json_object"},
         }
 
+        timeout = ({"timeout": timeout_for_upstream(self._settings.timeout_seconds)}
+                   if has_active_request() else {})
         try:
             response = self._http_client.post(
                 f"{self._settings.base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {self._settings.api_key}"},
                 json=payload,
+                **timeout,
             )
             response.raise_for_status()
             response_body = response.json()
