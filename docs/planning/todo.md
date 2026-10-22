@@ -16,7 +16,7 @@
 | EXT-09 / FIX-09 后续 / T32 [#41](https://github.com/YYchainsAw/aesir-ai-service/issues/41) | 指标代理与正式 SC 结论分离，补正式采样和证据 | 脚本 PASS 只可能证明当前代理；记忆正确率、语气区别、角色隔离、故障不中断均需对应验收材料。SC-001~013 验收埋点补齐（#53 / T38）已于 2026-10-20 完成，6 项 N/A 升为脚本可判定，实测 SC-005 FAIL 暴露自主行为多样性不足 |
 | FIX-04 采集 / T33 [#42](https://github.com/YYchainsAw/aesir-ai-service/issues/42) | SC-011 的 UE 输入至 NPC 首次实际表现采样，区分规则/LLM、文本/语音 | 既有 p95≤300ms/≥30次为已记录口径，运行验收仍待；生产对话没有传 `latency_ms`，不能等待新聊天就宣告采样完整，见[联调对齐表](../protocols/integration-alignment-v0.3.md) |
 | API-GAP（legacy静态发现） | 旧回执game_id及extra/version/UUID校验差异仍属legacy兼容；v0.4已统一严格作用域与已发布指令关联 | 新旧入口分开核对；UE接入和生产身份另验，不把旧schema差距概括为scoped仍无保护 |
-| MODEL-GAP（本轮静态发现） | 回执仅追加，无完成状态机、乱序合并和跨版directive_id/order_id完整关联；REQ-06指定历史决策查询尚未闭合 | 收到/accepted不等于执行完成；需记录实际阶段、身份与查询边界，不能由JSONL文件存在推断闭环 |
+| MODEL-GAP（第三步后余项） | scoped已有最小反馈账本、序号去重/终态保护及原请求关联查询；完整started/hit/completed、持久历史决策与REQ-06仍待闭合 | 见[闭环增量契约](../protocols/npc-loop-contract-v0.4.md)与[服务端验证](../logs/verification-records.md#loop-20261022)；accepted仅收到、executed仅UE自报，不能由JSONL或状态查询推断UE真实闭环 |
 | DATA-GAP（本轮静态发现） | 默认对话日志保留完整输入/回复，与NFR只摘要目标不一致；记忆清理范围和部分失败状态需明确 | 先确认保留/清除策略及目标范围；不宣称关闭或摘要化已生效，关系档案不因清记忆自动清除 |
 | DEP-01 | 远程HTTPS、生产认证与事务存储迁移；复用v0.4开发主体/存档授权和默认关闭legacy门禁 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
 | DEP-02 | 版本同步、跨重启持久去重、离线队列与冲突；复用已实现memory_epoch屏障 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
@@ -33,3 +33,5 @@
 历史SDD的单机、本地文件及无账号/DB/公网限定保留为旧基线。2026-10-21用户已采纳Boss本地、远程NPC、多个独立单机玩家的身份/存档隔离、缓存同步、外部ASR和模型分发；完整DEP规则见[部署指南](../guides/deployment.md)，15项位置与[六步开发方案](local-boss-cloud-companion-roadmap.md)保持对应。v0.4作用域子集已合入main，正式账号/数据库事务与离线同步仍待后续；多人联机战斗、通用账号产品、任意跨设备存档合并、人格自演化和Boss并入NPC仍不在范围。日常状态只在GitHub Issues维护。
 
 同日采纳的五方面20项机制及用例/FR/DEP映射见[交互演进计划](npc-interaction-evolution.md)。EVO批次是依赖划分；复用v0.4已有可信开发身份、绑定/epoch和有界内存幂等，取消/TTS/跨重启事务等完整目标和AT-EVO未由本轮运行验收。图源与PNG已通过MCP和Desktop同步，整组Word回填/排版结果由UE建模记录维护。
+
+2026-10-22第三步服务端增量在 `feature/npc-execution-loop` 通过适用核心回归，工作包见[DEP3里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/7)。同会话FIFO、取消屏障、并发/预算、最小反馈账本及只读查询已有受控证据；EXT-01、MODEL-GAP、EVO-01/02的跨端余项和第四步生产目标仍保留，UE连接继续后置。具体待验见[交接指南](../guides/scoped-development.md#loop-usage)。

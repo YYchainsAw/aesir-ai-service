@@ -4,6 +4,10 @@
 
 历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
 
+## 2026-10-22 — DEP3 队友请求与执行反馈（服务端分支实现）
+
+`feature/npc-execution-loop`新增同会话文本FIFO、请求取消/状态查询、有限生成并发与上游剩余预算、元数据追踪，以及有界执行反馈账本和只读查询。提交后失败保留UNKNOWN；回执不确定追加封锁对应NPC/run，避免污染损坏尾部。修复跟随目标和战术能力关联，未支持条件明确无动作。新增243项scoped测试、10个完整golden，适用核心回归1272 passed、1 skipped；无新增依赖。未修改/连接UE、未调用真实LLM/ASR或安装RL依赖，第三步整体与生产目标仍待验。见[计划](docs/planning/step-03-execution-loop-plan.md)、[契约](docs/protocols/npc-loop-contract-v0.4.md)与[实测记录](docs/logs/verification-records.md#loop-20261022)。
+
 ## 2026-10-21 — DEP2 NPC归属、生命周期与有效期（分支实现）
 
 按已批准的第二步计划，在 `feature/npc-scope-v04` 新增v0.4同版JSON边界、可信开发身份、玩家/存档/NPC状态分区、显式run/encounter CAS、记忆epoch重置屏障、单调预算、有限窗口single-flight与回执关联；旧协议须显式开启开发兼容模式。新增190项scoped测试和21个完整golden，适用核心回归1029 passed+1 skipped。未安装可选ML/RL、未调用真实LLM、未修改或连接UE。命令、证据与未验范围见[验证记录](docs/logs/verification-records.md#scope-20261021)，配置与接入见[开发指南](docs/guides/scoped-development.md)。

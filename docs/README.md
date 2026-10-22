@@ -10,6 +10,7 @@
 | 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
 | 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |
 | 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
+| 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/step-03-execution-loop-plan.md) · [闭环增量契约](protocols/npc-loop-contract-v0.4.md)（服务端回归通过，UE待验） |
 | 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/scoped-development.md) |
 | 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/deployment.md)，含外部ASR、模型发布及AT-DEP验收 |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/repro.md) |
@@ -32,6 +33,7 @@
 | [v0.2战术决策](protocols/combat-tactical-protocol-v0.2.md) | 显式legacy开发兼容的战斗快照、上下文决策、战斗事件与执行回执 |
 | [v0.3代理入口](protocols/npc-contract-v0.3.md) | 显式legacy开发兼容的心跳/文本、世界事件与回执边界 |
 | [v0.4作用域契约](protocols/npc-scope-contract-v0.4-draft.md) | 现行scoped JSON的身份、生命周期、时效与兼容边界；已合入main，服务端回归及UE待验范围见验证记录 |
+| [v0.4闭环增量契约](protocols/npc-loop-contract-v0.4.md) | 请求取消/状态查询、执行反馈账本与新增golden；保留原回执枚举和UE验收边界 |
 | [人格包与游戏档案schema](protocols/persona-pack-schema-v0.2.md) | 数据资产格式；它的版本不等于API协议版本 |
 
 这些契约按职责并存，不能仅因编号较旧删除仍使用的协议。指南只维护步骤与说明，字段表链接上述契约；当前接口的交互文档由运行实例的`/docs`提供。

@@ -84,4 +84,5 @@ def _isolate_dialogue_signals_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> 
     信号数据是 RL 前置资产，混入测试 mock 回复会污染日后训练/分析。
     """
     monkeypatch.setenv("AESIR_DIALOGUE_SIGNALS_DIR", str(tmp_path / "signals"))
+    monkeypatch.setenv("AESIR_REQUEST_TRACES_DIR", str(tmp_path / "request_traces"))
     yield

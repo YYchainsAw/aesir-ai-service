@@ -1,6 +1,6 @@
 # v0.4 作用域服务开发与交接
 
-2026-10-21，适用于 `feature/npc-scope-v04`。字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、`app/schemas/scoped.py` 和运行实例 `/docs` 为准；本页只维护操作、实现限制与UE后续接入顺序。
+2026-10-22更新：第二步基础已合入main；第三步增量适用于 `feature/npc-execution-loop`。字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、`app/schemas/scoped.py` 和运行实例 `/docs` 为准；本页只维护操作、实现限制与UE后续接入顺序。
 
 ## 1. 配置与入口
 
@@ -51,4 +51,30 @@ LLM计算期间不持提交锁；写入前同时检查当前run/encounter、epoc
 
 本轮只使用服务器pytest/TestClient、临时目录、mock业务和受控时钟。命令及实测结果见[验证记录](../logs/verification-records.md#scope-20261021)。不调用付费LLM、不安装可选ASR/RL、不修改UE或测试UE连接。
 
-UE接入时须完成：保存可信会话与save/run/encounter关联；换局取消在途请求并使旧回调失效；重试保留原request_id、快照及首次发送时钟；复核instance/binding/epoch/encounter和预算；在Action/GAS启动前检查能力、目标、资源、距离及动作锁；按实际执行事实回执。同档重进保留长期状态不等于完整SaveGame检查点回滚。第三步另行实现执行阶段闭环与真实端到端采样。
+UE接入时须完成：保存可信会话与save/run/encounter关联；换局取消在途请求并使旧回调失效；重试保留原request_id、快照及首次发送时钟；复核instance/binding/epoch/encounter和预算；在Action/GAS启动前检查能力、目标、资源、距离及动作锁；按实际执行事实回执。同档重进保留长期状态不等于完整SaveGame检查点回滚。第三步服务端增量见下节；真实UE执行阶段与端到端采样仍待验。
+
+<a id="loop-usage"></a>
+## 5. 第三步请求与执行反馈
+
+字段以[闭环增量契约](../protocols/npc-loop-contract-v0.4.md)、`app/schemas/loop.py`和`data/golden/loop/`为准。无新增第三方依赖，原chat/agent响应形状与既有回执枚举保持。控制/查询入口只做短校验和状态访问，不进入文本生成队列；同步供应商HTTP仍可能占用工作线程，不把此设计当作生产负载下的取消延迟保证。
+
+| 新配置 | 默认 / 含义 |
+| --- | --- |
+| `AESIR_SCOPE_MAX_GENERATION_CONCURRENCY` | 2，同时处理的文本生成请求；同会话仍串行 |
+| `AESIR_SCOPE_REQUEST_QUEUE_LIMIT` | 16，全局等待项，不含已运行项 |
+| `AESIR_SCOPE_SESSION_QUEUE_LIMIT` | 4，同会话等待项 |
+| `AESIR_SCOPE_REQUEST_STATE_LIMIT` | 1024，请求生命周期记录总容量 |
+| `AESIR_REQUEST_TRACES_DIR` | `data/runtime/request_traces`，按完整NPC/run分区的诊断元数据 |
+
+无需修改现有开发`.env`即可使用默认限额；已有`.env`未被本轮改写。心跳和事件不占文本生成槽位，规则心跳不触发LLM。httpx每阶段timeout收紧到请求剩余预算与供应商配置的较小值，但它不是整个HTTP绝对墙钟截止；返回后继续检查单调预算/取消/绑定，不接受迟到内容。供应商仍可能完成计费，取消不保证强杀远端计算。
+
+1. 沿前文发现context并绑定run，提交原chat或agent文本请求，保存request_id、session/encounter、binding/epoch及首次发送单调时间。chat与agent文本在同一NPC/run/session排队，后一轮读取前一轮已提交历史。
+2. 用户明确替代旧意图时，向 `POST /v1/scoped/requests/cancel` 发送完整NPC写信封，另带`target_request_id`、`operation=chat/agent-step`与取消原因。控制请求自身用新request_id；目标ID保持原值。取消可先于目标到达，队列容量不足会明确拒绝。`cancel_requested=true`才表示认可取消；已开始最终提交时为false，客户端仍须自行作废旧回调。
+3. `GET /v1/scoped/requests/{原request_id}` 使用console同样的scope查询参数，另传operation；原session/encounter也要一致。只返回生命周期、排队/处理/总耗时和实际upstream_attempts，不返回旧动作。每个物理HTTP尝试与每次实际上游调用有独立UUID；重试命中缓存不增加上游调用数。
+4. 收到directive后，UE复核目录、目标、条件、距离、资源、冷却、动作锁与有效期。跟随只引用快照玩家ID；等待不虚构目的地；战术建议保留真实ability_id。当前目录未允许的战斗跟随仍无动作。未满足或不明确的条件返回`CONDITION_NOT_SUPPORTED`，未实现UE条件登记/监听。
+5. 回执使用原directive_id（receipt.order_id）、原request_id及相同scope/encounter。重复身份不重复追加；accepted仅收到，executed仅UE自报。`GET /v1/scoped/directives/{directive_id}`返回已知原请求和最后反馈，不返回payload、不续期，未知ID为404。reported_at不作为乱序裁判；终态后的accepted不倒退状态，冲突终态拒绝。
+6. 若结果unknown，保留原关联并人工核对，不换ID自动重做。回执追加/flush/fsync失败还会封锁该NPC/run的新指令注册与回执追加，防止污染损坏日志尾部；其他run不受该封锁影响。进程重启或内部clear只清易失状态，不修复日志，重新使用前须核对磁盘；不提供自动恢复/事务保证。
+
+诊断`requests.jsonl`只写归属、请求/尝试UUID、阶段耗时和原因码，不写玩家原文、回复或API key；它是best-effort日志，写失败不改变业务结果，也不是持久确认。已有对话信号仍有原保留范围，不能据新追踪日志宣称全项目原文已摘要化。当前仍为单进程有界状态，正式认证、数据库事务、跨重启幂等及离线同步留第四步。
+
+服务端实测见[验证记录](../logs/verification-records.md#loop-20261022)。UE尚需验证旧回调作废、执行去重、实际Action/GAS启动及回执、条件监听协议、断网兜底与SC-011真实采样；本轮未修改UE或测试其连接，不据pytest通过宣称第三步整体验收。
