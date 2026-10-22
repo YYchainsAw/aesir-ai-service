@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import RLock
 from uuid import UUID, uuid4
 
+from app.scoped.context import use_scope
 from app.config import get_settings
 from app.scoped.context import NpcScope, RequestScope, current_scope
 from app.scoped.errors import ScopeError
@@ -72,6 +73,16 @@ def memory_path(scope: NpcScope, root: str | Path | None = None) -> Path:
 
 def read_memory_document(scope: NpcScope, root: str | Path | None = None) -> tuple[UUID, MemorySnapshot]:
     """现有作用域缺元数据时拒绝服务，绝不从备份复活旧 epoch。调用者持 NPC 锁。"""
+    from app.persistence.database import database_enabled, read_document, write_document
+    if database_enabled():
+        data = read_document("memory", scope.key)
+        if data is None:
+            data = {"memory_epoch": str(uuid4()), **MemorySnapshot().model_dump(mode="json")}
+            write_document("memory", scope.key, data, scope_parts=scope.key)
+        try:
+            return UUID(data["memory_epoch"]), MemorySnapshot.model_validate(data)
+        except (ValueError, TypeError, KeyError) as error:
+            raise unavailable() from error
     path = memory_path(scope, root)
     try:
         if not path.exists():
@@ -94,8 +105,12 @@ def read_memory_document(scope: NpcScope, root: str | Path | None = None) -> tup
 
 def write_memory_document(scope: NpcScope, epoch: UUID, snapshot: MemorySnapshot,
                           root: str | Path | None = None) -> None:
-    path = memory_path(scope, root)
     payload = {"memory_epoch": str(epoch), **snapshot.model_dump(mode="json")}
+    from app.persistence.database import database_enabled, write_document
+    if database_enabled():
+        write_document("memory", scope.key, payload, scope_parts=scope.key)
+        return
+    path = memory_path(scope, root)
     tmp = path.with_suffix(".json.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,6 +153,8 @@ def commit_guard(scope: RequestScope | None = None):
             if memory_epoch(scope.npc) != scope.memory_epoch:
                 raise ScopeError(409, "MEMORY_EPOCH_STALE", "Memory was reset; refresh the NPC scope")
             check_current(scope)
+            from app.persistence.auth import validate_current_principal
+            validate_current_principal(scope)
             for validator in tuple(_validators):
                 validator(scope)
             budget = current_budget()
@@ -154,6 +171,24 @@ def guarded_commit(function):
             request_scope = current_scope()
             if request_scope is None or request_scope.npc != bound_npc:
                 raise ScopeError(409, "SCOPE_MISMATCH", "NPC scope does not match request")
+        from app.persistence.database import database_enabled
+        from app.persistence.uow import current_uow
+        unit = current_uow() if database_enabled() else None
+        if unit is not None and function.__name__ in {
+            "record_turn_signal", "record_agent_step", "record_event_resolved", "record_observation"
+        }:
+            from copy import deepcopy
+            positional, named = deepcopy(args), deepcopy(kwargs)
+            scope = current_scope()
+            def diagnostic():
+                try:
+                    with use_scope(scope):
+                        function(*positional, **named)
+                except Exception:
+                    # The database has committed; observation failure cannot revoke it.
+                    pass
+            unit.after_commit(diagnostic)
+            return None
         with commit_guard():
             return function(*args, **kwargs)
     return guarded

@@ -1,0 +1,23 @@
+{
+  "protocol_version": "0.4",
+  "request_id": "00000000-0000-4000-8000-000000000007",
+  "scope": {
+    "game_id": "aesir",
+    "player_id": "00000000-0000-4000-8000-000000000001",
+    "save_id": "00000000-0000-4000-8000-000000000002",
+    "companion_id": "companion.alice"
+  },
+  "save_generation": "00000000-0000-4000-8000-000000000003",
+  "memory_epoch": "00000000-0000-4000-8000-000000000004",
+  "state_version": 5,
+  "acknowledgements": [
+    {
+      "event_id": "00000000-0000-4000-8000-000000000006",
+      "duplicate": false,
+      "relationship_status": "scored",
+      "relationship_delta": 3,
+      "memory_status": "recorded",
+      "confirmed_version": 5
+    }
+  ]
+}

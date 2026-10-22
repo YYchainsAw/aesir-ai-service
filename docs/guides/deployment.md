@@ -10,7 +10,7 @@ Boss冻结推理和BT、队友实时控制及所有实际世界执行在玩家�
 
 | 需求 | 目标 | 实现边界 |
 | --- | --- | --- |
-| DEP-REQ-01 | Boss本地、NPC远程HTTPS，开发继续支持本机联调 | UE位置和本地进程交付见[UE工作区部署说明](../../../../Unreal-Projects/AesirWarden/Docs/02_Design_Doc/TDD/06_Deployment.md)；正式发布/验收另记录两仓确切提交 |
+| DEP-REQ-01 | Boss本地、NPC远程HTTPS，开发继续支持本机联调 | UE位置和本地进程交付在UE仓 `Docs/02_Design_Doc/TDD/06_Deployment.md` 维护（跨仓位置）；正式发布/验收另记录两仓确切提交 |
 | DEP-REQ-02 | 已认证玩家及存档隔离 | 覆盖全部入口、持久数据、缓存、限流、日志查询、回执与删除，不只改目录 |
 | DEP-REQ-03 | 服务权威持久化与UE缓存同步 | 真实事实有持久去重、版本和确认，支持重启、冲突及重置屏障 |
 | DEP-REQ-04 | NPC服务转接外部ASR，保留文本兜底 | 当前mock/faster_whisper用于开发；外部适配及数据流待实现 |
@@ -21,7 +21,7 @@ Boss冻结推理和BT、队友实时控制及所有实际世界执行在玩家�
 
 ## 身份、存储与同步规则
 
-下表是规则的唯一完整维护位置；SDD、UE和联调页引用编号。玩家/存档、绑定和memory_epoch已有v0.4字段；同步游标、数据库事务和完整恢复仍是目标。后续精确字段、错误码和版本继续同步schema、契约及golden，不向legacy v0.3混填。
+下表是规则的唯一完整维护位置；SDD、UE和联调页引用编号。玩家/存档、绑定和memory_epoch已有v0.4字段；第四步已新增受控SQL事务、确认版本与事实/回执恢复，见[持久化契约](../protocols/npc-persistence-contract-v0.4.md)；UE缓存/队列及完整生产恢复仍待验。后续精确字段、错误码和版本继续同步schema、契约及golden，不向legacy v0.3混填。
 
 | ID | 规则与最小保证 |
 | --- | --- |
@@ -65,7 +65,7 @@ python3.12 -m venv .venv
 
 ## 验收条件
 
-以下`AT-DEP-*`对应DEP-REQ与BR-DEP，是新增目标检查；全部未执行，不作为原AT-01～12或SC已通过。
+以下`AT-DEP-*`对应DEP-REQ与BR-DEP，完整远程/UE/生产验收尚未完成，不作为原AT-01～12或SC已通过。第四步服务端受控子集与AT-PERSIST实测另见[验证记录](../logs/verification-records.md#persist-20261022)，不能据其通过关闭完整AT-DEP。
 
 | ID | 场景 | 通过条件 |
 | --- | --- | --- |
@@ -86,4 +86,4 @@ python3.12 -m venv .venv
 
 ## 当前实现差距
 
-v0.4已实现可信开发身份、存档授权、玩家/存档/角色分区、显式绑定、相对时效、持久memory_epoch和有界内存幂等；旧入口默认关闭并保留独立legacy命名空间，详见[scoped交接](scoped-development.md)。正式账号与HTTPS发布、跨进程/跨重启事务去重、离线同步、外部ASR、scoped SSE/语音、模型发布/签名下载和生产容量仍未完成；单worker JSON与内存状态不支持可靠共享多worker。现有服务端回归不替代本页AT-DEP完整远程验收。实现与跨仓依赖统一追踪[todo](../planning/todo.md)，本页不复制任务勾选或伪造运行记录。
+v0.4已实现可信开发身份、存档授权、玩家/存档/角色分区、显式绑定、相对时效、持久memory_epoch和有界内存幂等；旧入口默认关闭并保留独立legacy命名空间，详见[scoped交接](scoped-development.md)。第四步服务端已实现独立SQL事务/持久去重、服务端Bearer/存档授权、原子事实确认及历史回执归档，并有实际MySQL/进程重启/空库恢复证据，见[开发指南](persistent-development.md)。当前开发`.env`保留JSON模式，没有自动迁移/切换现有数据或公开服务。UE凭据/缓存/离线队列、正式HTTPS/OS隔离、完整灾备收敛、外部ASR、scoped SSE/语音、模型发布/签名下载与生产容量仍待验；所有后端继续单worker，不支持可靠共享多worker。现有服务端回归不替代本页AT-DEP完整远程验收。实现与跨仓依赖统一追踪[todo](../planning/todo.md)，本页不复制任务勾选或伪造运行记录。

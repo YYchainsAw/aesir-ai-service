@@ -1,0 +1,9 @@
+# SQL增量依赖约束，服务器Python3.12.15/2026-10-22实测。
+# 与requirements-dev.txt搭配：pip install -r requirements-dev.txt -c requirements-sql-linux-py312.lock
+# 原未提交requirements-dev-linux-py312.lock保留历史快照，不覆盖。
+SQLAlchemy==2.1.6
+PyMySQL==1.2.3
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.11
+typing_extensions==4.16.0

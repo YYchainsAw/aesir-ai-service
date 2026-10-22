@@ -4,7 +4,7 @@
 
 ## 1. 配置与入口
 
-继续使用项目 `.venv` 与单个 Uvicorn worker。核心依赖不变，无需安装数据库、Redis、Torch或真实ASR。
+继续使用项目 `.venv` 与单个 Uvicorn worker。第二、三步的JSON开发方式不依赖数据库、Redis、Torch或真实ASR；第四步SQL/Bearer的新增依赖、独立配置与恢复方式见[持久化开发指南](persistent-development.md)。
 
 | 配置 | 默认与开发用法 |
 | --- | --- |
@@ -29,6 +29,8 @@
 console只读查询需要 `save_id`、`companion_id`、`service_instance_id`、`run_id`、`run_binding_id`、`memory_epoch`，可附session/encounter。清理走 `/console/memory/reset` 的完整写请求。reset响应包含新epoch；同一reset请求可回放其结果，但只在该结果epoch仍为当前值时有效。另一reset发生后旧reset回放也拒绝。
 
 ## 3. 数据、重试与有效期
+
+本节保留第二步JSON/内存开发后端的数据规则；第四步SQL后端的权威存储、持久身份与恢复见[专门指南](persistent-development.md)。
 
 | 状态 | 新版分区及保留规则 |
 | --- | --- |
@@ -75,6 +77,8 @@ UE接入时须完成：保存可信会话与save/run/encounter关联；换局取
 5. 回执使用原directive_id（receipt.order_id）、原request_id及相同scope/encounter。重复身份不重复追加；accepted仅收到，executed仅UE自报。`GET /v1/scoped/directives/{directive_id}`返回已知原请求和最后反馈，不返回payload、不续期，未知ID为404。reported_at不作为乱序裁判；终态后的accepted不倒退状态，冲突终态拒绝。
 6. 若结果unknown，保留原关联并人工核对，不换ID自动重做。回执追加/flush/fsync失败还会封锁该NPC/run的新指令注册与回执追加，防止污染损坏日志尾部；其他run不受该封锁影响。进程重启或内部clear只清易失状态，不修复日志，重新使用前须核对磁盘；不提供自动恢复/事务保证。
 
-诊断`requests.jsonl`只写归属、请求/尝试UUID、阶段耗时和原因码，不写玩家原文、回复或API key；它是best-effort日志，写失败不改变业务结果，也不是持久确认。已有对话信号仍有原保留范围，不能据新追踪日志宣称全项目原文已摘要化。当前仍为单进程有界状态，正式认证、数据库事务、跨重启幂等及离线同步留第四步。
+诊断`requests.jsonl`只写归属、请求/尝试UUID、阶段耗时和原因码，不写玩家原文、回复或API key；它是best-effort日志，写失败不改变业务结果，也不是持久确认。已有对话信号仍有原保留范围，不能据新追踪日志宣称全项目原文已摘要化。本节的第三步JSON/内存后端仍为单进程有界状态；SQL/Bearer与持久确认使用下述第四步入口，不据本节判定整个项目仍无SQL支持。
 
 服务端实测见[验证记录](../logs/verification-records.md#loop-20261022)。UE尚需验证旧回调作废、执行去重、实际Action/GAS启动及回执、条件监听协议、断网兜底与SC-011真实采样；本轮未修改UE或测试其连接，不据pytest通过宣称第三步整体验收。
+
+2026-10-22第四步服务端已新增SQL/Bearer与持久事实/历史回执确认，原JSON开发配置仍可使用。正式认证、SQL事务和受控重启/恢复结果见[第四步指南](persistent-development.md)及[验证记录](../logs/verification-records.md#persist-20261022)；本文前述跨重启限制特指JSON/内存开发后端，不能套用为SQL已确认记录会随进程丢失。UE与生产余项继续单独验收。

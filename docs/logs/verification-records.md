@@ -194,3 +194,39 @@ POST /v1/agent/step        → 200 ×28 （每3秒心跳）
 原始记录保存在服务器 `data/runtime/remote-dev/verification/step3-pytest.log`、`step3-pytest.xml`、`step3-pytest-result.json`；专项433项为`step3-scoped.xml`。结果JSON保留时间、命令、分支基线、源码SHA256和保留文件校验，最终提交另记于运行元数据。这些文件不入Git。`.env`、`.python-version`、`requirements-dev-linux-py312.lock`与实施前SHA256完全一致，后两者继续保持原未提交状态。
 
 当前仅服务端开发增量通过，第三步整体验收与EVO-01生产余项没有关闭。UE仍需完成输入/回调代际、动作去重与实际执行/回执、条件监听协议、断网兜底及SC-011真实端到端采样；正式认证、数据库事务、跨重启恢复和离线同步留第四步。[开发指南](../guides/scoped-development.md#loop-usage)维护操作清单。
+
+<a id="persist-20261022"></a>
+## 2026-10-22 第四步SQL、访问控制与恢复服务端验证
+
+第三步PR #81已合入 `main@15f1672`，按用户授权在服务器 `/www/wwwroot/aesir-ai-service` 创建 `feature/npc-persistence-access`。跟踪为[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)与#82～#87；范围见[计划](../planning/step-04-persistence-access-plan.md)。没有改动现有MySQL5.7、开发`.env`或UE工作区，未连接UE，也未调用真实LLM/ASR/训练。
+
+项目Python 3.12.15，新增SQLAlchemy 2.1.6、PyMySQL 1.2.3（RSA extra安装cryptography 50.0.2）。独立MySQL 8.4.13容器仅在127.0.0.1:13306，限制640MiB/0.75CPU；项目dev/test/restore库、迁移/运行账号分离，凭据与数据在站点根外。开发18011保留原配置；本轮18012临时SQL/Bearer进程在演练后停止，没有发布公网入口。
+
+2026-10-22 20:30（Asia/Shanghai）适用核心回归：**1404 passed、1 skipped、7 warnings，74.71秒**。新增 `tests/persistence` 共132项（其中5项实际MySQL），新增10个完整golden由strict模型回读；原scoped 433项继续通过。命令为：
+
+```bash
+AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
+  .venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q --tb=short --junitxml=data/runtime/remote-dev/verification/step4-pytest.xml
+```
+
+跳过项为未安装可选faster-whisper的模块，7条是既有Starlette弃用提示。未包含需要NumPy/Torch的Boss推理/训练，也不是UE/真实模型质量或容量验收。未显式提供MySQL测试文件的普通运行会另跳过这5项，不能与本次真实库通过混淆。
+
+| 验收范围 | 本轮证据及实测含义 |
+| --- | --- |
+| AT-PERSIST-01/02 | Bearer缺失/错误/过期/撤销、玩家停用/存档撤回、console/reset分权、跨玩家拒绝、DB故障503无身份/JSON回退；生成中撤销无最终SQL/会话提交 |
+| AT-PERSIST-03/04 | SQL UoW文档与最终mutation故障全回滚、CAS冲突不覆盖赢家、会话提交后更新；journal持久身份/UNKNOWN/先到取消与重启后不可重做；归档提交失败也全回滚并保留unknown |
+| AT-PERSIST-05/06 | 原实例/绑定失效而历史确认可读，无可执行payload；实时/离线共用fact与receipt身份，终态保护、原run/encounter/epoch/能力及游戏目录校验，整批冲突无部分写入 |
+| AT-PERSIST-07/08 | 清记忆→旧epoch事实memory skipped_reset、relationship独立确认；旧回执归档不恢复记忆；服务受理时间不被旧UTC倒退；并发/持久调用额度与缓存不重复调用供应商 |
+| AT-PERSIST-09/10 | 默认dry-run、归属明确JSON与SHA、源不改/重复不重导/冲突拒绝、备份格式与校验/空目标约束；恢复默认撤销旧凭据，显式新发后可用 |
+| AT-PERSIST-11 | 实际MySQL5项：8.4版本、运行账号无DDL/无法读mysql.user、事务故障回滚两文档/版本、新Python进程读提交、HTTP runtime替换后旧绑定/同ID新绑定拒绝与历史恢复、CAS赢家保留 |
+| AT-PERSIST-12 | 适用核心、strict样例、实际MySQL与真实进程演练分别记录；所有模型调用为rule/mock/MockTransport |
+
+真实进程/恢复演练另于同日20:27（Asia/Shanghai）运行 `data/runtime/remote-dev/verification/step4-process-proof.py`，结果 `step4-process-proof.json`。两个实际HTTP进程PID为1377172→1377205（均已退出）：新实例不继承旧绑定，旧请求409，同ID换binding仍拒绝，历史确认complete；实时事件再离线同步duplicate，不重复加分；reset后旧epoch新事实跳过记忆；原旧epoch指令从accepted归档到executed，receipt_count=2，未改变记忆/关系。这里executed仍为测试客户端自报，不是UE技能实际执行。
+
+同一演练使用合成、完整归属的两份JSON验证实际MySQL dry-run/apply/重复导入及源SHA不变，没有迁移玩家真实数据。私有备份恢复至空隔离MySQL后，8张应用表计数一致（documents=13、operation_journal=6），memory_epoch与原事件确认保留；旧token即使备份时仍有效也被恢复策略停用，显式新签发凭据可验证原存档授权。备份SHA256为 `04fdd8682768818bbf9137b8b4f84e8693a10542c660c10b6ef72037d12a5b78`，原备份只在 `/etc/aesir-ai/dev/backups` 0600私有文件，不入Git。
+
+开发期首次bootstrap在时间列DOUBLE修正前发生；仅对本轮新建且相关表0行的独立dev库显式改正4个时间列，未改其他库。最终schema检查会拒绝MySQL单精度时间列，create_all不被描述为自动升级。恢复业务数据遵守备份恢复点，不能保留备份之后未知的reset/撤销；正式灾备切换仍需恢复点/RPO和后续清理收敛。
+
+原始JUnit/日志为 `step4-pytest.xml` / `step4-pytest.log`，元数据为 `step4-pytest-result.json`，含解释器/依赖、实际MySQL标志、源码SHA256、时间和保留文件校验。测试本身通过后，记录包装脚本因用系统解释器读取新依赖元数据失败；已从通过的JUnit/日志恢复元数据，并确认所有代码/样例文件mtime均早于测试开始，记录此事实而未伪造重跑。最终提交再核对源码哈希。`.env`、`.python-version`和原Linux锁文件SHA256与实施前完全一致，后两者继续保持原未提交状态。
+
+结论只覆盖第四步服务端开发增量。UE凭据/按档缓存/事实与回执本地队列、冲突处理、断网游戏兜底与SC-011仍待接入；正式数据切换、OS受限用户、HTTPS/传输限制、备份调度/保留/完整RPO演练和真实容量留发布验收。当前单worker，未启用生产多worker或公众服务。操作见[持久化开发指南](../guides/persistent-development.md)。

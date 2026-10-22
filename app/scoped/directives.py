@@ -57,6 +57,10 @@ class DirectiveRegistry:
             self.poisoned_runs.clear()
 
     def register(self, scope, request_id, directive):
+        from app.persistence.database import database_enabled
+        if database_enabled():
+            from app.persistence.directives import sql_registry
+            return sql_registry.register(scope, request_id, directive)
         with use_scope(scope), commit_guard(scope), self.lock:
             self._check_writable(scope)
             now = self.clock()
@@ -103,6 +107,10 @@ class DirectiveRegistry:
         return issued
 
     def state(self, scope, order_id):
+        from app.persistence.database import database_enabled
+        if database_enabled():
+            from app.persistence.directives import sql_registry
+            return sql_registry.state(scope, order_id)
         """返回最后确认的进程内反馈；unknown 不表示 UE 的执行终态。"""
         with use_scope(scope), commit_guard(scope), self.lock:
             issued = self._lookup(scope, order_id, missing_status=404)
@@ -112,6 +120,10 @@ class DirectiveRegistry:
                     "receipt_count": issued.receipt_count}
 
     def record(self, scope, receipts):
+        from app.persistence.database import database_enabled
+        if database_enabled():
+            from app.persistence.directives import sql_registry
+            return sql_registry.record(scope, receipts)
         with use_scope(scope), commit_guard(scope), self.lock:
             self._check_writable(scope)
             staged, records, written_keys = {}, [], set()

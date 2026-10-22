@@ -16,6 +16,7 @@ from app.api.v1.tactical import router as tactical_router
 from app.api.v1.voice import router as voice_router
 from app.api.v1.world import router as world_router
 from app.api.v1.scoped import router as scoped_router
+from app.api.v1.sync import router as sync_router
 
 router = APIRouter()
 router.include_router(health_router)
@@ -30,3 +31,5 @@ router.include_router(world_router)
 router.include_router(console_router)
 
 router.include_router(scoped_router)
+
+router.include_router(sync_router)

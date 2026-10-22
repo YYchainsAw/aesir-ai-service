@@ -9,7 +9,13 @@ from app.config import get_settings
 from app.scoped.context import RequestScope, safe_segment, use_scope
 from app.scoped.directives import registry
 from app.scoped.errors import ScopeError
-from app.scoped.identity import Principal, get_principal, resolve_npc_scope
+from app.scoped.identity import Principal, get_principal, require_permission, resolve_npc_scope
+from app.persistence.auth import use_principal, validate_principal, reserve_request_quota
+from app.persistence.database import database_enabled, read_document, write_document, state_version
+from app.persistence.uow import use_unit_of_work
+from app.persistence.journal import (get_durable_request_store, get_durable_event_store, stage_active_result, stage_cancel_target)
+from app.schemas.recovery import (RecoveryStateResponse, RecoveryOperationResponse, RecoveryDirectiveResponse,
+                                  RecoveryReceiptsRequest, RecoveryReceiptsResponse)
 from app.scoped.idempotency import get_request_store, get_event_store
 from app.scoped.runtime import get_runtime
 from app.scoped.storage import commit_guard, memory_epoch, reset_memory
@@ -79,7 +85,7 @@ def _execute(request, principal, operation, action):
     scope = _scope(request, principal)
     timing = getattr(request, "timing", None)
     # 初次校验发生在占位前；最终校验在各副作用以及缓存回放前再次进行。
-    with use_scope(scope), request_trace(scope, operation, request.request_id):
+    with use_principal(principal), use_scope(scope), request_trace(scope, operation, request.request_id):
         with commit_guard(scope):
             pass
         budget = TimingBudget(timing, has_snapshot=getattr(request, "world_context", None) is not None) if timing else None
@@ -90,12 +96,20 @@ def _execute(request, principal, operation, action):
 
         def business():
             try:
+                if database_enabled():
+                    with use_unit_of_work(scope) as unit:
+                        result = action(scope)
+                        with commit_guard(scope), final_commit():
+                            stage_active_result(result)
+                            unit.commit()
+                        return result
                 return action(scope)
             except HTTPException as error:
                 code = "HEARTBEAT_RATE_LIMITED" if error.status_code == 429 else "BUSINESS_REJECTED"
                 raise ScopeError(error.status_code, code, str(error.detail), request.request_id) from error
 
         def invoke():
+            reserve_request_quota(principal, scope.npc.game_id)
             if operation in {"chat", "agent-step"}:
                 serial = operation == "chat" or request.text is not None
                 return get_coordinator().execute(
@@ -104,7 +118,8 @@ def _execute(request, principal, operation, action):
                 )
             return business()
 
-        return get_request_store().execute(
+        store = get_durable_request_store() if database_enabled() else get_request_store()
+        return store.execute(
             (*scope.key, operation, str(request.request_id)), request, invoke,
             validate=validate, timing=budget, request_id=request.request_id,
             propagate_not_started=(operation in {"event", "chat", "agent-step"}),
@@ -131,36 +146,61 @@ def _directive(scope, request, directive):
 
 
 @router.get("/context", response_model=ScopedContextResponse)
-def context(save_id: UUID, companion_id: str, principal: Principal = Depends(get_principal)):
+def context(save_id: UUID, companion_id: str, principal: Principal = Depends(require_permission("npc:use"))):
     npc = resolve_npc_scope(principal, save_id, companion_id)
-    with get_runtime().lock:
+    with use_principal(principal), get_runtime().lock:
+        validate_principal(principal, npc)
         return {"protocol_version": "0.4", "scope": npc.as_dict(),
                 **get_runtime().context(npc), "memory_epoch": memory_epoch(npc)}
 
 
 @router.post("/runs/bind", response_model=ScopedControlResponse)
-def bind_run(request: BindRunRequest, principal: Principal = Depends(get_principal)):
+def bind_run(request: BindRunRequest, principal: Principal = Depends(require_permission("npc:use"))):
     scope = _save(principal, request.save_id)
-    result = get_runtime().bind_run(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
-    return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
+    with use_principal(principal), get_runtime().lock:
+        validate_principal(principal, scope)
+        reserve_request_quota(principal, scope.game_id)
+        if database_enabled():
+            from app.persistence.sync import get_save_generation
+            generation = get_save_generation(scope)
+            history_key = (*scope.key, str(request.run_id))
+            history = read_document("run-history", history_key)
+            if history is not None and history["generation"] != str(generation):
+                raise ScopeError(409, "SAVE_GENERATION_STALE", "A historical run cannot enter a different save generation")
+        result = get_runtime().bind_run(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
+        if database_enabled():
+            write_document("run-history", history_key,
+                           {"run_id": str(request.run_id), "generation": str(generation)}, scope_parts=scope.key)
+        return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
 
 
 @router.post("/runs/end", response_model=ScopedControlResponse)
-def end_run(request: EndRunRequest, principal: Principal = Depends(get_principal)):
+def end_run(request: EndRunRequest, principal: Principal = Depends(require_permission("npc:use"))):
     scope = _save(principal, request.save_id)
-    result = get_runtime().end_run(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
-    return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
+    with use_principal(principal), get_runtime().lock:
+        validate_principal(principal, scope)
+        reserve_request_quota(principal, scope.game_id)
+        result = get_runtime().end_run(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
+        return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
 
 
 @router.post("/encounters/control", response_model=ScopedControlResponse)
-def control_encounter(request: EncounterControlRequest, principal: Principal = Depends(get_principal)):
+def control_encounter(request: EncounterControlRequest, principal: Principal = Depends(require_permission("npc:use"))):
     scope = _save(principal, request.save_id)
-    result = get_runtime().control_encounter(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
-    return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
+    with use_principal(principal), get_runtime().lock:
+        validate_principal(principal, scope)
+        reserve_request_quota(principal, scope.game_id)
+        result = get_runtime().control_encounter(scope, **request.model_dump(exclude={"protocol_version", "save_id"}))
+        if database_enabled() and request.op == "begin":
+            from app.persistence.sync import get_save_generation
+            write_document("encounter-history", (*scope.key, str(request.run_id), str(request.encounter_id)),
+                           {"run_id": str(request.run_id), "encounter_id": str(request.encounter_id),
+                            "generation": str(get_save_generation(scope))}, scope_parts=scope.key)
+        return {"protocol_version": "0.4", "request_id": request.request_id, "scope": scope.as_dict(), **result}
 
 
 @router.post("/agent/step", response_model=ScopedAgentResponse)
-def agent_step(request: ScopedAgentRequest, principal: Principal = Depends(get_principal)):
+def agent_step(request: ScopedAgentRequest, principal: Principal = Depends(require_permission("npc:use"))):
     from app.api.v1.agent import agent_step as legacy_step
     from app.schemas.agent_step import AgentStepRequest
 
@@ -177,7 +217,7 @@ def agent_step(request: ScopedAgentRequest, principal: Principal = Depends(get_p
 
 
 @router.post("/companion/chat", response_model=ScopedChatResponse)
-def chat(request: ScopedChatRequest, principal: Principal = Depends(get_principal)):
+def chat(request: ScopedChatRequest, principal: Principal = Depends(require_permission("npc:use"))):
     from app.schemas.companion_dialogue import CompanionDialogueRequest
     from app.services.companion.dialogue_service import create_dialogue_reply
 
@@ -214,22 +254,42 @@ def _event_directive(response):
 
 @router.post("/combat/events", response_model=ScopedWorldEventResponse)
 @router.post("/world/events", response_model=ScopedWorldEventResponse)
-def world_event(request: ScopedWorldEventRequest, principal: Principal = Depends(get_principal)):
+def world_event(request: ScopedWorldEventRequest, principal: Principal = Depends(require_permission("npc:use"))):
     from app.api.v1.world import report_world_event
     from app.schemas.world_event import WorldEventRequest
 
     def run(scope):
+        if database_enabled():
+            from app.persistence.sync import lookup_fact
+            known = lookup_fact(scope.npc, scope.run_id, scope.encounter_id, request.event,
+                                origin_memory_epoch=scope.memory_epoch)
+            if known is not None:
+                return {**_base(scope, request.request_id, request.world_context),
+                        "event_id": request.event.event_id, "duplicate": True,
+                        "action": "none", "directive": None, "reaction": None,
+                        "recommendation_text": None,
+                        "observability": {"source": "rule", "used_snapshot_id": request.world_context.snapshot_id,
+                                          "reason_codes": ["FACT_ALREADY_CONFIRMED"]}}
+
         def produce():
             legacy = WorldEventRequest(request_id=str(request.request_id), companion_id=request.companion_id,
                                        event=request.event, world_context=request.world_context)
             response = report_world_event(legacy)
             directive = _directive(scope, request, _event_directive(response))
             output = response.model_dump(mode="json", exclude={"protocol_version", "companion_id", "request_id", "companion_action"})
+            if database_enabled():
+                from app.persistence.sync import stage_fact_confirmation
+                stage_fact_confirmation(scope.npc, scope.run_id, scope.encounter_id, request.event,
+                                        {"relationship_status": "processed",
+                                         "relationship_delta": response.observability.relationship_delta,
+                                         "memory_status": "processed"},
+                                        origin_memory_epoch=scope.memory_epoch, source="ue")
             return {**output, "action": "directive" if directive else "none", "directive": directive,
                     "_origin_request_id": str(request.request_id),
                     "_timing": {"valid_for_ms": current_budget().valid_for_ms}}
         payload = request.model_dump(mode="json", exclude={"request_id"})
-        result = get_event_store().execute(
+        event_store = get_durable_event_store() if database_enabled() else get_event_store()
+        result = event_store.execute(
             (*scope.key, str(scope.encounter_id or ""), request.event.event_id), payload, produce,
             validate=lambda: _validate(scope), timing=current_budget(), request_id=request.request_id,
             conflict_code="EVENT_ID_CONFLICT",
@@ -251,7 +311,7 @@ def _validate(scope):
 
 
 @router.post("/tactical/executions", status_code=202, response_model=ScopedExecutionResponse)
-def execution(request: ScopedExecutionRequest, principal: Principal = Depends(get_principal)):
+def execution(request: ScopedExecutionRequest, principal: Principal = Depends(require_permission("npc:use"))):
     def run(scope):
         return {**_base(scope, request.request_id), "stored": registry.record(scope, request.all_receipts)}
     return _execute(request, principal, "executions", run)
@@ -269,32 +329,52 @@ def _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance
 def console_view(
     request: Request, save_id: UUID, companion_id: str, run_id: UUID, run_binding_id: UUID, service_instance_id: UUID,
     memory_epoch_value: UUID = Query(alias="memory_epoch"), session_id: UUID | None = None,
-    encounter_id: UUID | None = None, principal: Principal = Depends(get_principal),
+    encounter_id: UUID | None = None, principal: Principal = Depends(require_permission("console:read")),
 ):
     from app.api.v1.console import console_state, view_memory
     scope = _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
                          memory_epoch_value, session_id, encounter_id, principal)
-    with use_scope(scope), commit_guard(scope):
+    with use_principal(principal), use_scope(scope), commit_guard(scope):
         output = (view_memory if request.url.path.endswith("/memory") else console_state)(companion_id)
         data = output.model_dump(mode="json", exclude={"companion_id"})
         return {**data, **_base(scope)}
 
 
 @router.post("/console/memory/reset", response_model=ScopedResetResponse)
-def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(get_principal)):
+def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(require_permission("memory:reset"))):
     scope = _scope(request, principal)
-    with use_scope(scope):
-        def run():
+    with use_principal(principal), use_scope(scope):
+        def apply_reset():
             with commit_guard(scope):
                 result = reset_memory(scope.npc, scope.memory_epoch)
-                return {**_base(scope, request.request_id), "memory_epoch": str(result["memory_epoch"]),
-                        "reset": True, "cleared_sessions": result["cleared_sessions"]}
+                output = {**_base(scope, request.request_id), "memory_epoch": str(result["memory_epoch"]),
+                          "reset": True, "cleared_sessions": result["cleared_sessions"]}
+                if database_enabled():
+                    # The old epoch was checked on guard entry; the staged
+                    # replacement intentionally has a new epoch now.
+                    stage_active_result(output)
+                    from app.persistence.uow import current_uow
+                    current_uow().commit()
+                return output
+
+        def run():
+            reserve_request_quota(principal, scope.npc.game_id)
+            if database_enabled():
+                with use_unit_of_work(scope):
+                    return apply_reset()
+            return apply_reset()
         # reset 回放允许请求的旧epoch，但仅可返回本次reset产生且仍为当前的epoch。
-        result = get_request_store().execute(
+        def validate_reset():
+            validate_principal(principal, scope)
+            get_runtime().validate_binding(scope)
+
+        reset_store = get_durable_request_store() if database_enabled() else get_request_store()
+        result = reset_store.execute(
             (*scope.key, "memory-reset", str(request.request_id)), request, run,
-            validate=lambda: get_runtime().validate_binding(scope), request_id=request.request_id,
+            validate=validate_reset, request_id=request.request_id,
         )
         with get_runtime().guard(scope):
+            validate_principal(principal, scope)
             if str(memory_epoch(scope.npc)) != result["memory_epoch"]:
                 raise ScopeError(409, "MEMORY_EPOCH_STALE", "Another reset superseded the original reset")
         return result
@@ -304,18 +384,23 @@ def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(get
 def read_loop_scope(
     save_id: UUID, companion_id: str, run_id: UUID, run_binding_id: UUID, service_instance_id: UUID,
     memory_epoch_value: UUID = Query(alias="memory_epoch"), session_id: UUID | None = None,
-    encounter_id: UUID | None = None, principal: Principal = Depends(get_principal),
+    encounter_id: UUID | None = None, principal: Principal = Depends(require_permission("npc:use")),
 ):
-    return _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
-                        memory_epoch_value, session_id, encounter_id, principal)
+    with use_principal(principal):
+        scope = _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
+                             memory_epoch_value, session_id, encounter_id, principal)
+        validate_principal(principal, scope)
+        return scope
 
 
 @router.post("/requests/cancel", response_model=ScopedCancelResponse)
-async def cancel_request(request: ScopedCancelRequest, principal: Principal = Depends(get_principal)):
+async def cancel_request(request: ScopedCancelRequest, principal: Principal = Depends(require_permission("npc:use"))):
     # A short control path stays outside the worker-bound generation queue.
     def cancel(scope):
         with commit_guard(scope):
             state = get_coordinator().cancel(scope, request.operation, request.target_request_id, request.reason_code)
+            if database_enabled() and state["cancel_requested"]:
+                stage_cancel_target(scope, request.operation, request.target_request_id)
         fields = {key: state[key] for key in ("target_request_id", "operation", "state", "cancel_requested", "reason_code")}
         return {**_base(scope, request.request_id), **fields}
     return _execute(request, principal, "request-cancel", cancel)
@@ -323,12 +408,113 @@ async def cancel_request(request: ScopedCancelRequest, principal: Principal = De
 
 @router.get("/requests/{target_request_id}", response_model=ScopedRequestStatusResponse)
 async def request_status(target_request_id: UUID, operation: Literal["chat", "agent-step"],
-                         scope: RequestScope = Depends(read_loop_scope)):
-    with use_scope(scope), commit_guard(scope):
+                         scope: RequestScope = Depends(read_loop_scope),
+                         principal: Principal = Depends(require_permission("npc:use"))):
+    with use_principal(principal), use_scope(scope), commit_guard(scope):
         return {**_base(scope), **get_coordinator().status(scope, operation, target_request_id)}
 
 
 @router.get("/directives/{directive_id}", response_model=ScopedDirectiveStateResponse)
-async def directive_status(directive_id: UUID, scope: RequestScope = Depends(read_loop_scope)):
-    with use_scope(scope), commit_guard(scope):
+async def directive_status(directive_id: UUID, scope: RequestScope = Depends(read_loop_scope),
+                           principal: Principal = Depends(require_permission("npc:use"))):
+    with use_principal(principal), use_scope(scope), commit_guard(scope):
         return {**_base(scope), **registry.state(scope, directive_id)}
+
+
+
+def _recovery_npc(principal, save_id, companion_id):
+    if not database_enabled():
+        raise ScopeError(404, "RECOVERY_UNAVAILABLE", "Persistent recovery is not enabled")
+    npc = resolve_npc_scope(principal, save_id, companion_id)
+    validate_principal(principal, npc)
+    return npc
+
+
+def _recovery_base(npc):
+    return {"protocol_version": "0.4", "scope": npc.as_dict(),
+            "service_instance_id": str(get_runtime().service_instance_id),
+            "state_version": state_version(npc.key)}
+
+
+@router.get("/recovery/state", response_model=RecoveryStateResponse)
+def recovery_state(save_id: UUID, companion_id: str,
+                   principal: Principal = Depends(require_permission("npc:use"))):
+    from app.scoped.storage import scope_lock
+    with use_principal(principal):
+        npc = _recovery_npc(principal, save_id, companion_id)
+        with scope_lock(npc):
+            validate_principal(principal, npc)
+            memory = read_document("memory", npc.key)
+            generation = read_document("save-generation", npc.save_key)
+            if memory is None or generation is None:
+                raise ScopeError(404, "STATE_UNKNOWN", "No authoritative snapshot has been initialized")
+            relationship = read_document("relationship", npc.key)
+            return {**_recovery_base(npc), "save_generation": generation["generation"],
+                    "memory_epoch": memory["memory_epoch"],
+                    "memory": {key: value for key, value in memory.items() if key != "memory_epoch"},
+                    "relationship": relationship}
+
+
+@router.get("/recovery/operations/{request_id}", response_model=RecoveryOperationResponse)
+def recovery_operation(request_id: UUID, save_id: UUID, companion_id: str, run_id: UUID,
+                       operation: str = Query(min_length=1, max_length=32, pattern=r"^[a-z][a-z0-9-]*$"),
+                       principal: Principal = Depends(require_permission("npc:use"))):
+    from app.scoped.storage import scope_lock
+    with use_principal(principal):
+        npc = _recovery_npc(principal, save_id, companion_id)
+        with scope_lock(npc):
+            validate_principal(principal, npc)
+            result = get_durable_request_store().recover(npc, run_id, operation, request_id)
+            return {**_recovery_base(npc), **result}
+
+
+@router.get("/recovery/directives/{directive_id}", response_model=RecoveryDirectiveResponse)
+def recovery_directive(directive_id: UUID, save_id: UUID, companion_id: str, run_id: UUID,
+                       principal: Principal = Depends(require_permission("npc:use"))):
+    from app.persistence.directives import sql_registry
+    from app.scoped.storage import scope_lock
+    with use_principal(principal):
+        npc = _recovery_npc(principal, save_id, companion_id)
+        with scope_lock(npc):
+            validate_principal(principal, npc)
+            return {**_recovery_base(npc), **sql_registry.recover(npc, run_id, directive_id)}
+
+
+@router.post("/recovery/receipts", response_model=RecoveryReceiptsResponse)
+def archive_receipts(request: RecoveryReceiptsRequest,
+                     principal: Principal = Depends(require_permission("npc:use"))):
+    from app.persistence.directives import sql_registry
+    from app.scoped.storage import scope_lock
+    with use_principal(principal):
+        npc = _recovery_npc(principal, request.save_id, request.companion_id)
+
+        def validate_archive():
+            validate_principal(principal, npc)
+
+        def apply():
+            reserve_request_quota(principal, npc.game_id)
+            with scope_lock(npc), use_unit_of_work(npc) as unit:
+                validate_archive()
+                generation = read_document("save-generation", npc.save_key)
+                history = read_document("run-history", (*npc.save_key, str(request.origin_run_id)))
+                if generation is None or generation["generation"] != str(request.save_generation):
+                    raise ScopeError(409, "SAVE_GENERATION_STALE", "The historical receipt save generation is not current")
+                if history is None or history["generation"] != str(request.save_generation):
+                    raise ScopeError(409, "ORIGIN_RUN_UNKNOWN", "The original run was not registered for this save generation")
+                stored, duplicate = sql_registry.archive(
+                    npc, request.origin_run_id, request.origin_memory_epoch, request.receipts,
+                    expected_state_version=request.expected_state_version,
+                )
+                output = {**_recovery_base(npc), "request_id": str(request.request_id),
+                          "origin_run_id": str(request.origin_run_id), "stored": stored,
+                          "duplicate": duplicate}
+                validate_archive()
+                stage_active_result(output, confirmed_state_version=True)
+                unit.commit()
+                return output
+
+        return get_durable_request_store().execute(
+            (*npc.key, str(request.origin_run_id), "receipt-archive", str(request.request_id)),
+            request, apply, validate=validate_archive, request_id=request.request_id,
+            allow_historical_replay=True,
+        )

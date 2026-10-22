@@ -1,0 +1,25 @@
+{
+  "protocol_version": "0.4",
+  "request_id": "00000000-0000-4000-8000-000000000007",
+  "save_id": "00000000-0000-4000-8000-000000000002",
+  "companion_id": "companion.alice",
+  "save_generation": "00000000-0000-4000-8000-000000000003",
+  "expected_state_version": 4,
+  "facts": [
+    {
+      "origin_run_id": "00000000-0000-4000-8000-000000000005",
+      "origin_encounter_id": null,
+      "origin_memory_epoch": "00000000-0000-4000-8000-000000000004",
+      "source": "ue",
+      "event": {
+        "event_id": "00000000-0000-4000-8000-000000000006",
+        "event_type": "gift_given",
+        "occurred_at": "2026-10-22T00:00:00Z",
+        "sequence": 1,
+        "details": {
+          "item_name": "supplied gift"
+        }
+      }
+    }
+  ]
+}

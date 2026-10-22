@@ -18,6 +18,14 @@ def final_generation_commit(function):
 def scoped_upstream(function):
     @wraps(function)
     def attempted(*args, **kwargs):
+        from app.persistence.database import database_enabled
+        from app.scoped.requests import has_active_request, timeout_for_upstream
+        if database_enabled() and has_active_request():
+            # Reject stale/cancelled work before reserving a daily provider call;
+            # quota failures must not count as an actual upstream attempt.
+            timeout_for_upstream(float("inf"))
+            from app.persistence.auth import reserve_upstream_quota
+            reserve_upstream_quota()
         with upstream_attempt() as attempt_id:
             started = time.monotonic()
             outcome = "returned"

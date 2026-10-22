@@ -2,7 +2,7 @@
 
 AesirWarden 的 Python 配套服务。NPC 服务负责对话、记忆、关系、语音转写、行为建议和回执采集；Boss RL 在独立进程中训练和推理。UE 始终负责世界状态、技能合法性、实际执行和结果结算。
 
-2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、外部ASR转接和模型版本发布。当前仍是单worker开发实现；v0.4已有作用域与生命周期子集，正式账号、数据库事务/同步和外部ASR另行实施。新增部署要求和验收见[部署指南](docs/guides/deployment.md)，不表示现代码可直接公网开放。
+2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、外部ASR转接和模型版本发布。当前仍是单worker开发实现；2026-10-22第四步已新增SQL事务/Bearer授权、持久确认及真实事实/历史回执归档，并有受控MySQL与恢复证据。UE接入、正式数据/网络发布、完整离线队列与外部ASR仍待验。新增部署要求和验收见[部署指南](docs/guides/deployment.md)，不表示现代码可直接公网开放。
 
 ## 开发环境启动 NPC 服务
 
@@ -29,6 +29,7 @@ python -m venv .venv
 | 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
 | 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
 | 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/step-02-identity-scope-plan.md) · [v0.4契约草案](docs/protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
+| SQL、正式凭据、持久确认与事实/回执恢复 | [第四步计划](docs/planning/step-04-persistence-access-plan.md) · [持久化开发指南](docs/guides/persistent-development.md) |
 | 正式部署、玩家隔离、缓存同步、ASR及模型分发 | [部署指南](docs/guides/deployment.md) |
 | 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
 | 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
@@ -50,15 +51,15 @@ python -m venv .venv
 
 `app` 不导入 `rl`，NPC服务可在未安装Gymnasium、SB3或Torch时运行。Boss HTTP推理已存在；UE运行接入、故障回退修复和正式BT/PPO对照分别验收。模型不随Git克隆分发，获取和身份核对见RL说明。
 
-新版scoped JSON使用v0.4，旧协议v0.1、v0.2、v0.3仅在显式legacy开发模式按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作；回执仍追加记录，v0.4提供已发布指令关联与同一逻辑request_id的窗口内幂等，完整执行状态机仍未完成。
+新版scoped JSON使用v0.4，旧协议v0.1、v0.2、v0.3仅在显式legacy开发模式按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作；第三步提供最小反馈账本，第四步SQL后端持久保存请求/事件/指令/回执并支持恢复；JSON开发后端仍是有限窗口内存状态。accepted仅收到、executed仅UE自报，完整启动/命中/完成协议及游戏验收仍待。
 
 ## 检查改动
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q
+.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q
 ```
 
-上述为无需 ML/RL 依赖的核心回归，包含 `tests/scoped` 的新版身份、生命周期、隔离、时效与幂等测试；完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
+上述为无需 ML/RL 依赖的核心回归，包含 `tests/scoped` 的新版身份、生命周期、隔离、时效与幂等测试；`tests/persistence`含隔离SQLite与显式启用的5项MySQL测试；无专用MySQL连接文件时该5项明确跳过，真实库运行见持久化指南。完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
 
 日常任务只维护一个状态来源，文档保留规则、依赖与验收定义。修改接口字段时同步schema、契约与golden样例；修改业务规则时同步需求、图和追踪，未决定的技能数量或跨端阶段协议继续列为未决。
