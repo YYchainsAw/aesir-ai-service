@@ -1,6 +1,6 @@
 # NPC与UE联调指南
 
-> 当前说明按2026-10-19服务源码`a2dd426`整理。这里维护启动、接入检查和历史样例边界；字段以[NPC契约v0.3](npc-contract-v0.3.md)、[v0.2战术](combat-tactical-protocol-v0.2.md)、[v0.1订单/对话](ue-protocol-contract-v0.1.md)为准。需求与真实验收见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
+> 当前说明按2026-10-19服务源码`a2dd426`整理。这里维护启动、接入检查和历史样例边界；现行scoped JSON字段以[v0.4契约](npc-scope-contract-v0.4-draft.md)为准；下文显式legacy开发兼容示例分别遵循[NPC契约v0.3](npc-contract-v0.3.md)、[v0.2战术](combat-tactical-protocol-v0.2.md)、[v0.1订单/对话](ue-protocol-contract-v0.1.md)。需求与真实验收见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
 
 > 部署目标更新（2026-10-21）：[15项分工对照](../planning/ai-capability-placement.md)已明确Boss本地、队友语义与长期状态云端；下表`127.0.0.1`是开发接入地址。开发实例及SSH转发见[远程开发指南](../guides/remote-development.md)；正式HTTPS、事务/离线同步、外部ASR和断网验收见[部署指南](../guides/deployment.md)。v0.4已实现作用域子集并合入main，字段与限制见本页末节，本页旧端点表仍仅适用于显式legacy兼容。
 

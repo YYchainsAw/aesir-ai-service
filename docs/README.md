@@ -28,10 +28,10 @@
 
 | 契约 | 当前用途 |
 | --- | --- |
-| [v0.1订单与对话](protocols/ue-protocol-contract-v0.1.md) | 兼容文本/语音订单解析、陪伴对话与流式响应 |
-| [v0.2战术决策](protocols/combat-tactical-protocol-v0.2.md) | 战斗快照、上下文决策、战斗事件与执行回执 |
-| [v0.3代理入口](protocols/npc-contract-v0.3.md) | 心跳/文本主入口、世界事件、当前端点矩阵及回执兼容边界 |
-| [v0.4作用域草案](protocols/npc-scope-contract-v0.4-draft.md) | 身份、生命周期、时效与兼容边界；分支实现及服务端回归见验证记录 |
+| [v0.1订单与对话](protocols/ue-protocol-contract-v0.1.md) | 显式legacy开发兼容的文本/语音订单解析、陪伴对话与流式响应 |
+| [v0.2战术决策](protocols/combat-tactical-protocol-v0.2.md) | 显式legacy开发兼容的战斗快照、上下文决策、战斗事件与执行回执 |
+| [v0.3代理入口](protocols/npc-contract-v0.3.md) | 显式legacy开发兼容的心跳/文本、世界事件与回执边界 |
+| [v0.4作用域契约](protocols/npc-scope-contract-v0.4-draft.md) | 现行scoped JSON的身份、生命周期、时效与兼容边界；已合入main，服务端回归及UE待验范围见验证记录 |
 | [人格包与游戏档案schema](protocols/persona-pack-schema-v0.2.md) | 数据资产格式；它的版本不等于API协议版本 |
 
 这些契约按职责并存，不能仅因编号较旧删除仍使用的协议。指南只维护步骤与说明，字段表链接上述契约；当前接口的交互文档由运行实例的`/docs`提供。

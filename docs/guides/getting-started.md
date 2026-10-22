@@ -1,6 +1,6 @@
 # 本机启动与检查
 
-> 2026-10-19按`a2dd426`校对；当前默认NPC端口8011。本页集中启动、依赖与常见操作，字段见[当前契约](../protocols/npc-contract-v0.3.md)，需求见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
+> 2026-10-19按`a2dd426`校对；当前默认NPC端口8011。本页集中启动、依赖与常见操作，现行scoped JSON字段见[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)，旧示例字段见[legacy v0.3及其引用的兼容契约](../protocols/npc-contract-v0.3.md)，需求见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
 
 正式目标为远程NPC与本地Boss；本页保留Windows开发操作。下文旧业务示例须显式启用legacy兼容；默认新版入口、身份与绑定顺序见[v0.4交接](scoped-development.md)。生产环境的Linux运行环境、认证、存储、外部ASR和发布门禁见[部署指南](deployment.md)，当前本机文件后端不能直接作为多人公网服务。
 
@@ -78,7 +78,7 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8011/v1/companion/chat' -C
 
 ## 语音和外部后端
 
-部署目标见[AI-DEP-12/13分工对照](../planning/ai-capability-placement.md)及[部署指南](deployment.md)：采集/PTT、采用时的VAD与播放在UE本地；初期文本优先，正式语音已采纳NPC服务转接外部ASR。下面仍说明当前已支持的`mock`／`faster_whisper`，外部ASR尚无适配，不新增未实现的配置值，真人音频与时延另验收。
+部署目标见[AI-DEP-12/13分工对照](../planning/ai-capability-placement.md)及[部署指南](deployment.md)：采集/PTT、已采纳后置的VAD与播放在UE本地；初期文本优先，正式语音已采纳NPC服务转接外部ASR。下面仍说明当前已支持的`mock`／`faster_whisper`，外部ASR尚无适配，不新增未实现的配置值，真人音频与时延另验收。
 
 ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机能力配置AESIR_ASR_MODEL/DEVICE/COMPUTE_TYPE/LANGUAGE。首次下载模型可能联网，运行需已有模型和依赖，不能把mock通过当真实语音已验收。
 
@@ -88,12 +88,12 @@ ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机�
 
 ```powershell
 # 安装开发依赖后按改动运行适用测试；先阅读测试及conftest的隔离约定
-.\.venv\Scripts\python -m pytest
+.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q
 # 需先起服务：演示会调用API并可能写正常运行数据
 .\.venv\Scripts\python -m scripts.command_service.mock_ue_flow
 ```
 
-本页本轮未执行上述命令。历史669通过/2跳过等数字属于当时提交，不承诺当前总数；真实ASR、LLM、UE执行、Windows包和正式P95均需各自记录。metrics_report的覆盖代理不自动等于需求验收通过，详见[复现与验收](repro.md)。
+上述pytest为无需额外ML/RL依赖的核心范围，已包含scoped回归；全量RL推理/环境测试另需相应可选依赖。本页本轮未执行上述业务测试。历史669通过/2跳过等数字属于当时提交，不承诺当前总数；真实ASR、LLM、UE执行、Windows包和正式P95均需各自记录。metrics_report的覆盖代理不自动等于需求验收通过，详见[复现与验收](repro.md)。
 
 常见问题：401/模型不可用检查配置并重启；缺faster-whisper仅安装所需语音依赖；端口不通核对run_server实际打印地址与UE配置；PowerShell别名curl导致参数错误时使用curl.exe或Invoke-RestMethod。完整字段不要在本页另建一套，回到对应契约查。
 
