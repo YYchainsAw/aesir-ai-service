@@ -12,6 +12,7 @@
 | 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
 | 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/step-03-execution-loop-plan.md) · [闭环增量契约](protocols/npc-loop-contract-v0.4.md)（服务端回归通过，UE待验） |
 | 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/scoped-development.md) |
+| 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/step-04-persistence-access-plan.md) · [持久化开发指南](guides/persistent-development.md) · [增量契约](protocols/npc-persistence-contract-v0.4.md)（服务端验证通过，UE/正式发布待验） |
 | 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/deployment.md)，含外部ASR、模型发布及AT-DEP验收 |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/repro.md) |
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/llm-integration.md) |
@@ -21,6 +22,7 @@
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/todo.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/npc-interaction-evolution.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/course-requirements-index.md) |
+| 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
 | Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
 | 真实测试/联调发生过什么 | [验证记录](logs/verification-records.md) · [里程碑](../CHANGELOG.md) |
@@ -34,6 +36,7 @@
 | [v0.3代理入口](protocols/npc-contract-v0.3.md) | 显式legacy开发兼容的心跳/文本、世界事件与回执边界 |
 | [v0.4作用域契约](protocols/npc-scope-contract-v0.4-draft.md) | 现行scoped JSON的身份、生命周期、时效与兼容边界；已合入main，服务端回归及UE待验范围见验证记录 |
 | [v0.4闭环增量契约](protocols/npc-loop-contract-v0.4.md) | 请求取消/状态查询、执行反馈账本与新增golden；保留原回执枚举和UE验收边界 |
+| [v0.4持久化与恢复增量](protocols/npc-persistence-contract-v0.4.md) | SQL权威状态、Bearer与权限、持久确认、真实事实/历史回执归档；单worker及生产/跨端验收分开 |
 | [人格包与游戏档案schema](protocols/persona-pack-schema-v0.2.md) | 数据资产格式；它的版本不等于API协议版本 |
 
 这些契约按职责并存，不能仅因编号较旧删除仍使用的协议。指南只维护步骤与说明，字段表链接上述契约；当前接口的交互文档由运行实例的`/docs`提供。
@@ -46,4 +49,4 @@
 
 规则、实现状态和验证结果分别登记。参数有代码默认值不等于全体成员已批准；模型能导出不等于人工已接受；HTTP成功不等于UE实际完成行为。
 
-当前图源仅在`design/uml/src`维护一套draw.io文件，由MCP修改后用Desktop导出到`png`。旧长策划、阶段流水账和PlantUML通过Git历史回查，不在本目录另存备份。实际审查与修改摘要见课程索引，历史验证摘要保留日期、环境与结论范围。
+UML图源在`design/uml/src`，数据库ER/PDM在`design/database/src`；各维护一套draw.io源，由MCP修改后用Desktop逐页导出到对应`png`，保留源与预览。旧长策划、阶段流水账和PlantUML通过Git历史回查，不在本目录另存备份。实际审查与修改摘要见课程索引，历史验证摘要保留日期、环境与结论范围。

@@ -53,6 +53,12 @@ class RelationshipStore:
     # -- 读取 ---------------------------------------------------------------
     def load(self) -> None:
         """从磁盘读回；损坏先回退备份，再不行隔离并回退初值（降级路径）。"""
+        from app.persistence.database import database_enabled, read_document
+        if self._scope and database_enabled():
+            data = read_document("relationship", self._scope.key)
+            self._set(RelationshipState.model_validate(data) if data is not None else
+                      RelationshipState(value=get_settings().relationship_initial, stage=""))
+            return
         try:
             raw = self._path.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -121,6 +127,11 @@ class RelationshipStore:
 
     def _persist_locked(self) -> None:
         """原子写入（tmp + rename）+ 单版本备份（.bak）。调用方须持锁。"""
+        from app.persistence.database import database_enabled, write_document
+        if self._scope and database_enabled():
+            write_document("relationship", self._scope.key, self._state.model_dump(mode="json"),
+                           scope_parts=self._scope.key)
+            return
         try:
             self._dir.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -174,6 +185,11 @@ def get_relationship_store(
     缓存按「角色 + game_id + 实际根目录」失效：配置根目录变化时重建实例。
     """
     npc_scope = checked_npc(npc_id, game_id)
+    from app.persistence.database import database_enabled
+    if npc_scope and database_enabled():
+        store = RelationshipStore(npc_id, game_id=game_id, root=root)
+        store.load()
+        return store
     effective_root = str(state_directory(root if root is not None else get_settings().relationship_root, game_id, npc_id))
     cache_key = (npc_id, game_id, root, npc_scope)
     with scope_lock(npc_scope) if npc_scope else nullcontext():

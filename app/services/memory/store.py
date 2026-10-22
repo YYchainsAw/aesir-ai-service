@@ -428,6 +428,13 @@ def get_memory_store(
     AESIR_MEMORY_ROOT）或 game_id 变化时重建实例，避免读写到旧目录。
     """
     npc_scope = checked_npc(npc_id, game_id)
+    from app.persistence.database import database_enabled
+    if npc_scope and database_enabled():
+        # A request-local object prevents staged/rolled-back state leaking through
+        # the legacy process cache before its SQL transaction commits.
+        store = MemoryStore(npc_id, game_id=game_id, root=root)
+        store.load()
+        return store
     effective_root = str(state_directory(root if root is not None else get_settings().memory_root, game_id, npc_id))
     cache_key = (npc_id, game_id, root, npc_scope)
     # 读取对应人格包的角色自指黑名单，未找到角色时降级为空（B-05）

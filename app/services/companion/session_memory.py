@@ -80,6 +80,17 @@ class SessionMemoryStore:
         """
         if self._max_turns == 0:
             return
+        from app.persistence.database import database_enabled
+        from app.persistence.uow import current_uow
+        unit = current_uow() if database_enabled() else None
+        if unit is not None:
+            key = self._key(session_id, companion_id)
+            turn = DialogueTurn(user_text=user_text, reply_text=reply_text, emotion_id=emotion_id)
+            def append_committed():
+                with self._lock:
+                    self._sessions.setdefault(key, deque(maxlen=self._max_turns)).append(turn)
+            unit.after_commit(append_committed)
+            return
         with self._lock:
             turns = self._sessions.setdefault(
                 self._key(session_id, companion_id), deque(maxlen=self._max_turns)
@@ -107,6 +118,18 @@ class SessionMemoryStore:
 
 
     def clear_scope(self, npc) -> int:
+        from app.persistence.database import database_enabled
+        from app.persistence.uow import current_uow
+        unit = current_uow() if database_enabled() else None
+        if unit is not None:
+            with self._lock:
+                keys = [key for key in self._sessions if key[:5] == ("scoped", *npc.key)]
+            def clear_committed():
+                with self._lock:
+                    for key in keys:
+                        self._sessions.pop(key, None)
+            unit.after_commit(clear_committed)
+            return len(keys)
         with self._lock:
             keys = [key for key in self._sessions if key[:5] == ("scoped", *npc.key)]
             for key in keys:

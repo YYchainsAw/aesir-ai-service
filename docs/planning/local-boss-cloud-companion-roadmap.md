@@ -67,6 +67,8 @@
 
 ## 第四步：补持久化与访问控制，再开放多人
 
+2026-10-22本步服务端在 `feature/npc-persistence-access` 完成SQL事务、Bearer/授权、持久身份与只读恢复、真实事实/历史回执归档、迁移及安全恢复；适用核心回归1404 passed、1 skipped（含5项实际MySQL测试），并在独立MySQL 8.4.13完成真实HTTP进程重启及空库恢复演练。见[实施计划](step-04-persistence-access-plan.md)、[契约](../protocols/npc-persistence-contract-v0.4.md)、[运维开发指南](../guides/persistent-development.md)和[实测记录](../logs/verification-records.md#persist-20261022)。旧5.7/开发.env未变，尚未切换正式数据或公开服务；UE缓存/本地离线队列、生产认证接入、HTTPS/OS隔离及容量仍待对应验收。
+
 - 开发阶段先明确身份和存储访问边界，首期保持单 worker 与按归属隔离的 JSON；不通过增加 worker 掩盖进程缓存/文件一致性问题。
 - 多人内测前评估受支持 MySQL LTS 的独立应用库与最小权限账号，持久化记忆、关系、请求去重及回执；内容可继续使用 JSON 字段，暂不引入 Redis、MQ 或向量数据库。服务器现有版本实测为5.7.43，既有实例和其他业务不在第二步变更范围，新正式服务不直接沿用旧版本作为选型。
 - 通过存储访问边界迁移，明确旧 JSON 归属、备份、导入校验、切换和回滚；迁移失败不能静默丢失已有数据。多 worker 待跨进程一致性另行验证后评估。

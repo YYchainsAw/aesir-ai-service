@@ -4,6 +4,14 @@
 
 历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
 
+## 2026-10-22 — DEP4数据库设计与SQL审计补齐
+
+新增需求映射、两页ER/单页PDM、8表44列字典、保留初始DDL及带阻断检查的v1漂移修复SQL；2份draw.io源由本地MCP保存，Desktop导出3张含XML的PNG并上传。新增结构/工件审计及15项回归，脚本组50 passed；真实隔离MySQL验证初始DDL和修复正反场景。test/restore结构一致，dev到期列可空偏差如实保留待修，未改既有库或业务schema。本次为实现后补齐设计，详见[数据库索引](docs/design/database/README.md)与[证据](docs/logs/verification-records.md#database-design-20261022)。
+
+## 2026-10-22 — DEP4 SQL持久化、访问控制与恢复（服务端分支实现）
+
+`feature/npc-persistence-access`新增独立MySQL事务与确认版本、正式Bearer/存档授权和管理分权、持久请求/事件去重、SQL执行反馈、只读历史确认及离线真实事实/历史回执归档；记忆重置按分项确认，恢复默认停用所有旧凭据。提供默认dry-run的归属JSON迁移、私有备份与空目标恢复工具。新增132项测试、10个完整golden；适用核心1404 passed、1 skipped，含5项真实MySQL专项，另完成8.4.13真实HTTP进程重启与备份恢复。未升级旧5.7、未改开发.env、未切正式数据、未修改/连接UE或调用真实模型；生产/跨端余项保留。见[计划](docs/planning/step-04-persistence-access-plan.md)、[开发指南](docs/guides/persistent-development.md)与[实测记录](docs/logs/verification-records.md#persist-20261022)。
+
 ## 2026-10-22 — DEP3 队友请求与执行反馈（服务端分支实现）
 
 `feature/npc-execution-loop`新增同会话文本FIFO、请求取消/状态查询、有限生成并发与上游剩余预算、元数据追踪，以及有界执行反馈账本和只读查询。提交后失败保留UNKNOWN；回执不确定追加封锁对应NPC/run，避免污染损坏尾部。修复跟随目标和战术能力关联，未支持条件明确无动作。新增243项scoped测试、10个完整golden，适用核心回归1272 passed、1 skipped；无新增依赖。未修改/连接UE、未调用真实LLM/ASR或安装RL依赖，第三步整体与生产目标仍待验。见[计划](docs/planning/step-03-execution-loop-plan.md)、[契约](docs/protocols/npc-loop-contract-v0.4.md)与[实测记录](docs/logs/verification-records.md#loop-20261022)。

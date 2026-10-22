@@ -12,7 +12,7 @@ from typing import Literal
 from uuid import UUID
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
@@ -38,10 +38,20 @@ class Settings(BaseSettings):
     game_id: str = "aesir"
 
     # -- v0.4 归属边界（单 worker；生产认证在第四步接入）-------------------
-    scope_identity_backend: Literal["disabled", "development"] = "disabled"
+    scope_identity_backend: Literal["disabled", "development", "bearer"] = "disabled"
     scope_dev_player_id: UUID | None = None
     scope_dev_save_ids: list[UUID] = Field(default_factory=list)
     scope_legacy_enabled: bool = False  # 仅开发兼容；独立旧目录，不能读取 scoped 状态
+
+    # -- 第四步事务存储与凭据（显式迁移，单 worker）---------------------
+    scope_storage_backend: Literal["json", "sql"] = "json"
+    scope_database_url: SecretStr = SecretStr("")
+    scope_database_url_file: str = ""  # 可从站点根外0600文件读取，避免命令参数泄露
+    scope_database_pool_size: int = Field(default=5, ge=1, le=10)
+    scope_sqlite_test_mode: bool = False  # SQLite仅显式隔离测试，不作为MySQL故障回退
+    scope_request_quota_per_minute: int = Field(default=120, ge=1)
+    scope_upstream_quota_per_day: int = Field(default=200, ge=1)
+    scope_sync_batch_limit: int = Field(default=50, ge=1, le=100)
 
     # -- 第三步请求编排（单 worker，保留原请求预算）----------------------
     scope_max_generation_concurrency: int = Field(default=2, ge=1, le=16)

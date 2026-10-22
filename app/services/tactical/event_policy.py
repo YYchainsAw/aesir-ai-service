@@ -353,6 +353,10 @@ def _resolve(
     评估在锁内进行：生活事件的关系计分是副作用，若挪到锁外，并发重试可能
     在两次查表之间都未命中而重复计分（SC-007）。
     """
+    from app.persistence.database import database_enabled
+    if current_scope() and database_enabled():
+        # Durable event de-duplication is committed with business state.
+        return evaluate(), False
     if current_scope():
         key = (runtime_key(key[0]), *key[1:])
     with _seen_events_lock:
@@ -501,9 +505,13 @@ def _score_relationship(
     try:
         # T38：apply_event 现在返回三元组；生活事件的拦截原因不进本链路埋点，
         # 丢弃（SC-004 的冷却观测走对话信号通道，见 dialogue_service）。
+        from app.persistence.database import database_enabled
+        # UE UTC remains provenance, never the authority for server cooldown/day.
+        # Offline and realtime SQL facts share this server-receipt clock policy.
+        scoring_time = None if current_scope() and database_enabled() else occurred_at
         state, delta, _reason = get_relationship_store(
             companion_id, game_id=game_id
-        ).apply_event(event_type, occurred_at)
+        ).apply_event(event_type, scoring_time)
     except RelationshipStoreError:
         return _REL_UNAVAILABLE, "", 0
     return _REL_SCORED, state.stage, delta

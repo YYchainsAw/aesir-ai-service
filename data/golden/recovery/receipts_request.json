@@ -1,0 +1,26 @@
+{
+  "protocol_version": "0.4",
+  "request_id": "11111111-1111-4111-8111-111111111111",
+  "save_id": "22222222-2222-4222-8222-222222222222",
+  "companion_id": "companion.alice",
+  "origin_run_id": "33333333-3333-4333-8333-333333333333",
+  "origin_memory_epoch": "66666666-6666-4666-8666-666666666666",
+  "save_generation": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "expected_state_version": 7,
+  "receipts": [
+    {
+      "protocol_version": "0.4",
+      "order_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "result": "executed",
+      "encounter_id": null,
+      "request_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      "reason_code": "",
+      "agent_id": "companion.alice",
+      "ability_id": null,
+      "reported_at": null,
+      "received_at": null,
+      "policy_revision": "",
+      "sequence": 1
+    }
+  ]
+}

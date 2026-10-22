@@ -4,6 +4,8 @@
 
 2026-10-21按用户后续授权同步DEP/EVO目标：4份源的5页均已由draw.io MCP读取并保存，再用draw.io Desktop 32.4.1逐页导出含XML的PNG。图形已表达认证玩家/存档作用域、外部ASR与后置TTS、记忆来源/重置世代和持久命令协作；这些是完整目标分析；main已有v0.4身份/分区/绑定/epoch及有界内存幂等子集，精确实现与限制见[scoped交接](../../guides/scoped-development.md)。跨重启事务、完整EVO、UE及生产验收仍待完成。整组Word由UE仓本轮同步，最终版本与排版结果以该仓记录为准。
 
+2026-10-22补充：下文图形及“当前”实现说明保留2026-10-21的建模基线；第四步SQL事务、持久确认/回执及恢复已有独立服务端证据，JSON开发后端仍有自身边界，见[持久化指南](../../guides/persistent-development.md)。数据库的实体、8表结构与实际外键另见[ER/PDM及字典](../database/README.md)；本组UML不是数据库物理设计，也未因此重新绘制或视为跨端验收。
+
 ## 当前图源与预览
 
 | 标识 | 内容和范围 | 可编辑源 | Desktop导出 |
@@ -40,7 +42,7 @@
 | UML-14 记忆重置协作 | 已同步目标：认证、屏障提交、缓存清理与旧代写入拒绝；实际清理失败仍报告部分状态，不承诺现行原子回滚 | UC-07；M4/C3、BR-DEP-06、AT-EVO-08 |
 | UML-15 指令与回执协作 | 已同步目标：同键同内容回放后结束、同键异内容冲突、首次持久化、UE条件监听、真实回执和事务确认；保留现枚举与目标阶段差异 | UC-02/04/05/06；D2、G3/G4、C2/C3、AT-EVO-07/09 |
 
-完整部署与语音生命周期由UE的[A11部署图](../../../../../Unreal-Projects/AesirWarden/Docs/UML/src/11_AIDeployment.drawio)和[A12输入/播放两页](../../../../../Unreal-Projects/AesirWarden/Docs/UML/src/12_NPCVoiceLifecycle.drawio)维护。A12a解释按键/最终转写与取消，A12b解释确认文本合成、有序播放和打断；生成、播放和动作结果分开。本仓不复制同义源，Word回填与运行验证各自登记。
+完整部署与语音生命周期由UE仓的A11部署图 `Docs/UML/src/11_AIDeployment.drawio` 和A12输入/播放两页 `Docs/UML/src/12_NPCVoiceLifecycle.drawio`维护。A12a解释按键/最终转写与取消，A12b解释确认文本合成、有序播放和打断；生成、播放和动作结果分开。本仓不复制同义源，Word回填与运行验证各自登记。
 
 ## 历史图与来源
 

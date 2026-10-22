@@ -18,8 +18,9 @@
 | API-GAP（legacy静态发现） | 旧回执game_id及extra/version/UUID校验差异仍属legacy兼容；v0.4已统一严格作用域与已发布指令关联 | 新旧入口分开核对；UE接入和生产身份另验，不把旧schema差距概括为scoped仍无保护 |
 | MODEL-GAP（第三步后余项） | scoped已有最小反馈账本、序号去重/终态保护及原请求关联查询；完整started/hit/completed、持久历史决策与REQ-06仍待闭合 | 见[闭环增量契约](../protocols/npc-loop-contract-v0.4.md)与[服务端验证](../logs/verification-records.md#loop-20261022)；accepted仅收到、executed仅UE自报，不能由JSONL或状态查询推断UE真实闭环 |
 | DATA-GAP（本轮静态发现） | 默认对话日志保留完整输入/回复，与NFR只摘要目标不一致；记忆清理范围和部分失败状态需明确 | 先确认保留/清除策略及目标范围；不宣称关闭或摘要化已生效，关系档案不因清记忆自动清除 |
-| DEP-01 | 远程HTTPS、生产认证与事务存储迁移；复用v0.4开发主体/存档授权和默认关闭legacy门禁 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
-| DEP-02 | 版本同步、跨重启持久去重、离线队列与冲突；复用已实现memory_epoch屏障 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
+| DEP-01 | SQL/Bearer服务端及迁移/恢复工具已有受控证据；正式数据切换、OS隔离与HTTPS发布仍待 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
+| DEP-02 | SQL持久身份、确认版本、事实/回执归档与epoch分项已实现；UE缓存/本地队列和完整恢复/冲突流程待接入 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
+| DB-GAP / DEP4 | 已补需求追踪、ER/PDM、8表44列字典、保留DDL及结构审计；dev凭据到期列仍有可空性漂移，发布前需安排受检修复 | 见[数据库设计](../design/database/README.md)；初始SQL与修复已在新增隔离MySQL验证，不能以另库通过覆盖dev失败；高增长账本拆表/索引和长期清理仍按实际容量需求推进 |
 | DEP-03 | 外部ASR、模型可信发布/下载回滚、生产守护及容量采样 | DEP-REQ-04/05/06/08；AT-DEP-07/09/10；只记录真实运行证据 |
 | EVO-01 | 请求生命周期、旧代取消、逻辑命令幂等与UE真实反馈；关联认证作用域和事务结果 | D1/D2/D4、G3/G4、C1/C2；先对齐协议/样例；AT-EVO-01/02/07/09，原EXT-01/MODEL-GAP不因此关闭 |
 | EVO-02 | 上下文来源、事件合并/过期、分阶段追踪及按键→外部ASR→文本最小链路 | D3、G1/G2、C4、V1；AT-EVO-03/05/10和AT-DEP-07；沿用纯心跳规则及无主动推送 |
@@ -30,8 +31,10 @@
 
 2026-10-20新增（均已由GitHub建账，此处仅留指针）：FIX-12/style_guard元语言词表口径（[#55](https://github.com/YYchainsAw/aesir-ai-service/issues/55)/T40，待26轮真实对话回归）；Boss第三种子重训（[#58](https://github.com/YYchainsAw/aesir-ai-service/issues/58)/T43，旁路按评测选优）；M2旧账核对（#17/#18/#29/#30，逐项核对关闭或补证据）。S5外部人格包守卫（#39/T30）已于2026-10-20完成，见CHANGELOG与验证记录。
 
-历史SDD的单机、本地文件及无账号/DB/公网限定保留为旧基线。2026-10-21用户已采纳Boss本地、远程NPC、多个独立单机玩家的身份/存档隔离、缓存同步、外部ASR和模型分发；完整DEP规则见[部署指南](../guides/deployment.md)，15项位置与[六步开发方案](local-boss-cloud-companion-roadmap.md)保持对应。v0.4作用域子集已合入main，正式账号/数据库事务与离线同步仍待后续；多人联机战斗、通用账号产品、任意跨设备存档合并、人格自演化和Boss并入NPC仍不在范围。日常状态只在GitHub Issues维护。
+历史SDD的单机、本地文件及无账号/DB/公网限定保留为旧基线。2026-10-21用户已采纳Boss本地、远程NPC、多个独立单机玩家的身份/存档隔离、缓存同步、外部ASR和模型分发；完整DEP规则见[部署指南](../guides/deployment.md)，15项位置与[六步开发方案](local-boss-cloud-companion-roadmap.md)保持对应。v0.4作用域子集已合入main；第四步分支已有SQL/Bearer与事实/回执同步服务端证据，正式数据切换、UE缓存/队列及完整恢复仍待后续；多人联机战斗、通用账号产品、任意跨设备存档合并、人格自演化和Boss并入NPC仍不在范围。日常状态只在GitHub Issues维护。
 
 同日采纳的五方面20项机制及用例/FR/DEP映射见[交互演进计划](npc-interaction-evolution.md)。EVO批次是依赖划分；复用v0.4已有可信开发身份、绑定/epoch和有界内存幂等，取消/TTS/跨重启事务等完整目标和AT-EVO未由本轮运行验收。图源与PNG已通过MCP和Desktop同步，整组Word回填/排版结果由UE建模记录维护。
 
 2026-10-22第三步服务端增量在 `feature/npc-execution-loop` 通过适用核心回归，工作包见[DEP3里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/7)。同会话FIFO、取消屏障、并发/预算、最小反馈账本及只读查询已有受控证据；EXT-01、MODEL-GAP、EVO-01/02的跨端余项和第四步生产目标仍保留，UE连接继续后置。具体待验见[交接指南](../guides/scoped-development.md#loop-usage)。
+
+2026-10-22第四步服务端在 `feature/npc-persistence-access` 已通过1404 passed、1 skipped适用核心回归，含5项真实MySQL测试；另完成独立SQL HTTP进程重启、源JSON不改导入与私有备份空库恢复。见[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)、[契约](../protocols/npc-persistence-contract-v0.4.md)和[验证记录](../logs/verification-records.md#persist-20261022)。EVO-01/03与DEP完整生产/UE目标不因服务端受控通过而关闭；恢复较旧快照的RPO/后续reset收敛、本地队列与发布门禁继续保留。
