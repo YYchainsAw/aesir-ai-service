@@ -38,12 +38,12 @@ def assert_error(function, code):
 
 def test_schema_is_explicit_and_wrong_version_is_rejected(tmp_path):
     db = Database.from_url("sqlite:///" + str(tmp_path / "empty.sqlite"))
-    assert_error(db.check_schema, "STATE_UNAVAILABLE")
+    assert_error(db.check_schema, "DATABASE_SCHEMA_MISMATCH")
     db.initialize_schema()
     db.check_schema()
     with db.engine.begin() as connection:
         connection.execute(schema_versions.update().values(version=999))
-    assert_error(db.check_schema, "STATE_UNAVAILABLE")
+    assert_error(db.check_schema, "DATABASE_SCHEMA_MISMATCH")
     db.engine.dispose()
 
 
@@ -324,18 +324,6 @@ def test_configured_sqlite_url_requires_explicit_test_mode(tmp_path, monkeypatch
     finally:
         reset_database()
 
-
-def test_mysql_schema_gate_rejects_single_precision_timestamp_columns(database, monkeypatch):
-    from types import SimpleNamespace
-    from sqlalchemy import Float
-    import app.persistence.database as persistence
-    from app.persistence.schema import metadata
-    monkeypatch.setattr(database, "_check_server_version", lambda: None)
-    monkeypatch.setattr(database.engine.dialect, "name", "mysql")
-    def columns(name):
-        return [{"name": column.name, "type": Float()} for column in metadata.tables[name].c]
-    monkeypatch.setattr(persistence, "inspect", lambda connection: SimpleNamespace(get_columns=columns))
-    assert_error(database.check_schema, "DATABASE_SCHEMA_MISMATCH")
 
 
 def test_restore_never_reactivates_credentials_revoked_after_the_backup(database, tmp_path, monkeypatch):

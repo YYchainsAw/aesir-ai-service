@@ -46,7 +46,7 @@
 | `secret_hash` | VARCHAR(64) | 否 | — | 无 | SHA-256十六进制 | 完整高熵token的哈希，鉴权恒定时间比对；无UNIQUE约束 |
 | `permissions` | VARCHAR(250) | 否 | — | 无 | 去重排序后逗号分隔 | 非空权限集合：npc:use、console:read、memory:reset、docs:read；数据库不校验集合 |
 | `created_at` | DOUBLE | 否 | — | 无 | 签发时服务端UTC秒 | 凭据签发时间；没有数据库CURRENT_TIMESTAMP默认 |
-| `expires_at` | DOUBLE | 否 | — | 无 | created_at + 有限正TTL | 到期UTC秒；源码要求NOT NULL，既有dev库偏差见第11节 |
+| `expires_at` | DOUBLE | 否 | — | 无 | created_at + 有限正TTL | 到期UTC秒；要求NOT NULL，首次dev漂移及后续整改见第11节 |
 | `revoked` | TINYINT(1) / BOOL | 否 | — | 无 | 客户端默认false；签发显式false | 是否已撤销；备份恢复操作会保守撤销全部恢复凭据 |
 
 外键 `(game_id, player_id) → access_players(game_id, player_id)`，参考名 `access_credentials_ibfk_1`，无级联。InnoDB自动建立非唯一二级索引 `game_id(game_id, player_id)`支持该FK；它不是源码另写的业务索引。默认TTL为3600秒是CLI/API函数参数行为，不是数据库DEFAULT。
@@ -120,10 +120,10 @@ LLM等待期间不持有业务长事务。最终结果与业务状态原子提�
 
 | 列 | MySQL类型 | 可空 | 键/索引 | 数据库默认 | 应用默认/写入 | 含义 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `id` | INTEGER | 否 | PK；AUTO_INCREMENT | 无固定DEFAULT | 初始化显式1 | SQLAlchemy整数单列PK在MySQL隐式自增；服务只读取id=1，不能依赖自动生成另一个标记 |
+| `id` | INTEGER | 否 | PK；AUTO_INCREMENT | 无固定DEFAULT | 初始化显式1 | SQLAlchemy整数单列PK在MySQL隐式自增；门禁要求唯一id=1，不能依赖自动生成另一个标记 |
 | `version` | INTEGER | 否 | — | 无 | SCHEMA_VERSION=1 | 当前版本号；初始SQL最后插入(1,1)，不以存在该行代替完整结构审计 |
 
-当前无“只能一行”“id只能为1”的CHECK。应用初始化遇到版本不符会拒绝继续；`check_schema()`的现有门禁只做版本、可访问列与DOUBLE时间类型检查，完整设计核对另用验证脚本。
+当前无“只能一行”“id只能为1”的数据库CHECK；应用共享结构门禁要求版本表恰好只有 `(1, SCHEMA_VERSION)` 一行。`check_schema()`现与离线MySQL审计共享metadata结构检查，不能只凭版本行或启动成功推断业务语义、权限和容量全部通过。
 
 ## 10. 全部索引与物理外键
 
@@ -142,15 +142,15 @@ LLM等待期间不持有业务长事务。最终结果与业务状态原子提�
 
 ## 11. 实际库核对与保密边界
 
-2026-10-22只读检查MySQL 8.4.13的三个项目隔离库，未读取或展示凭据值：
+2026-10-22首次只读检查发现dev到期列可空性漂移；后续先备份dev，再通过修复SQL前置检查并执行ALTER。下表为本轮修复后的只读核对，未读取或展示凭据值：
 
 | 环境 | access_credentials.expires_at类型 | 可空 | NULL行数 | 版本标记 |
 | --- | --- | --- | --- | --- |
-| dev84 | DOUBLE | 是，偏离源码 | 0 | 1 |
+| dev84 | DOUBLE | 否，已修复 | 0 | 1 |
 | test84 | DOUBLE | 否 | 0 | 1 |
 | restore84 | DOUBLE | 否 | 0 | 1 |
 
-本次不自动改已有库。偏差整改脚本见 [v1到期列修复SQL](sql/repairs/001-v1-credential-expiry-not-null.sql)，它是现有v1漂移整改，不伪装成schema v2。执行前必须核对版本、列型与NULL=0，并按[SQL使用说明](sql/README.md)操作。
+dev/test/restore三个库现均通过共享结构审计。整改使用 [v1到期列修复SQL](sql/repairs/001-v1-credential-expiry-not-null.sql)，恢复v1已有NOT NULL约束，未标记为schema v2；test/restore已符合规范，没有重复ALTER。原始差异、私有备份和整改后核对分别保留在[验证记录](../../logs/verification-records.md#schema-gate-20261022)。后续其他实例仍须独立核对前置条件并按[SQL使用说明](sql/README.md)执行，不能借用本表结果。
 
 使用 `python -m scripts.check_database_design`检查保留DDL、数据字典列覆盖和PDM源列/类型/键标记；追加 `--database-url-file <站点根外0600连接文件>`只读核对真实MySQL完整结构。脚本不打印DSN、凭据、payload或请求正文；检测漂移返回非0。具体运行证据见[验证记录](../../logs/verification-records.md)。
 

@@ -191,7 +191,12 @@ def _read_principal(connection, credential_id, *, token_hash=None):
         expected = row["secret_hash"] if row is not None else "0" * 64
         if not secrets.compare_digest(token_hash, expected):
             raise _invalid()
-    if row is None or row["revoked"] or row["expires_at"] <= _now():
+    if row is None or row["revoked"]:
+        raise _invalid()
+    expiry = row["expires_at"]
+    if isinstance(expiry, bool) or not isinstance(expiry, (int, float)) or not math.isfinite(expiry):
+        raise _unavailable()
+    if expiry <= _now():
         raise _invalid()
     game_id = safe_segment(get_settings().game_id)
     if row["game_id"] != game_id:

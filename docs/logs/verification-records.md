@@ -267,3 +267,44 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 原始证据位于服务器忽略目录：`database-design-v1.json`（DDL/修复正反场景）、`database-design-audits.json`（三个既有库只读结果）、`database-design-diagrams.json`（图源/PNG校验）与 `database-design-script-tests.xml`（脚本JUnit）。这些文件在 `data/runtime/remote-dev/verification`，不与私有凭据或业务数据一起提交。
 
 结论只覆盖数据库设计材料、保留SQL的隔离执行与结构检查；dev偏差仍需安排受检修复，JSON账本容量/索引/长期保留、正式数据切换和生产恢复演练继续待验。UE、真实LLM/ASR、HTTPS/公众网络、容量或多worker没有因图纸补齐而通过。审查入口保持PR #88草稿。
+
+
+<a id="schema-gate-20261022"></a>
+## 2026-10-22 第四步结构门禁与既有开发库修复
+
+PR #88已由用户合入main，服务器快进至 `eea7532` 后从main创建 `fix/npc-schema-validation`，继续第四步受检收尾，跟踪[#89](https://github.com/YYchainsAw/aesir-ai-service/issues/89)。本次修复既有dev库的expires_at可空性偏差，并把离线结构审计接入实际SQL启动/首次访问和初始化边界；schema仍为v1，没有另建无实际结构变化的v2迁移。
+
+新增共享模块 `app/persistence/validation.py`，由运行时 `check_schema()` 与设计审计复用metadata规则。核对8表、44列及顺序/类型/可空/数据库默认、自增/生成列、PK/FK（含schema及动作）、索引、CHECK、引擎/字符集和唯一版本标记。metadata未固定的collation不硬编码为样本0900，大小写策略仍需正式部署核定。结构差异统一拒绝为503 `DATABASE_SCHEMA_MISMATCH`，SQL访问/反射失败仍报告不可用，不向HTTP回显差异或DSN。
+
+SQL lifespan每次复核（包括缓存连接），首次获取SQL连接只有验证成功才进入缓存；普通请求不重复反射。初始化使用独立、未缓存的operator连接，只有完全空库才建表；已有完整库仅只读幂等核对，错误版本、残缺或其他表拒绝且不先补建DDL。认证对缺失、非有限或非数值到期数据返回AUTH_UNAVAILABLE，不再抛TypeError或形成无期限凭据。
+
+### 开发库备份与修复
+
+21:38（Asia/Shanghai）先确认dev唯一偏差是 `access_credentials.expires_at` 的NULL属性、当前NULL行数0；没有运行中的18012 SQL验证进程。为修复前保全已知偏差库，使用受控只读REPEATABLE READ快照保存完整8表格式v1逻辑备份，并单独保存原SHOW CREATE定义；不为运行服务绕过门禁。两文件在 `/etc/aesir-ai/dev/backups`，0600，文件名为 `step4-followup-dev-before-schema-repair-20261022.json` 及同前缀 `-ddl.json`，没有进入站点根或Git。
+
+随后原样执行已审的v1修复SQL三段CREATE/CALL/DROP；过程内版本、DOUBLE列型和NULL计数检查通过后才改为NOT NULL。8张表的业务行逐行及规范内容SHA256前后完全一致：documents13、journal6、state_versions3，其余五表各1行；无残留helper过程，版本仍1。逻辑备份内容SHA256为 `047182d75c7f3f68a54c77b700f6ce34f8dceb4bc3275f8afd3650f53c57edeb`。只对专用dev执行这一既有约束修复，test/restore结构及旧5.7未变。dev/test/restore之后的共享只读审计均通过8表44列。
+
+### 回归与真实MySQL门禁
+
+2026-10-22 21:42～21:44（Asia/Shanghai），Python3.12.15适用核心回归 **1463 passed、1 skipped、7 warnings，81.35秒**，含5项实际MySQL。相比已合入main的1419项适用核心基线净增44项；persistence共176项。跳过的仍是未安装可选faster-whisper模块，warnings为既有Starlette弃用提示。命令：
+
+```bash
+AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
+  .venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q --tb=short --junitxml=data/runtime/remote-dev/verification/step4-followup-pytest.xml
+```
+
+| 证据 | 本轮真实结果 |
+| --- | --- |
+| SQLite与反射回归 | 漂移类型/NULL/default/列、键、索引、引擎等拒绝；已有库init不补表/不改标记；失败连接不缓存；缓存后结构变化仍阻止下次SQL lifespan；异常expiry拒绝 |
+| 独立MySQL空库 | 新库 `aesir_ai_gate84_20261022` 运行入口先503且保持零表；init preview仍零表；只有显式operator init创建完整8表 |
+| 实际SQL启动负例 | 在上述新库把expires_at改成DOUBLE NULL后，直接check与首次get_database均拒绝；实际18012进程PID1448600在lifespan退出码3，无监听及业务写入 |
+| 实际SQL启动正例 | 仅将该隔离库恢复NOT NULL后，实际进程PID1448632健康200、无Bearer业务请求401；演练后进程已终止，18012无监听 |
+| 既有库初始化边界 | 隔离完整库的错误marker999保持不变，init退出1；新 `aesir_ai_gate_partial84_20261022` 始终只有schema_versions表，init退出1而不补表 |
+| 账号与开发实例 | 两个新增验证库只授予项目迁移/运行账号各自权限；运行账号DDL和读取mysql.user均拒绝；原18011 JSON进程健康200 |
+| 图与文档 | PDM仅改修复状态注记；本地MCP保存、Desktop32.4.1导出含XML PNG，1644×1503，嵌入页与源一致并目视通过；ER与8表44列/2FK设计不变 |
+
+实际进程证明发生于21:43:02～21:43:09，与pytest使用不同独立库，不混用原test库做DDL。两个新隔离库及四份0600连接文件保留用于复现，临时rootURL从未落盘；helper和合成业务数据无残留。HTTP证明只覆盖服务启动与认证门禁，没有UE或真实模型调用。
+
+原始记录位于服务器忽略目录 `data/runtime/remote-dev/verification`：`step4-followup-repair.json`、`step4-followup-audits.json`、`step4-followup-mysql-gate.json/.log`及 `-process.log`、`step4-followup-pytest.xml/.log/-result.json`、`step4-followup-diagrams.json`。回归前后303份源码/样例SHA256一致；`.env`、Python版本文件和历史Linux锁SHA256与本轮开始一致，原未提交文件保留。最终提交后再把证据源码SHA与Git核对。
+
+本轮完成第四步已知服务端门禁与dev结构整改，单worker边界不变。未切换原开发.env为SQL/Bearer，未迁移真实玩家数据，也未测试UE连接；UE凭据/缓存/事实队列、完整跨端恢复，HTTPS/OS隔离、自动备份/保留、真实容量和正式RPO继续按既定步骤验收。

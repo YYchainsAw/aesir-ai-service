@@ -76,6 +76,8 @@
 
 验收：跨玩家读取/修改被拒绝；服务重启后按约定恢复；重复请求及回执保持幂等；备份恢复与 JSON 迁移可核对且可回滚。完成该阶段前不宣称具备正式多人服务能力。
 
+2026-10-22后续：PR #88已合入main；`fix/npc-schema-validation` 完成dev结构偏差受检修复、SQL启动/首次接入门禁与仅空库初始化，适用核心回归1463 passed、1 skipped，仍含5项真实MySQL。独立真实进程证明错误结构拒绝启动，恢复正确结构后健康/认证门禁可用。跟踪[#89](https://github.com/YYchainsAw/aesir-ai-service/issues/89)及[本轮验证](../logs/verification-records.md#schema-gate-20261022)，不以服务端收尾关闭UE或生产余项。
+
 ## 第五步：并行完成 Boss 本地发行
 
 - 保持现有独立 localhost HTTP 推理方案，冻结 Schema 4、26 维观测、9 动作契约；短期不为切换引擎内推理重写现有链路。

@@ -12,14 +12,14 @@
 | --- | --- |
 | 声明来源 | `app/persistence/schema.py`、`auth.py`、`journal.py`；业务写入在 `database.py`、`uow.py`、`directives.py`、`sync.py` |
 | 引擎与编码 | 全8表使用InnoDB、utf8mb4；源码没有显式指定collation |
-| 样本环境 | 独立MySQL 8.4.13验证实例；本次只读核对dev/test/restore，未更改现有库 |
+| 样本环境 | 独立MySQL 8.4.13验证实例；首次审查发现dev漂移，后续已备份并修复，三个项目库只读审计均通过 |
 | 实际collation | 验证库全8表继承 `utf8mb4_0900_ai_ci`；新库必须预先核对数据库默认值，不假定任意环境相同 |
 | 时间表示 | `created_at/expires_at/finished_at` 为UTC Unix秒的DOUBLE；额度窗口起点为BIGINT整数秒，未使用MySQL TIMESTAMP |
 | 默认值 | `active=True`、`revoked=False` 是SQLAlchemy客户端默认值，不是数据库 `DEFAULT`；直接SQL写入必须显式提供 |
 | 约束范围 | 8个主键、2条物理外键；无额外UNIQUE/CHECK声明，无自动级联删除策略 |
 | 运行范围 | 单worker、短事务；数据库已存在不代表运行时binding、队列和取消已具备多worker一致性 |
 
-时间使用DOUBLE是已验证的物理精度约束，不能替换成单精度FLOAT。应用 `check_schema()` 会检查这些列的实际类型，但这不等于完整校验所有列、默认值、主外键和collation。
+时间使用DOUBLE是已验证的物理精度约束，不能替换成单精度FLOAT。应用 `check_schema()` 与离线MySQL审计共用结构检查，对照metadata核对字段、类型、可空性、默认值、主外键和索引等声明；具体覆盖与部署约束见第8节。
 
 ## 2. 八表、主键与物理关系
 
@@ -104,6 +104,6 @@ v1把变动频繁的NPC记忆快照和受协议控制的确认/回执聚合保�
 
 ## 8. 实现核对与后续变更
 
-PDM、字典和 `001-initial-schema.sql` 以源码v1声明为规范，不能用一个schema版本号掩盖实际列定义差异。本次只读核对发现dev库的 `access_credentials.expires_at` 为 `DOUBLE NULL`，源码与DDL要求 `DOUBLE NOT NULL`；test/restore库该列均为 `DOUBLE NOT NULL`，三个库版本标记均为1。dev差异需要独立修复SQL的前置检查和人工安排，当前没有修改既有验证库。实际核对结果与命令随本次[验证记录](../../logs/verification-records.md)保留。
+PDM、字典和 `001-initial-schema.sql` 以源码v1声明为规范，不能用一个schema版本号掩盖实际列定义差异。首次只读核对发现dev库的 `access_credentials.expires_at` 为 `DOUBLE NULL`，源码与DDL要求 `DOUBLE NOT NULL`；test/restore当时已符合规范。后续推进已先备份dev，再通过版本、列型及NULL=0前置检查后执行保留的v1修复SQL；三个项目库现均为 `DOUBLE NOT NULL`，只读结构审计均通过，版本标记仍为1。过程与结果见[本轮验证记录](../../logs/verification-records.md#schema-gate-20261022)。
 
-`check_schema()` 当前校验服务版本、`schema_versions(id=1)`、可选取声明列以及DOUBLE列型，不完整比较nullability、全部约束、索引和collation。新增的设计审计命令补充只读完整比较，不能把HTTP启动成功当作全结构一致的证据。v1漂移修复与未来真正的版本迁移分别管理，步骤见[SQL说明](sql/README.md)。
+`check_schema()` 与设计审计命令现复用 `app/persistence/validation.py`，不再让运行时只做DOUBLE列型检查。共享检查精确核对8表集合、列名/顺序、编译后的物理类型及长度、nullability、数据库默认、MySQL自增、非预期生成列、主键顺序、外键列及更新/删除行为、二级索引列/唯一性/重复数量、非预期CHECK，以及MySQL的InnoDB和utf8mb4要求；版本表必须仅有 `(1, SCHEMA_VERSION)` 一行。SQL启动及首次取连接先校验，通过后缓存连接，不在每次请求重复反射；漂移拒绝为 `DATABASE_SCHEMA_MISMATCH`，不向HTTP暴露内部差异。未在metadata固定的collation不会强制等于样本 `utf8mb4_0900_ai_ci`；可用不等于大小写策略已经完成正式验收。检查只读，不审计业务行内容或数据库权限，不修复库，也不替代JSON业务约束与容量验证。v1漂移修复与未来真正的版本迁移分别管理，步骤见[SQL说明](sql/README.md)。

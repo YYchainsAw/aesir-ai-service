@@ -1,6 +1,6 @@
 # SQL持久化、访问控制与恢复开发指南
 
-2026-10-22，适用于 `feature/npc-persistence-access`。字段和错误以[持久化增量契约](../protocols/npc-persistence-contract-v0.4.md)、`app/schemas/recovery.py`、`app/schemas/sync.py`与golden为准；本页只维护操作与交接。原v0.4绑定/预算使用[基础指南](scoped-development.md)，范围和真实结果见[第四步计划](../planning/step-04-persistence-access-plan.md)及[验证记录](../logs/verification-records.md#persist-20261022)。
+2026-10-22，适用于第四步PR #88合入后的main及 `fix/npc-schema-validation` 后续修正。字段和错误以[持久化增量契约](../protocols/npc-persistence-contract-v0.4.md)、`app/schemas/recovery.py`、`app/schemas/sync.py`与golden为准；本页只维护操作与交接。原v0.4绑定/预算使用[基础指南](scoped-development.md)，范围和真实结果见[第四步计划](../planning/step-04-persistence-access-plan.md)及[验证记录](../logs/verification-records.md#persist-20261022)。
 
 ## 1. 环境与配置
 
@@ -24,9 +24,9 @@
 
 ## 2. 显式初始化与授权
 
-建表前先审查[数据库设计](../design/database/README.md)与[SQL执行规范](../design/database/sql/README.md)：空库可选择保留的初始DDL或下述CLI，两者不重复执行。已有库先用 `scripts.check_database_design --database-url-file <私有文件>` 只读审计；当前开发库expires_at可空漂移需另行修复，原 `check_schema()`并非完整结构比较。
+建表前先审查[数据库设计](../design/database/README.md)与[SQL执行规范](../design/database/sql/README.md)：空库可选择保留的初始DDL或下述CLI，两者不重复执行。已有库先用 `scripts.check_database_design --database-url-file <私有文件>` 只读审计；开发库expires_at可空漂移已在备份后受控修复，三个项目库审计均通过，见[本轮证据](../logs/verification-records.md#schema-gate-20261022)。运行时 `check_schema()` 现与该审计共享metadata结构检查；样本collation未写进metadata，不硬编码为0900，部署仍须核对大小写语义。
 
-以下命令在服务器项目根运行，仅通过文件路径选角色，连接串不出现在命令参数。`init`不带apply只显示计划；应用schema用迁移账号，日常进程用仅SELECT/INSERT/UPDATE/DELETE运行账号。schema版本/列型不符会拒绝，不能以自动create_all代替升级迁移或DDL回滚。
+以下命令在服务器项目根运行，仅通过文件路径选角色，连接串不出现在命令参数。`init`不带apply只显示计划；应用schema用迁移账号，日常进程用仅SELECT/INSERT/UPDATE/DELETE运行账号。SQL进程在启动与首次取数据库连接时校验结构，通过后缓存连接，不逐请求重复反射。schema版本或结构与声明不符会拒绝；初始化只在没有任何表的专用空库执行DDL，既有完整v1幂等只读检查，部分库或漂移不自动补表。不能以自动create_all代替升级迁移或DDL回滚。
 
 ```bash
 cd /www/wwwroot/aesir-ai-service

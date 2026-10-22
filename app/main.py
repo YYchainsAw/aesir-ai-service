@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from starlette.exceptions import HTTPException
 from starlette.concurrency import run_in_threadpool
@@ -7,11 +9,20 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import router
 from app.config import get_settings
+from app.persistence.database import database_enabled, get_database
 from app.scoped.errors import ScopeError
 from app.scoped.identity import get_principal, check_permission
 from app.services.companion.profile_repository import CompanionProfileError
 
+@asynccontextmanager
+async def lifespan(_app):
+    if database_enabled():
+        await run_in_threadpool(lambda: get_database().check_schema())
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Aesir AI Service",
     version="0.1.0",
     description="Companion dialogue and tactical service; scoped JSON contract v0.4.",

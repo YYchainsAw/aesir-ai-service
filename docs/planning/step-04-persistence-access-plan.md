@@ -1,10 +1,10 @@
 # 第四步：持久化、访问控制与恢复实施计划
 
-> 2026-10-22，`persistence-plan-v1`。用户授权继续第四步；第三步PR #81已合入 `main@15f1672`，本步分支 `feature/npc-persistence-access`。本页维护范围、依赖与验收定义，运行结果另记[验证记录](../logs/verification-records.md)。
+> 2026-10-22，`persistence-plan-v1`。第三步PR #81已合入 `main@15f1672`；第四步基础实现及数据库设计由PR #88合入 `main@eea7532`。用户授权继续推进，当前后续分支为 `fix/npc-schema-validation`。本页维护范围、依赖与验收定义，运行结果另记[验证记录](../logs/verification-records.md)。
 
-主线以[六步方案](local-boss-cloud-companion-roadmap.md)为准，需求映射为DEP-REQ-02/03/06/07、BR-DEP-01/02/03/04/06及EVO-01生产余项/EVO-03同步子集。工作状态由[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)与[#82](https://github.com/YYchainsAw/aesir-ai-service/issues/82)～[#87](https://github.com/YYchainsAw/aesir-ai-service/issues/87)维护，不复制任务勾选。新字段见[持久化增量契约](../protocols/npc-persistence-contract-v0.4.md)。
+主线以[六步方案](local-boss-cloud-companion-roadmap.md)为准，需求映射为DEP-REQ-02/03/06/07、BR-DEP-01/02/03/04/06及EVO-01生产余项/EVO-03同步子集。工作状态由[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)维护；基础工作包[#82](https://github.com/YYchainsAw/aesir-ai-service/issues/82)～[#87](https://github.com/YYchainsAw/aesir-ai-service/issues/87)已随PR #88完成，结构门禁与既有库整改后续由[#89](https://github.com/YYchainsAw/aesir-ai-service/issues/89)维护，不复制任务勾选。新字段见[持久化增量契约](../protocols/npc-persistence-contract-v0.4.md)。
 
-数据库设计补充见[ER/PDM与SQL索引](../design/database/README.md)，含需求映射、8表44列字典、初始DDL、v1实例漂移修复及后续迁移规范。本组为实现后补齐审查，不追记为先于编码；已有dev库到期列的可空性差异尚未应用修复，完整结构审计不能由schema版本/启动成功替代。
+数据库设计补充见[ER/PDM与SQL索引](../design/database/README.md)，含需求映射、8表44列字典、初始DDL、v1实例漂移修复及后续迁移规范。本组为实现后补齐审查，不追记为先于编码。首次发现的dev库到期列可空性漂移已在备份后受控修复，dev/test/restore只读结构审计均通过；运行时与离线审计现共用metadata结构门禁，完整运行验收仍不能由schema版本或启动成功替代。证据见[本轮记录](../logs/verification-records.md#schema-gate-20261022)。
 
 ## 1. 目标与边界
 
@@ -44,7 +44,7 @@ SQL模式的记忆/关系对象不使用可泄漏暂存值的全局缓存；会�
 
 事务失败无已提交业务效果；连接在COMMIT附近丢失或最终提交后检查失败则保守UNKNOWN，保持稳定身份占位而不重做。重启仍生成新service_instance，旧绑定保持无效；历史请求结果只通过恢复接口读确认/原关联，不给旧动作新的时钟。数据库不自动TTL删除逻辑身份；清理策略启用前另定，不通过遗忘UNKNOWN释放执行资格。
 
-schema初始化是显式CLI操作。MySQL DDL存在[隐式提交](https://dev.mysql.com/doc/refman/8.4/en/implicit-commit.html)，不将 `create_all` 当通用升级/DDL自动回滚工具。版本或列型不符时拒绝业务，后续变更需要版本化迁移与备份；运行账号无DDL权限。
+schema初始化是显式CLI操作，仅无任何表的专用空库允许DDL；非空目标先完整只读核对，符合v1时幂等返回，缺表或漂移时拒绝自动补建。运行时在SQL启动及首次获取数据库连接时使用同一metadata结构门禁，通过后缓存连接。MySQL DDL存在[隐式提交](https://dev.mysql.com/doc/refman/8.4/en/implicit-commit.html)，不将 `create_all` 当通用升级/DDL自动回滚工具。版本或结构不符时拒绝业务，后续变更需要版本化迁移与备份；运行账号无DDL权限。
 
 ## 5. 服务端验收
 

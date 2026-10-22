@@ -4,6 +4,10 @@
 
 历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
 
+## 2026-10-22 — DEP4结构门禁与开发库整改
+
+已合入的第四步后续补齐SQL启动/首次接入结构检查，运行时与离线审计共享metadata规则；只有空库能初始化DDL，已有错误库只读拒绝，损坏凭据到期数据拒绝认证。dev的expires_at可空偏差在私有备份后受检修复，8表业务数据不变，三个项目库结构审计通过。适用核心1463 passed、1 skipped（含5项真实MySQL），独立实际进程验证错误结构拒绝启动及恢复后健康/认证门禁；PDM源与预览同步。范围及后续UE/生产边界见[计划](docs/planning/step-04-persistence-access-plan.md)与[证据](docs/logs/verification-records.md#schema-gate-20261022)。
+
 ## 2026-10-22 — DEP4数据库设计与SQL审计补齐
 
 新增需求映射、两页ER/单页PDM、8表44列字典、保留初始DDL及带阻断检查的v1漂移修复SQL；2份draw.io源由本地MCP保存，Desktop导出3张含XML的PNG并上传。新增结构/工件审计及15项回归，脚本组50 passed；真实隔离MySQL验证初始DDL和修复正反场景。test/restore结构一致，dev到期列可空偏差如实保留待修，未改既有库或业务schema。本次为实现后补齐设计，详见[数据库索引](docs/design/database/README.md)与[证据](docs/logs/verification-records.md#database-design-20261022)。
