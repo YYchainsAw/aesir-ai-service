@@ -230,3 +230,40 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 原始JUnit/日志为 `step4-pytest.xml` / `step4-pytest.log`，元数据为 `step4-pytest-result.json`，含解释器/依赖、实际MySQL标志、源码SHA256、时间和保留文件校验。测试本身通过后，记录包装脚本因用系统解释器读取新依赖元数据失败；已从通过的JUnit/日志恢复元数据，并确认所有代码/样例文件mtime均早于测试开始，记录此事实而未伪造重跑。最终提交再核对源码哈希。`.env`、`.python-version`和原Linux锁文件SHA256与实施前完全一致，后两者继续保持原未提交状态。
 
 结论只覆盖第四步服务端开发增量。UE凭据/按档缓存/事实与回执本地队列、冲突处理、断网游戏兜底与SC-011仍待接入；正式数据切换、OS受限用户、HTTPS/传输限制、备份调度/保留/完整RPO演练和真实容量留发布验收。当前单worker，未启用生产多worker或公众服务。操作见[持久化开发指南](../guides/persistent-development.md)。
+
+
+<a id="database-design-20261022"></a>
+## 2026-10-22 第四步数据库设计补齐与结构审计
+
+用户要求补齐需求导向的ER/PDM、数据字典和保留建表SQL。在既有第四步分支 `feature/npc-persistence-access`、实现基线 `8e3362c` 上完成[数据库设计](../design/database/README.md)，未追记为编码前已完成设计。保留原45FR/7UC和协议含义，补需求→17类逻辑实体→8物理表44列的映射、10个JSON命名空间及聚合/拆表边界；没有更换现有业务schema或数据后端。
+
+本地Windows使用draw.io MCP的 `list_pages/set_page` 保存2份源的3页，再由draw.io Desktop 32.4.1逐页导出含XML的3张PNG，上传服务器 `docs/design/database/src` 和 `png`。ER两页区分逻辑归属与物理外键，PDM逐列列出类型、PK/FK、NN/NULL、AI及索引。已逐页AI目视检查文字、基数和连线；PNG的CRC、嵌入的对应页XML与源页结构一致，服务器5文件SHA256与本地导出一致。没有把既有UML领域图当ER/PDM，也未重新绘制UML或回填UE Word。
+
+2026-10-22 21:17（Asia/Shanghai），项目Python 3.12.15上的最终脚本回归 **50 passed、1 warning，0.57秒**，其中新增数据库设计检查15项。唯一warning为既有Starlette/httpx弃用提示。命令：
+
+```bash
+.venv/bin/python -m pytest tests/scripts -q --tb=short \
+  --junitxml=data/runtime/remote-dev/verification/database-design-script-tests.xml
+.venv/bin/python -m scripts.check_database_design
+.venv/bin/python -m scripts.check_database_design \
+  --database-url-file /etc/aesir-ai/dev/mysql84-test-runtime.url
+.venv/bin/python -m scripts.check_database_design \
+  --database-url-file /etc/aesir-ai/dev/mysql84-restore-runtime.url
+```
+
+离线检查保留SQL与MySQL metadata规范化编译结果一致、字典逐列类型/空性/键/数据库默认表述、PDM表列全集/类型/完整标记/归属及2条实线FK端点。只读数据库审计比较表列顺序、类型、可空性、默认、自增、PK、FK及目标schema、二级索引、CHECK、引擎、字符集、参考collation与版本标记；不是由HTTP启动成功推定一致。针对工件变异及跨schema FK的负向回归能拒绝伪造约束。本次未重跑第四步1404项核心业务回归；其255个源码文件SHA256仍与通过回归的 `8e3362c` 一致，该历史结果仍以原记录及提交为准。
+
+| 核对或演练 | 实际结果及限制 |
+| --- | --- |
+| test84、restore84只读结构审计 | 均通过；8表44列、2FK、1个MySQL隐式二级索引，符合当前v1及参考排序规则 |
+| dev84只读结构审计 | 退出码1，唯一差异为 `access_credentials.expires_at` 实际DOUBLE NULL，源码要求DOUBLE NOT NULL；三个既有库的该列NULL行数均0、版本均1。失败结果保留，未自动修复 |
+| 初始DDL真实执行 | 最终文件在新建隔离 `aesir_ai_design84_final_20261022` 执行，MySQL8.4.13；8次CREATE及1次版本INSERT，8表44列/2FK和结构审计通过；重复执行被重名表明确阻断。先前未规范行尾空格的初稿在另库验证，不代替最终文件证据 |
+| v1到期列修复SQL | 在新增隔离 `aesir_ai_design84_20261022` 模拟漂移后验证成功；版本错误、FLOAT列型、存在NULL三个反例由SIGNAL阻断ALTER；最终结构审计通过且无残留helper过程 |
+| 图纸与文档 | 2源3页/3PNG；全部嵌入页与源一致、上传哈希一致；本次新增/修改Markdown相对文件链接检查与 `git diff --check` 通过 |
+| 既有环境保留 | dev/test/restore数据和结构、现有5.7、开发.env、Python版本文件和历史Linux锁不改；后三项SHA256与实施前清单一致 |
+
+保留初始SQL的SHA256为 `b989fe243e5c3561a5ae8dea0bbd2eefde7482d52c66295732d56b5f5c91bc3f`，v1修复SQL为 `e6bbd7121533e45348b739771c80f6ae4f76b3324c31865e62fbadf2bb3f23ca`。初始SQL最终只规范生成器的行尾空格，语义不变，且已单独执行最终文件；原SHA和两次目标分别保留于证据。修复是恢复v1既有约束，不伪装成不存在的v2迁移；未启用自动迁移执行器。新隔离库仅保留核对结构，合成数据及辅助过程已清除，临时私有root连接文件已删除。
+
+原始证据位于服务器忽略目录：`database-design-v1.json`（DDL/修复正反场景）、`database-design-audits.json`（三个既有库只读结果）、`database-design-diagrams.json`（图源/PNG校验）与 `database-design-script-tests.xml`（脚本JUnit）。这些文件在 `data/runtime/remote-dev/verification`，不与私有凭据或业务数据一起提交。
+
+结论只覆盖数据库设计材料、保留SQL的隔离执行与结构检查；dev偏差仍需安排受检修复，JSON账本容量/索引/长期保留、正式数据切换和生产恢复演练继续待验。UE、真实LLM/ASR、HTTPS/公众网络、容量或多worker没有因图纸补齐而通过。审查入口保持PR #88草稿。

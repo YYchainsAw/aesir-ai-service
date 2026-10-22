@@ -4,6 +4,8 @@
 
 主线以[六步方案](local-boss-cloud-companion-roadmap.md)为准，需求映射为DEP-REQ-02/03/06/07、BR-DEP-01/02/03/04/06及EVO-01生产余项/EVO-03同步子集。工作状态由[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)与[#82](https://github.com/YYchainsAw/aesir-ai-service/issues/82)～[#87](https://github.com/YYchainsAw/aesir-ai-service/issues/87)维护，不复制任务勾选。新字段见[持久化增量契约](../protocols/npc-persistence-contract-v0.4.md)。
 
+数据库设计补充见[ER/PDM与SQL索引](../design/database/README.md)，含需求映射、8表44列字典、初始DDL、v1实例漂移修复及后续迁移规范。本组为实现后补齐审查，不追记为先于编码；已有dev库到期列的可空性差异尚未应用修复，完整结构审计不能由schema版本/启动成功替代。
+
 ## 1. 目标与边界
 
 | 目标 | 本步范围 |

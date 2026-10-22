@@ -19,6 +19,8 @@ Bearer模式始终封锁legacy，不接受开发兼容开关旁路；文档需�
 
 ## 2. SQL原子性与逻辑身份
 
+物理表、逻辑实体与字段说明见[数据库设计](../design/database/README.md)；本契约只维护接口和提交语义，不将通用documents中的每种记录视为独立物理表。
+
 SQL文档用namespace和完整逻辑键的唯一哈希保存原key、scope、payload及CAS版本；NPC确认版本按完整game/player/save/npc递增。请求/事件journal保存原逻辑key、指纹、owner instance、状态、确认版本及结果。哈希不是玩家认证；原scope/key仍核对。
 
 请求claim为独立短事务。LLM期间无长事务/行锁；最终事务一起提交记忆、关系、epoch、事件/指令/回执与请求结果。处理中的重试等待原owner，载荷或binding/epoch改动冲突；未开始准入失败可放开占位，已开始但提交不明保留UNKNOWN。逻辑身份不自动TTL删除，也不因换HTTP ID恢复未知的原事实执行资格。数据库事务回滚时会话历史不追加；提交后诊断失败不撤回数据库事实。

@@ -36,6 +36,7 @@ python -m venv .venv
 | 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
 | 查接口和人格包字段 | [文档索引](docs/README.md)的契约入口 |
 | 查当前需求、规则、异常和对象职责 | [NPC需求主文](docs/planning/aesir-agent-sdd-v1.1.md) |
+| 审查数据库ER/PDM、数据字典及建表/迁移SQL | [数据库设计索引](docs/design/database/README.md) |
 | 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/course-requirements-index.md) |
 | 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/todo.md) |
 | 实施已采纳的对话/语音/Agent/记忆/云端演进 | [交互演进计划](docs/planning/npc-interaction-evolution.md)，含UC映射、批次与新增验收 |

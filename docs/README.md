@@ -22,6 +22,7 @@
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/todo.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/npc-interaction-evolution.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/course-requirements-index.md) |
+| 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
 | Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
 | 真实测试/联调发生过什么 | [验证记录](logs/verification-records.md) · [里程碑](../CHANGELOG.md) |
@@ -48,4 +49,4 @@
 
 规则、实现状态和验证结果分别登记。参数有代码默认值不等于全体成员已批准；模型能导出不等于人工已接受；HTTP成功不等于UE实际完成行为。
 
-当前图源仅在`design/uml/src`维护一套draw.io文件，由MCP修改后用Desktop导出到`png`。旧长策划、阶段流水账和PlantUML通过Git历史回查，不在本目录另存备份。实际审查与修改摘要见课程索引，历史验证摘要保留日期、环境与结论范围。
+UML图源在`design/uml/src`，数据库ER/PDM在`design/database/src`；各维护一套draw.io源，由MCP修改后用Desktop逐页导出到对应`png`，保留源与预览。旧长策划、阶段流水账和PlantUML通过Git历史回查，不在本目录另存备份。实际审查与修改摘要见课程索引，历史验证摘要保留日期、环境与结论范围。

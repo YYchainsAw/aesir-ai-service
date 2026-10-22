@@ -24,6 +24,8 @@
 
 ## 2. 显式初始化与授权
 
+建表前先审查[数据库设计](../design/database/README.md)与[SQL执行规范](../design/database/sql/README.md)：空库可选择保留的初始DDL或下述CLI，两者不重复执行。已有库先用 `scripts.check_database_design --database-url-file <私有文件>` 只读审计；当前开发库expires_at可空漂移需另行修复，原 `check_schema()`并非完整结构比较。
+
 以下命令在服务器项目根运行，仅通过文件路径选角色，连接串不出现在命令参数。`init`不带apply只显示计划；应用schema用迁移账号，日常进程用仅SELECT/INSERT/UPDATE/DELETE运行账号。schema版本/列型不符会拒绝，不能以自动create_all代替升级迁移或DDL回滚。
 
 ```bash
