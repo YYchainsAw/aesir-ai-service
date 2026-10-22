@@ -5,19 +5,19 @@ from copy import deepcopy
 import hashlib
 import json
 import re
-from importlib import import_module
 from pathlib import Path
 import os
 import stat
 from threading import RLock
 
-from sqlalchemy import Double, create_engine, event, insert, inspect, select
+from sqlalchemy import create_engine, event, insert, inspect, select
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
 from app.scoped.errors import ScopeError
-from app.persistence.schema import SCHEMA_VERSION, documents, metadata, schema_versions, state_versions
+from app.persistence.schema import SCHEMA_VERSION, documents, schema_versions, state_versions
+from app.persistence.validation import application_metadata, schema_differences
 
 
 def unavailable():
@@ -76,23 +76,20 @@ class Database:
         return cls(engine)
 
     def initialize_schema(self):
-        """Explicit operator command only; uses a separate migration account."""
-        # Import optional application table declarations before explicit DDL.
-        for module in ("app.persistence.auth", "app.persistence.journal"):
-            try:
-                import_module(module)
-            except ModuleNotFoundError as error:
-                if error.name != module:
-                    raise
+        """Create v1 only in an empty database; existing schemas are read-only."""
+        expected = application_metadata()
         try:
             self._check_server_version()
-            metadata.create_all(self.engine)
+            with self.engine.connect() as connection:
+                empty = not inspect(connection).get_table_names()
+            if not empty:
+                self.check_schema()
+                return
+            # MySQL DDL auto-commits. Never repair a partial or mismatched schema
+            # by create_all; only the explicit operator can initialize an empty DB.
+            expected.create_all(self.engine, checkfirst=False)
             with self.engine.begin() as connection:
-                version = connection.execute(select(schema_versions.c.version).where(schema_versions.c.id == 1)).scalar_one_or_none()
-                if version is None:
-                    connection.execute(insert(schema_versions).values(id=1, version=SCHEMA_VERSION))
-                elif version != SCHEMA_VERSION:
-                    raise unavailable()
+                connection.execute(insert(schema_versions).values(id=1, version=SCHEMA_VERSION))
             self.check_schema()
         except SQLAlchemyError as error:
             raise unavailable() from error
@@ -108,20 +105,8 @@ class Database:
         try:
             self._check_server_version()
             with self.engine.connect() as connection:
-                version = connection.execute(select(schema_versions.c.version).where(schema_versions.c.id == 1)).scalar_one_or_none()
-                if version != SCHEMA_VERSION:
-                    raise unavailable()
-                for table in metadata.sorted_tables:
-                    connection.execute(select(table).limit(0))
-                if self.engine.dialect.name == "mysql":
-                    inspector = inspect(connection)
-                    for table in metadata.sorted_tables:
-                        doubles = {column.name for column in table.c if isinstance(column.type, Double)}
-                        if not doubles:
-                            continue
-                        actual = {column["name"]: column["type"] for column in inspector.get_columns(table.name)}
-                        if any(actual[name].__class__.__name__.upper() != "DOUBLE" for name in doubles):
-                            raise ScopeError(503, "DATABASE_SCHEMA_MISMATCH", "Application schema requires full precision timestamp columns")
+                if schema_differences(connection):
+                    raise ScopeError(503, "DATABASE_SCHEMA_MISMATCH", "Application database schema does not match the supported version")
         except SQLAlchemyError as error:
             raise unavailable() from error
 
@@ -203,9 +188,7 @@ def database_enabled():
     return getattr(get_settings(), "scope_storage_backend", "json") == "sql"
 
 
-def get_database():
-    global _database, _database_url
-    settings = get_settings()
+def _configured_url(settings):
     file = getattr(settings, "scope_database_url_file", "")
     try:
         if file:
@@ -218,21 +201,43 @@ def get_database():
             url = secret.get_secret_value() if hasattr(secret, "get_secret_value") else secret
     except OSError as error:
         raise unavailable() from error
+    return url
+
+
+def _configured_database(url, settings):
+    if not url:
+        raise unavailable()
+    try:
+        if make_url(url).drivername.startswith("sqlite") and not getattr(settings, "scope_sqlite_test_mode", False):
+            raise ValueError("SQLite is available only in explicit persistence test mode")
+        return Database.from_url(url)
+    except (ValueError, SQLAlchemyError) as error:
+        raise unavailable() from error
+
+
+def database_for_initialization():
+    """Uncached operator-only connection; init explicitly validates or creates v1."""
+    settings = get_settings()
+    return _configured_database(_configured_url(settings), settings)
+
+
+def get_database():
+    global _database, _database_url
+    settings = get_settings()
+    url = _configured_url(settings)
     with _database_lock:
         if _database is not None and _database_url is None:
             return _database
-        if not url:
-            raise unavailable()
         if _database is None or _database_url != url:
+            candidate = _configured_database(url, settings)
+            try:
+                candidate.check_schema()
+            except BaseException:
+                candidate.engine.dispose()
+                raise
             if _database is not None:
                 _database.engine.dispose()
-            try:
-                if make_url(url).drivername.startswith("sqlite") and not getattr(settings, "scope_sqlite_test_mode", False):
-                    raise ValueError("SQLite is available only in explicit persistence test mode")
-                _database = Database.from_url(url)
-            except (ValueError, SQLAlchemyError) as error:
-                raise unavailable() from error
-            _database_url = url
+            _database, _database_url = candidate, url
         return _database
 
 

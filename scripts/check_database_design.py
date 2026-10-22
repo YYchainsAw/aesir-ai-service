@@ -10,14 +10,15 @@ import re
 import stat
 import xml.etree.ElementTree as ET
 
-from sqlalchemy import Boolean, create_engine, inspect, select
+from sqlalchemy import Boolean, create_engine
 from sqlalchemy.dialects import mysql
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.schema import CreateTable
 
 from app.persistence import auth, journal  # noqa: F401 -- register all eight tables
-from app.persistence.schema import SCHEMA_VERSION, metadata, schema_versions
+from app.persistence.schema import SCHEMA_VERSION, metadata
+from app.persistence.validation import foreign_key_signature as _foreign_key_signature, schema_differences
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -177,22 +178,6 @@ def check_artifacts(design_root: Path | None = None) -> list[str]:
     return errors
 
 
-def _type_name(value) -> str:
-    rendered = str(value.compile(dialect=mysql.dialect())).upper()
-    return {"TINYINT(1)": "BOOL", "BOOLEAN": "BOOL", "INT": "INTEGER"}.get(rendered, rendered)
-
-
-def _foreign_key_signature(fk, current_schema):
-    schema = fk.get("referred_schema")
-    if schema in {None, current_schema}:
-        schema = None
-    options = fk.get("options") or {}
-    return (tuple(fk["constrained_columns"]), schema, fk["referred_table"],
-            tuple(fk["referred_columns"]),
-            (options.get("ondelete") or "RESTRICT").upper(),
-            (options.get("onupdate") or "RESTRICT").upper())
-
-
 def audit_mysql(url_file: Path) -> list[str]:
     """Inspect structure only. No DDL, DML, business row values, or DSNs in output."""
     if os.name == "posix" and stat.S_IMODE(url_file.stat().st_mode) & 0o077:
@@ -206,73 +191,7 @@ def audit_mysql(url_file: Path) -> list[str]:
         with engine.connect() as connection:
             if engine.dialect.is_mariadb or engine.dialect.server_version_info < (8, 4):
                 errors.append("database: requires MySQL 8.4+")
-            inspector = inspect(connection)
-            expected_tables = set(metadata.tables)
-            actual_tables = set(inspector.get_table_names())
-            if expected_tables != actual_tables:
-                errors.append("tables: names differ from application metadata")
-            for table in metadata.sorted_tables:
-                if table.name not in actual_tables:
-                    continue
-                prefix = table.name
-                actual_columns = inspector.get_columns(table.name)
-                if [column.name for column in table.c] != [c["name"] for c in actual_columns]:
-                    errors.append(f"{prefix}: column names/order differ")
-                by_name = {column["name"]: column for column in actual_columns}
-                for column in table.c:
-                    actual = by_name.get(column.name)
-                    if actual is None:
-                        continue
-                    label = f"{prefix}.{column.name}"
-                    if _type_name(actual["type"]) != _type_name(column.type):
-                        errors.append(f"{label}: type differs")
-                    if actual["nullable"] != column.nullable:
-                        errors.append(f"{label}: nullable={actual['nullable']}; expected {column.nullable}")
-                    expected_default = str(column.server_default.arg) if column.server_default else None
-                    if actual.get("default") != expected_default:
-                        errors.append(f"{label}: server default differs")
-                    if bool(actual.get("autoincrement", False)) != (table._autoincrement_column is column):
-                        errors.append(f"{label}: auto increment differs")
-                pk = inspector.get_pk_constraint(table.name)["constrained_columns"]
-                if pk != [column.name for column in table.primary_key]:
-                    errors.append(f"{prefix}: primary key differs")
-                expected_fks = {
-                    (tuple(element.parent.name for element in fk.elements),
-                     None, fk.referred_table.name, tuple(element.column.name for element in fk.elements),
-                     (fk.ondelete or "RESTRICT").upper(), (fk.onupdate or "RESTRICT").upper())
-                    for fk in table.foreign_key_constraints
-                }
-                actual_fks = {
-                    _foreign_key_signature(fk, engine.url.database)
-                    for fk in inspector.get_foreign_keys(table.name)
-                }
-                if expected_fks != actual_fks:
-                    errors.append(f"{prefix}: foreign keys differ")
-                indexes = inspector.get_indexes(table.name)
-                # InnoDB adds a child index if its FK is not a left prefix of the PK.
-                expected_indexes = set()
-                for fk in table.foreign_key_constraints:
-                    columns = tuple(element.parent.name for element in fk.elements)
-                    if tuple(pk[:len(columns)]) != columns:
-                        expected_indexes.add((columns, False))
-                for index in table.indexes:
-                    expected_indexes.add((tuple(column.name for column in index.columns), bool(index.unique)))
-                actual_indexes = {(tuple(index["column_names"]), bool(index["unique"])) for index in indexes}
-                if actual_indexes != expected_indexes or len(indexes) != len(expected_indexes):
-                    errors.append(f"{prefix}: secondary indexes differ")
-                if inspector.get_check_constraints(table.name):
-                    errors.append(f"{prefix}: unexpected CHECK constraint")
-                options = inspector.get_table_options(table.name)
-                if options.get("mysql_engine", "").lower() != "innodb":
-                    errors.append(f"{prefix}: engine differs")
-                if options.get("mysql_default charset") != "utf8mb4":
-                    errors.append(f"{prefix}: charset differs")
-                if options.get("mysql_collate") != "utf8mb4_0900_ai_ci":
-                    errors.append(f"{prefix}: collation differs from documented v1 reference")
-            if "schema_versions" in actual_tables:
-                markers = connection.execute(select(schema_versions)).all()
-                if markers != [(1, SCHEMA_VERSION)]:
-                    errors.append("schema_versions: requires only marker (1, current_version)")
+            errors.extend(schema_differences(connection))
     finally:
         engine.dispose()
     return errors

@@ -18,7 +18,7 @@ from sqlalchemy import Date, DateTime, LargeBinary, Numeric, func, insert, selec
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
-from app.persistence.database import checked_namespace, get_database, parts_hash, unavailable
+from app.persistence.database import checked_namespace, database_for_initialization, get_database, parts_hash, unavailable
 from app.persistence.schema import SCHEMA_VERSION, documents, metadata, schema_versions, state_versions
 from app.scoped.context import safe_segment
 from app.scoped.errors import ScopeError
@@ -255,10 +255,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
-            database = get_database()
-            if args.apply:
-                database.initialize_schema()
-            result = {"mode": "apply" if args.apply else "dry-run", "schema_version": SCHEMA_VERSION}
+            database = database_for_initialization()
+            try:
+                if args.apply:
+                    database.initialize_schema()
+                result = {"mode": "apply" if args.apply else "dry-run", "schema_version": SCHEMA_VERSION}
+            finally:
+                database.engine.dispose()
         elif args.command == "import-json":
             database = get_database() if args.apply else None
             result = import_json(database, args.memory_root, args.relationship_root, apply=args.apply)

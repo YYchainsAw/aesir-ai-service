@@ -325,3 +325,17 @@ def test_cli_rejects_nonprivate_parent_directory(access, tmp_path):
     output = directory / "must-not-create.token"
     assert manage_access.main(["token-issue", "--player-id", str(player.player_id), "--output", str(output)]) == 1
     assert not output.exists()
+
+
+@pytest.mark.parametrize("expiry", [None, float("nan"), float("inf"), -float("inf"), True, "1010.0"])
+def test_corrupt_expiry_is_unavailable_without_accepting_or_leaking_a_credential(access, expiry):
+    player = access.player()
+    with access.database.engine.connect() as connection:
+        row = dict(connection.execute(select(auth.credentials)).mappings().one())
+    row["expires_at"] = expiry
+    # Inject a malformed result independently of backend NOT NULL enforcement;
+    # this covers corrupt/mocked rows without relaxing the physical v1 schema.
+    result = SimpleNamespace(mappings=lambda: SimpleNamespace(first=lambda: row))
+    connection = SimpleNamespace(execute=lambda _statement: result)
+    error = rejected(lambda: auth._read_principal(connection, player.principal.credential_id), 503, "AUTH_UNAVAILABLE")
+    assert player.token not in error.message

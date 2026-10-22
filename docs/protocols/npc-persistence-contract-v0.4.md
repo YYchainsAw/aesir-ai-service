@@ -4,7 +4,7 @@
 
 ## 1. 存储与认证模式
 
-默认 `scope_storage_backend=json`，旧开发使用方式保留。显式SQL模式通过站点根外0600连接文件或SecretStr配置连接MySQL/PyMySQL，schema必须先由迁移账号初始化并通过版本/列型校验；业务请求不自动建表。SQLite只在 `scope_sqlite_test_mode=true` 时可作为配置后端用于隔离测试，没有MySQL故障回退。
+默认 `scope_storage_backend=json`，旧开发使用方式保留。显式SQL模式通过站点根外0600连接文件或SecretStr配置连接MySQL/PyMySQL，schema必须先由迁移账号初始化；SQL启动及首次接入用共享metadata门禁核对表列、约束、索引、引擎/字符集及唯一版本标记，通过才缓存连接。结构不符拒绝服务，业务请求不自动建表；现有库的init仅只读核对，只有完全空库可建表。SQLite只在 `scope_sqlite_test_mode=true` 时可作为配置后端用于隔离测试，没有MySQL故障回退。
 
 `scope_identity_backend=bearer` 使用 `Authorization: Bearer <credential>`，数据库验证哈希、玩家活跃状态、过期/撤销、游戏、权限和存档授权；客户端不能自报身份。凭据由受限运维CLI签发/撤销，没有公网注册或发token接口。明文仅写指定私有新文件，不入库或日志，供应商key不下发。开发principal的固定身份不等于生产认证。
 
@@ -73,6 +73,8 @@ save_generation按game/player/save独立持久登记；memory_epoch只表示NPC�
 | 409 SAVE_GENERATION_STALE / ORIGIN_RUN_UNKNOWN / ORIGIN_ENCOUNTER_UNKNOWN | 存档世代或原来源控制历史不符，不冒认当前局 |
 | 409 REQUEST_ID_CONFLICT / EVENT_ID_CONFLICT | 已有逻辑身份被改内容，保留原事实核对 |
 | 429 REQUEST_QUOTA_EXCEEDED / UPSTREAM_QUOTA_EXCEEDED | 对应额度不足；不因换session/NPC逃逸同玩家额度 |
+| 503 DATABASE_SCHEMA_MISMATCH / DATABASE_VERSION_UNSUPPORTED | 数据库结构或服务版本不符合要求；启动拒绝或首次SQL接入失败，由运维核对，不能由业务请求自动修复 |
+| 503 AUTH_UNAVAILABLE | 凭据状态不可验证，含缺失或非有限的到期数据；不降为匿名或接受无期限凭据 |
 | 503 STATE_UNAVAILABLE / REQUEST_OUTCOME_UNKNOWN | 状态不可用或提交确认不明；后者保留原关联核对，禁止自动换ID重做 |
 
 旧instance/binding/epoch、回执sequence/终态等继续沿用原契约。只导入完整scoped JSON的已知归属；legacy文件不会自动归入玩家。恢复默认撤销所有恢复凭据，防较旧快照复活后续已撤销token；需核对授权后重新签发。业务数据只回到备份恢复点，不自动保留之后的reset/撤销，正式切换需另行收敛。导入/备份/恢复和切换操作见[运维与开发指南](../guides/persistent-development.md)，不以本页字段目标代替实测或UE接入。

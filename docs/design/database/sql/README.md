@@ -7,7 +7,7 @@
 | 文件 | 目的与适用对象 |
 | --- | --- |
 | `001-initial-schema.sql` | 从当前SQLAlchemy metadata编译并核对的MySQL v1初始DDL；8次CREATE TABLE，最后登记 `(id=1, version=1)`；只用于已选定的空应用库 |
-| `repairs/001-v1-credential-expiry-not-null.sql` | 已存在v1库的特定漂移修复候选；仅修复credentials.expires_at的可空性，带检查步骤；不等于v2迁移，不自动执行 |
+| `repairs/001-v1-credential-expiry-not-null.sql` | 已存在v1库的特定漂移修复；仅修复credentials.expires_at的可空性，带检查步骤；dev已受控执行，不等于v2迁移，不自动执行 |
 
 目前没有已实现的v2结构，也没有Alembic或其他版本迁移执行器。本目录不制作“成功但不改结构”的占位v2脚本。未来版本确有结构/语义变化时，再新增有前置条件、数据处理与验证证据的增量SQL。
 
@@ -24,7 +24,7 @@
 1. 现有受控CLI：先用 `scripts.persistence_data init` 预览，再显式 `--apply`；内部 `metadata.create_all()` 建表并登记v1。
 2. 需要人工审查DDL的交付环境：由迁移账号在已选空库执行 `001-initial-schema.sql`，随后运行只读结构审计和应用 `check_schema()`。
 
-两条路径不能在同一目标上顺次重复执行。SQL有意不使用 `IF NOT EXISTS` 掩盖既有定义，任何重名表应中止；`create_all()` 的存在性判断也不代表既有表结构匹配。脚本与源码规范一致，不承诺MySQL自动生成的外键/索引名称在所有环境相同。
+两条路径选择其一即可，不重复执行初始SQL。SQL有意不使用 `IF NOT EXISTS` 掩盖既有定义，任何重名表应中止。当前CLI只在目标没有任何表时建表并登记版本；非空目标只做完整只读结构检查，已符合的v1可幂等返回，缺表、额外表或其他漂移均拒绝，不自动补建或修复。`create_all()` 的存在性判断不能替代这一门禁。脚本与源码规范一致，不承诺MySQL自动生成的外键/索引名称在所有环境相同。
 
 默认值须按字典提供：active、revoked的默认值来自SQLAlchemy客户端，初始SQL不虚构数据库DEFAULT；时间列必须是DOUBLE，不将其改成FLOAT。源码未固定表collation，当前样本继承 `utf8mb4_0900_ai_ci`；部署前明确数据库默认值和标识大小写策略，不能把另一环境的默认值视为已验证。
 
@@ -32,9 +32,9 @@ MySQL DDL不是一个可以整体回滚的普通业务事务。若脚本中途�
 
 ## 3. 已有v1库与漂移修复
 
-`metadata.create_all()` 只创建缺失表，不修改已存在列、默认值、主外键或索引。当前应用检查覆盖版本、可选取列和DOUBLE列型，不能完全发现结构漂移。已有库必须先只读比较实际元数据与v1规范，再决定是否需要修复；禁止把初始DDL当升级脚本。
+`metadata.create_all()` 只创建缺失表，不修改已存在列、默认值、主外键或索引。当前应用 `check_schema()` 与离线MySQL审计复用metadata结构检查，发现声明不一致时拒绝继续；检查本身不建表、不迁移也不修复。已有库必须先只读比较实际元数据与v1规范，再决定是否需要修复；禁止把初始DDL当升级脚本。
 
-本轮发现dev验证库 `access_credentials.expires_at` 为 `DOUBLE NULL`，而当前源码及初始SQL为 `DOUBLE NOT NULL`。`repairs/001-v1-credential-expiry-not-null.sql` 保留这一真实差异的修复步骤：先确认版本和实际列型、统计NULL到期值并核对凭据处置，再安排停止凭据写入的维护窗口，最后才执行受限ALTER与复核。本次文档交付没有对现有dev/test/restore库应用修复。
+首次设计审查发现dev验证库 `access_credentials.expires_at` 为 `DOUBLE NULL`，而源码及初始SQL为 `DOUBLE NOT NULL`。后续推进已先备份dev库，确认版本、DOUBLE列型及NULL=0，再执行 `repairs/001-v1-credential-expiry-not-null.sql` 并复核。dev/test/restore现均通过只读结构审计；test/restore原已符合规范，没有重复ALTER，schema版本均保留1。备份、SQL哈希与核对证据见[本轮验证记录](../../../logs/verification-records.md#schema-gate-20261022)；这不构成其他实例跳过维护窗口或前置检查的理由。
 
 修复脚本使用带明确名称的临时辅助存储过程，以 `SQL SECURITY INVOKER` 按执行者权限运行；版本、DOUBLE列型或NULL计数不符合前置条件时由SIGNAL阻止ALTER，成功后删除辅助过程。执行账号除目标ALTER外还需本脚本相应的例程权限；业务运行账号不执行。用支持DELIMITER的MySQL客户端执行整份脚本，不使用 `--force` 忽略错误；失败后核对辅助过程是否残留并按脚本说明处置，不能误把客户端继续执行当成功。
 

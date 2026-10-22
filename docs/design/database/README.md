@@ -1,6 +1,6 @@
 # NPC持久化数据库设计
 
-> 2026-10-22，`database-design-v1`。对应第四步分支 `feature/npc-persistence-access`、源码schema v1；这是实现后补齐的需求与数据库设计审查，不追记为编码前已完成。规则与接口仍以原需求、部署指南和持久化契约为准，运行结果另记[验证记录](../../logs/verification-records.md#database-design-20261022)。
+> 2026-10-22，`database-design-v1`。对应第四步PR #88已合入的源码schema v1；本轮在 `fix/npc-schema-validation` 继续完善结构门禁与既有dev库整改。这是实现后补齐的需求与数据库设计审查，不追记为编码前已完成。规则与接口仍以原需求、部署指南和持久化契约为准，运行结果另记[验证记录](../../logs/verification-records.md#database-design-20261022)。
 
 ## 1. 设计范围与阅读顺序
 
@@ -34,9 +34,9 @@
 
 `sql/001-initial-schema.sql`是从当前SQLAlchemy metadata编译并核对的初始v1结构，只在明确选定的新空库执行。已有库不重跑初始DDL；`schema_versions`不是自动迁移器，`create_all()`不更新已有列。尚无v2结构，不制作空占位迁移。
 
-`sql/repairs/001-v1-credential-expiry-not-null.sql`针对本轮发现的v1漂移：dev库的credentials.expires_at允许NULL，而源码要求DOUBLE NOT NULL。test/restore该列符合规范，三个库NULL行数均为0。修复脚本检查版本、DOUBLE和NULL行再ALTER，本轮只在新增隔离库验证，未修复既有dev/test/restore。正式切换前必须处理该差异并复核完整结构。
+`sql/repairs/001-v1-credential-expiry-not-null.sql`针对首次设计审查发现的v1漂移：dev库的credentials.expires_at允许NULL，而源码要求DOUBLE NOT NULL。后续推进已先备份dev库，再核对版本、DOUBLE及NULL=0并执行该修复；dev/test/restore三个项目库的只读结构审计现均通过，schema版本仍为1。原始发现与本轮整改分别保留在[验证记录](../../logs/verification-records.md#schema-gate-20261022)，不将当前一致倒写为历史无差异。
 
-metadata是当前实现结构基线，保留SQL由检查器对照，图和字典不得另立一套表。逻辑模型与物理实现的差异有意保留：通用JSON文档适合当前有界快照，但高增长事实/回执账本、按scope/时间检索和保留治理需按测量结果设计独立表或投影索引，不能把JSON当作无限扩展的默认存储。
+metadata是当前实现结构基线，保留SQL由检查器对照，图和字典不得另立一套表。运行时 `check_schema()` 与离线MySQL审计复用 `app/persistence/validation.py` 的结构检查；未声明的collation不硬编码为样本的0900规则，部署仍须明确大小写策略。逻辑模型与物理实现的差异有意保留：通用JSON文档适合当前有界快照，但高增长事实/回执账本、按scope/时间检索和保留治理需按测量结果设计独立表或投影索引，不能把JSON当作无限扩展的默认存储。
 
 ## 4. 维护与检查
 
