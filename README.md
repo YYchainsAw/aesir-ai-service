@@ -50,15 +50,15 @@ python -m venv .venv
 
 `app` 不导入 `rl`，NPC服务可在未安装Gymnasium、SB3或Torch时运行。Boss HTTP推理已存在；UE运行接入、故障回退修复和正式BT/PPO对照分别验收。模型不随Git克隆分发，获取和身份核对见RL说明。
 
-新版scoped JSON使用v0.4，旧协议v0.1、v0.2、v0.3仅在显式legacy开发模式按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作，回执当前只追加记录。
+新版scoped JSON使用v0.4，旧协议v0.1、v0.2、v0.3仅在显式legacy开发模式按端点并存；`/health`的版本字段不代表所有端点都使用同一版本。当前主入口`action`只有`none`和`directive`。服务返回建议不表示UE已经启动或完成动作；回执仍追加记录，v0.4提供已发布指令关联与同一逻辑request_id的窗口内幂等，完整执行状态机仍未完成。
 
 ## 检查改动
 
 ```powershell
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py -q
+.\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q
 ```
 
-上述为无需 ML/RL 依赖的核心回归；完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
+上述为无需 ML/RL 依赖的核心回归，包含 `tests/scoped` 的新版身份、生命周期、隔离、时效与幂等测试；完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
 
 日常任务只维护一个状态来源，文档保留规则、依赖与验收定义。修改接口字段时同步schema、契约与golden样例；修改业务规则时同步需求、图和追踪，未决定的技能数量或跨端阶段协议继续列为未决。

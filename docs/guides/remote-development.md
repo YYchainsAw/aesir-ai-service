@@ -99,10 +99,10 @@ ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8011:127.0.0.1:18011 baota-serve
 
 ```bash
 cd /www/wwwroot/aesir-ai-service
-.venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py -q
+.venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped -q
 ```
 
-该范围包括 API、服务、Schema、脚本及纯 Python Boss 契约。`tests/rl/boss/test_inference.py` 顶层导入 NumPy；环境/推理测试需要相应 RL 依赖，因此不以无可选依赖时直接全量 pytest 作为核心环境验收。真实 faster-whisper 测试可能因缺可选依赖跳过，必须在结果中说明。不要把跳过、未执行或 Mock 通过写成真实模型通过。
+该范围包括 API、服务、Schema、脚本、纯 Python Boss 契约及 `tests/scoped` 的v0.4身份/生命周期回归。此处为当前复用命令；下节第一步历史运行尚未包含随后新增的scoped套件，原计数保持其当时范围，第二步结果见[验证记录](../logs/verification-records.md#scope-20261021)。`tests/rl/boss/test_inference.py` 顶层导入 NumPy；环境/推理测试需要相应 RL 依赖，因此不以无可选依赖时直接全量 pytest 作为核心环境验收。真实 faster-whisper 测试可能因缺可选依赖跳过，必须在结果中说明。不要把跳过、未执行或 Mock 通过写成真实模型通过。
 
 ## 本轮验证记录
 
@@ -112,7 +112,7 @@ cd /www/wwwroot/aesir-ai-service
 | --- | --- |
 | 项目环境 | uv 0.13.1、CPython 3.12.15、独立 `.venv`；系统 Python 3.10.12 保留 |
 | 核心安装 | 锁文件 30 个核心/开发分发包及项目 editable 安装；FastAPI 0.141.1、Uvicorn 0.52.4、pytest 9.1.1；`pip check` 与锁文件审计通过 |
-| 核心回归 | 上述核心命令：839 passed、1 skipped、7 warnings，pytest 报告 22.37 秒；跳过为缺少可选 faster-whisper 的模块收集，RL 环境/推理测试不在本次范围 |
+| 核心回归 | 第一步当时核心命令（未含后续新增的 `tests/scoped`）：839 passed、1 skipped、7 warnings，pytest 报告 22.37 秒；跳过为缺少可选 faster-whisper 的模块收集，RL 环境/推理测试不在本次范围 |
 | 首轮发现与修正 | 原用例在创建阻塞文件后调用 `load()`，Linux 提前触发 `NotADirectoryError`；将阻塞操作移到空存储加载之后，继续检查真实写入抛 `MemoryStoreError`。只改 `tests/services/test_memory_degradation.py` 的准备顺序，未改业务存储逻辑；随后核心回归通过。测试修正保留在服务器工作区，未纳入文档提交；未经此修正的基线在 Linux 仍可能触发该已知失败 |
 | 依赖提示 | 7 条为 Starlette 的 httpx TestClient、旧 422 常量弃用提示；本轮没有为消除提示而调整项目既有直接依赖 |
 | 服务与健康检查 | 仅监听 `127.0.0.1:18011`；`GET /health` 为 200、status=ok、commit=e4e20f7；`GET /openapi.json` 为 200，含 18 个路径 |

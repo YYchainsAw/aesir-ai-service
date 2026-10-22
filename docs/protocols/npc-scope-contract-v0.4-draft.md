@@ -1,6 +1,6 @@
 # NPC身份与有效期契约v0.4草案
 
-> 2026-10-21，按服务器工作区 `main@93d9d6c` 的现有实现设计。**2026-10-21已按批准方案完成分支实现与适用服务端回归；UE接入待第三步验收。** 本页对应[六步方案](../planning/local-boss-cloud-companion-roadmap.md)第二步；当前已支持格式仍见[v0.3契约](npc-contract-v0.3.md)。开发分支为 `feature/npc-scope-v04`，实际结果见[验证记录](../logs/verification-records.md#scope-20261021)；文件名保留draft便于既有链接兼容，不表示可以省略服务端/UE验收。
+> 2026-10-21，按服务器工作区 `main@93d9d6c` 的现有实现设计。**已按批准方案完成服务端实现与适用回归，并经PR #74合入main；UE接入待第三步验收。** 本页对应[六步方案](../planning/local-boss-cloud-companion-roadmap.md)第二步；现行scoped JSON字段以本页、对应schema及golden为准；旧格式仅见[legacy v0.3及其引用的兼容契约](npc-contract-v0.3.md)。原开发分支为 `feature/npc-scope-v04`，实际结果见[验证记录](../logs/verification-records.md#scope-20261021)；文件名保留draft便于既有链接兼容，不表示可以省略服务端/UE验收。
 
 ## 1. 范围与已批准决策
 
