@@ -411,7 +411,9 @@ def _command_step(request: AgentStepRequest) -> AgentStepResponse:
     """
     from app.services.tactical.llm_intent import parse_intent_with_source
 
-    intent, source = parse_intent_with_source(request.text)
+    intent, source = parse_intent_with_source(
+        request.text, companion_id=request.companion_id
+    )
     ctx = request.world_context
 
     if intent is None:
