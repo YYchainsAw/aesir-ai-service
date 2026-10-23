@@ -10,6 +10,7 @@ from rl.boss.contract import (
     OBSERVATION_LOW,
     SCHEMA_VERSION,
     make_action_mask,
+    make_observation,
 )
 from rl.boss.evaluation import evaluate_policy, run_episode
 from rl.boss.policy import RuleBossPolicy
@@ -220,3 +221,11 @@ def test_calibrated_profiles_avoid_baseline_ceiling_results() -> None:
         for metrics in report.metrics_by_profile.values()
     )
     assert report.metrics_by_profile["defensive"].mean_target_perfect_guards > 0.0
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_observation_contract_requires_finite_values(value):
+    observation = [0.0] * OBSERVATION_DIM
+    observation[0] = value
+    with pytest.raises(ValueError):
+        make_observation(observation)

@@ -2,7 +2,7 @@
 
 `rl/boss/` 训练、评估和部署 Boss 高层动作策略，使用 MaskablePPO；NPC 服务 `app/` 不导入它。模拟器规则基线 `RuleBossPolicy` 与 UE 的 `BT_AesirBoss` 是不同实现，模拟器成绩不能直接代表 UE 实战。
 
-部署目标见[15 项能力分工](../docs/planning/ai-capability-placement.md)（`placement-v1`，AI-DEP-01/02/14/15）及[六步方案第五步](../docs/planning/local-boss-cloud-companion-roadmap.md)：源码可在服务器开发，冻结推理发行到玩家电脑；训练/正式评估与在线 NPC 服务隔离。本页既有模型身份/接口说明不表示 Windows 包、自动模型更新、独立 PPO 评估或 UE 验收已经完成。
+部署目标见[15 项能力分工](../docs/planning/ai-capability-placement.md)（`placement-v1`，AI-DEP-01/02/14/15）及[六步方案第五步](../docs/planning/local-boss-cloud-companion-roadmap.md)：源码可在服务器开发，冻结推理发行到玩家电脑；训练/正式评估与在线 NPC 服务隔离。第五步实现与验收见[实施计划](../docs/planning/step-05-boss-local-release-plan.md)、[本地发行指南](../docs/guides/boss-local-release.md)及[验证记录](../docs/logs/verification-records.md#boss-release-20261023)；包构建、独立模拟评估与UE实战分别记录，自动更新不在本次实现。
 
 ## 运行入口
 
@@ -13,7 +13,7 @@
 .\.venv\Scripts\python scripts\rl\boss\eval.py --episodes 20 --seed 0 --json
 ```
 
-当前 `eval.py` **只评估规则基线**，没有加载冻结 PPO 的参数。无需重训的冻结模型独立评估入口、逐局原始输出及精确复评命令仍待实现，不能把此命令写成 PPO 测试。
+默认 `eval.py` 仍只评估规则基线。第五步新增 `--policy frozen|compare --model <固定ZIP> --out <全新目录>`，通过生产运行时加载原冻结候选且不训练；compare使用同画像/seed比较PPO与模拟器Rule并保留逐局JSONL、summary和实验manifest。命令和种子边界见[发行指南](../docs/guides/boss-local-release.md#4-无重训冻结评估)，不能把默认rule命令写成PPO测试或UE BT成绩。
 
 训练冒烟命令与正式训练示例如下；它们会写入 `models/rl/boss/`，本轮文档整理没有执行训练。
 
@@ -54,7 +54,7 @@ Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005
 
 ## 本地交付与版本发布
 
-2026-10-21用户采纳Boss冻结推理在玩家本机运行：初始程序、依赖、模型和材料随游戏交付，服务器提供可信版本清单和可选更新，训练与在线NPC服务分开调度。首期复用下述独立HTTP服务；ONNX/NNE为后续候选，当前无自动打包/下载/进程管理实现。清单需包含SHA、Schema/动作和游戏/推理运行时兼容性；签名验证、菜单阶段切换、失败回滚及断网行为只在[UE部署说明](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/02_Design_Doc/TDD/06_Deployment.md)维护，服务端要求见[部署指南](../docs/guides/deployment.md)。正式研究固定模型并关闭自动更新。
+2026-10-21用户采纳Boss冻结推理在玩家本机运行：初始程序、依赖、模型和材料随游戏交付，服务器提供可信版本清单和可选更新，训练与在线NPC服务分开调度。首期复用下述独立HTTP服务；ONNX/NNE为后续候选，第五步新增Windows原生onedir构建和独立EXE校验/自测入口；自动下载和UE进程管理仍待各自实现。清单需包含SHA、Schema/动作和游戏/推理运行时兼容性；签名验证、菜单阶段切换、失败回滚及断网行为只在[UE部署说明](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/02_Design_Doc/TDD/06_Deployment.md)维护，服务端要求见[部署指南](../docs/guides/deployment.md)。正式研究固定模型并关闭自动更新。
 
 ## 冻结策略 HTTP 服务
 
@@ -66,7 +66,7 @@ Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005
 
 可用 `--model <实际ZIP路径>` 指定文件。`GET /health` 返回服务信息；`POST /v1/boss/policy/decide` 接受 Schema 4 观察，返回一个高层动作或 `actionable=false` 的合法暂时无动作。GAS 动作可用性和真实启动、命中、伤害仍由 UE 复核。
 
-当前加载器只检查文件存在并加载，**不会自动核对 selection SHA、训练版本和部署身份**；`model_id` 来自文件名，health 中模拟器修订来自当前源码。人工核对文件的结果不能写成运行时已完成身份校验。
+第五步加载器先按版本库中的 `rl/boss/deployment.json` 验证原ZIP/selection/training三份固定SHA，再核对Schema、sim/reward、seed、原模型来源、26项有序特征和9动作映射，加载后验证实际模型空间；只接受该受信候选，CPU线程为1/1，不训练。health/响应保留model_id并增加model_sha256/release_id，health提供材料来源，不暴露本机模型路径。观察拒绝NaN/Inf，预测必须为mask允许的整数动作；全锁态合法暂时无动作。源码CLI仅允许literal loopback，冻结EXE只允许127.0.0.1。当前UE尚未验证新增强身份字段，因此服务门禁通过不等于UE接入完成。
 
 UE 已确认目标为连续 3 次通信、协议或非法动作错误后切 BT，保持到本场遭遇结束；仅完整合法响应清零，合法暂时无动作不算故障。UE 当前 PolicyClient 在动作字段校验前清零，存在连续非法动作累积失效的已知缺陷；模型身份完整核验、终局取消与同遭遇策略段关联也需联调，参见 [UE RL 契约](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/08_RL_Research/01_BossRLContract.md)、[已知问题](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/06_Test_Doc/02_KnownIssues.md)。这些 UE 目标不表示 Python 或两端已验收。
 

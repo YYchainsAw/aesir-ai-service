@@ -40,7 +40,7 @@ python -m venv .venv
 | 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/course-requirements-index.md) |
 | 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/todo.md) |
 | 实施已采纳的对话/语音/Agent/记忆/云端演进 | [交互演进计划](docs/planning/npc-interaction-evolution.md)，含UC映射、批次与新增验收 |
-| 训练或运行Boss PPO | [Boss RL说明](rl/README.md) |
+| Boss本地运行包、冻结模型与逐局评估 | [第五步计划](docs/planning/step-05-boss-local-release-plan.md) · [发行指南](docs/guides/boss-local-release.md) · [RL说明](rl/README.md) |
 | 查真实联调和历史里程碑 | [验证记录](docs/logs/verification-records.md) · [CHANGELOG](CHANGELOG.md) |
 
 ## 服务边界与端口

@@ -11,5 +11,8 @@ requires-python = ">=3.12"
 [tool.setuptools.packages.find]
 include = ["app*", "rl*", "scripts*"]
 
+[tool.setuptools.package-data]
+"rl.boss" = ["deployment.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
