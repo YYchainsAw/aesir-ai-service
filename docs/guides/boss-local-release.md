@@ -4,6 +4,8 @@
 
 ## 1. 发行内容与适用环境
 
+当前状态：Boss PPO模型尚在开发，本轮运行包仅用于验证已有模型快照的本地推理和打包流程，属于开发验证包。本文的发行流程是后续复用的基础设施；模型研发、正式候选确认和第五步整体验收均未完成。“冻结”仅表示本次运行/评估不修改该快照，并非停止后续研发。
+
 Boss包运行在玩家Windows设备，通过回环HTTP提供Schema4的高层动作建议；NPC服务继续在服务器运行。当前候选固定为schema4/sim005/reward003/seed1，`rl/boss/deployment.json` 固定ZIP及两份原材料的SHA。加载前验证字节和语义，随后检查实际26维Box、9动作Discrete空间；改文件名或sidecar自报SHA不能替换候选。
 
 本轮Windows运行时为64位Python3.11.9，CPU Torch2.7.1、SB3/SB3-Contrib2.7.1、Gymnasium1.2.3及实际固定依赖；它与原训练环境一致，随独立EXE目录交付。NPC项目继续Python3.12+，不会因Boss包调整服务器解释器或安装RL训练依赖。
@@ -65,10 +67,11 @@ Rule是Python模拟器基线，和UE的 `BT_AesirBoss` 不同。新结果不覆�
 
 | 责任 | 后续实际检查 |
 | --- | --- |
+| 正式模型前置 | 完成Boss PPO研发、训练/选模证据与候选确认；按新候选更新ZIP、selection/training材料和可信descriptor，再重建、复验完整包，不能直接覆盖当前包内ZIP |
 | 本地进程生命周期 | UE负责菜单阶段启动、就绪、端口占用识别、退出及残留进程回收；本轮独立EXE退出成功不代表UE已管理 |
 | 模型身份 | 按预期release_id/model_sha256核health与响应，拒绝未知候选；当前客户端只要求model_id非空，尚未完成强身份核验 |
 | 连续错误切BT | 修复KI-01：完整合法动作/合法无动作通过校验后才清零；连续三次通信/协议/非法动作错误切BT并保持本场 |
 | 终局与晚到响应 | 修复KI-06：结束/退出时停止推理、取消在途请求，拒绝旧局回包；现有Stop/request对象身份提供部分保护，不能省略终局接入 |
 | 整体实战 | 断开公网后Boss仍运行；缺/错模型、未就绪、进程异常、退出、回退及同条件BT/PPO必须在游戏记录真实证据 |
 
-本轮用户继续将UE连接测试后置，既有UE工作区不改。服务侧发行与评估材料完成后仍保留以上门槛，不能提前关闭游戏整体验收。既有KI和实战协议由UE仓 `Docs/06_Test_Doc/02_KnownIssues.md` 与 `Docs/08_RL_Research/01_BossRLContract.md` / `03_EvaluationProtocol.md`维护。
+本轮用户继续将UE连接测试后置，既有UE工作区不改。本轮基础设施与快照验证完成后，仍须完成模型研发、正式候选确认、重新构建复验及以上UE门槛，不能提前关闭第五步整体验收。既有KI和实战协议由UE仓 `Docs/06_Test_Doc/02_KnownIssues.md` 与 `Docs/08_RL_Research/01_BossRLContract.md` / `03_EvaluationProtocol.md`维护。

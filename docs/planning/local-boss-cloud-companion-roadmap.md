@@ -80,14 +80,14 @@
 
 ## 第五步：并行完成 Boss 本地发行
 
-2026-10-23本步在 `feature/boss-local-release` 实现固定候选身份门禁、Windows原生CPU运行包和无重训逐局评估；服务器核心1553 passed、1 skipped，Windows Boss139 passed、1 skipped，实际EXE17项检查通过。计划/材料见[第五步实施计划](step-05-boss-local-release-plan.md)、[本地发行指南](../guides/boss-local-release.md)及[证据](../logs/verification-records.md#boss-release-20261023)。本轮未修改/连接UE，游戏进程管理、KI-01/KI-06及实战回退仍待验，不能把独立运行包当作第五步游戏整体验收。
+2026-10-23本步在 `feature/boss-local-release` 实现固定候选身份门禁、Windows原生CPU运行包和无重训逐局评估；服务器核心1553 passed、1 skipped，Windows Boss139 passed、1 skipped，实际EXE17项检查通过。计划/材料见[第五步实施计划](step-05-boss-local-release-plan.md)、[本地发行指南](../guides/boss-local-release.md)及[证据](../logs/verification-records.md#boss-release-20261023)。2026-10-23用户明确Boss PPO模型尚未开发完成；现包为当前模型快照的开发验证包，已完成部分限于推理、打包及评估基础设施，第五步整体仍在进行中。正式模型研发、选模与候选确认尚待完成，之后须更新身份材料、重新构建并复验。游戏进程管理、KI-01/KI-06及实战回退也仍待验；本轮未修改/连接UE。
 
-- 保持现有独立 localhost HTTP 推理方案，冻结 Schema 4、26 维观测、9 动作契约；短期不为切换引擎内推理重写现有链路。
-- 交付冻结模型、运行时、schema/动作映射与版本清单、模型 SHA；模型不随 Git clone 自动到位，运行时须识别正确候选。
+- 保持现有独立 localhost HTTP 推理方案；本轮以 Schema 4、26 维观测、9 动作为验证基线。后续模型研发若改变观察/动作，须同步版本、UE契约与测试，不因开发验证包提前冻结研发设计。
+- 模型研发验收、正式候选确认后，再交付对应模型、运行时、schema/动作映射与版本清单及模型 SHA；模型不随 Git clone 自动到位，运行时须识别正确候选。
 - UE 管理本地推理进程的启动、就绪检测和退出；修复并复测 UE 已知问题 KI-01/KI-06 所涉回退与生命周期问题。异常时使用本地 BT，具体行为以 UE 契约为准。
 - Windows 运行时与可执行发行包在 Windows 原生环境构建和验证；Linux 开发服务器保存源码或模型不等于已产出可用 Windows 包。
 
-验收：断开公网时 Boss 推理与 BT 回退仍可运行；首次启动、未就绪、进程异常、退出和模型不匹配均有可复现结果。先完成该验收，再评估 ONNX/NNE，不把其作为首期前置条件。
+验收：先完成Boss PPO模型研发、选模和正式候选确认，再用该候选重建运行包并验证模型/运行时兼容；断开公网时 Boss 推理与 BT 回退仍可运行；首次启动、未就绪、进程异常、退出和模型不匹配均有可复现结果。先完成该验收，再评估 ONNX/NNE，不把其作为首期前置条件。
 
 ## 第六步：建立独立正式发布入口
 

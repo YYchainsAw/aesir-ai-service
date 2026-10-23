@@ -5,7 +5,7 @@
 | 编号 | 尚需解决的内容 | 处理边界 |
 | --- | --- | --- |
 | EXT-01 | 真实玩家输入→解析→UE 接收→实际启动/命中/完成→回执闭环；Alice/Bruno 技能声明与 UE 可执行能力逐项对照 | 服务端返回 200、接收回执或临时心跳通道均不代表技能已完成；按实际能力拒绝越界，不擅自冻结技能数量 |
-| EXT-02 / DEP5 | 第五步新增候选身份门禁、Windows原生发行和冻结PPO逐局评估；UE预期身份/进程管理、KI-01/KI-06及同条件BT/PPO实战仍待验 | schema4/sim005/reward003 seed1不变；独立持出结果与900局选模分开；见[第五步计划](step-05-boss-local-release-plan.md)、[发行指南](../guides/boss-local-release.md)及实际证据 |
+| EXT-02 / DEP5 | Boss PPO模型仍在研发；当前仅有模型快照的身份门禁、Windows开发验证包和逐局评估基础设施。正式选模/候选确认及重新构建复验见[DEP5-05 / #96](https://github.com/YYchainsAw/aesir-ai-service/issues/96)；UE预期身份/进程管理、KI-01/KI-06、同条件BT/PPO实战也待完成 | schema4/sim005/reward003 seed1仅为本轮验证基线，不代表研发定稿；独立持出结果与900局选模分开；见[第五步计划](step-05-boss-local-release-plan.md)、[发行指南](../guides/boss-local-release.md)及实际证据 |
 | EXT-03 / OUT-05 | 对话RL导演层是否立项（#54 / T39） | 仍待批准；现有信号可分析，不能据此启用在线学习或自演化人格 |
 | EXT-07 | 已采纳外部ASR转接；供应商适配、音频门禁、文本兜底和真人时延待验，VAD/流式转写/TTS/播放打断后置（#56 / T41） | 见BR-DEP-05、V1～V4及AT-EVO-03/04；mock/本机Whisper不代替正式外部ASR，供应商/声音/保留与播出门槛启用前记录 |
 | EXT-08 | 读档、快进、跨存档及服务重启恢复（#57 / T42）；持久同步与离线队列继续后续实现 | 已批准的同档长期状态保留、v0.4显式绑定/相对时效/重置epoch已有服务端子集，见[第二步计划](step-02-identity-scope-plan.md)与[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)；不以此替代#57全部时间/衰减范围或BR-DEP-03/04/06的数据库同步目标 |
