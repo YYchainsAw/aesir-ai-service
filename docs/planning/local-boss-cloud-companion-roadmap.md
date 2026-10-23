@@ -4,7 +4,9 @@
 
 日常排期与任务完成状态仍以 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues) 为唯一来源。本文维护方案、依赖和验收定义；本轮环境命令与实测证据集中记录于[远程开发指南](../guides/remote-development.md)，不另建重复任务看板。既有需求数字、阶段状态和课程 SDD 不因本文自动改写。
 
-逐项能力位置、旧计划覆盖与补充边界见 [15 项部署分工对照](ai-capability-placement.md)（`placement-v1`，`AI-DEP-01`～`AI-DEP-15`），与 UE 仓 `Docs/02_Design_Doc/TDD/06_Deployment.md` 使用相同编号；该路径为未发布工作区文档定位。缓存/离线同步、VAD、外部 ASR 与自动模型分发均按实际支持和后续设计分别验收，不由方案文字推定已实现。
+2026-10-23当前交接基线为Python `main@b641b2f`与UE `main@ea43abc`：第二至四步服务端已合入，UE主线仍使用0.3入口，整体验收尚未完成；Boss基础设施[PR #95](https://github.com/YYchainsAw/aesir-ai-service/pull/95)的`f1dff27`未合并，正式模型[#96](https://github.com/YYchainsAw/aesir-ai-service/issues/96)仍在研发。逐项AIRI采纳/实现/待验、准确v0.4路由、任务分工与最小证据见[两仓交接基线](airi-learning-alignment-20261023.md)。接下来优先文本入口修复与UE最小执行闭环，SQL恢复/队列接入及外部ASR、正式发布分别建账；不重做已合入服务端，也不将20项后置扩展捆绑为文本首版前置。
+
+逐项能力位置、旧计划覆盖与补充边界见 [15 项部署分工对照](ai-capability-placement.md)（`placement-v1`，`AI-DEP-01`～`AI-DEP-15`），与 UE 仓 `Docs/02_Design_Doc/TDD/06_Deployment.md` 使用相同编号。缓存/离线同步、VAD、外部 ASR 与自动模型分发均按实际支持和后续设计分别验收，不由方案文字推定已实现；两仓已发布文档及本次固定提交见交接基线。
 
 ## 分工与运行位置
 

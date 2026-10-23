@@ -1,5 +1,31 @@
 # 历史验证与决策记录
 
+<a id="text-routing-20261023"></a>
+## 2026-10-23 文本角色入口修复与两仓交接
+
+本轮在独立Windows worktree从`main@b641b2f`建立`codex/npc-alignment-20261023`，代码与测试提交为`a0869b8106196956416d7626c46ae1cbd3b3606b`；该候选提交尚未合入main。原开发工作区及未提交内容未改动。两仓比较基线仍为服务`b641b2f`、UE`ea43abc`，实际接入使用包含本修复的服务提交并另记UE构建/资产。
+
+共享`agent/step`文本入口调用意图解析门面时漏传`companion_id`，使Bruno命令按Alice默认唤醒词/LLM prompt解析。现将已校验的请求角色传给原门面，legacy与scoped复用同一修复，不改变协议、能力目录或执行权。新增40例HTTP回归使用真实解析门面，LLM客户端仅使用无网络替身，覆盖双入口、Alice/Bruno中英文唤醒词、跨角色/闲聊无动作、LLM角色prompt与故障规则回退及快照目标。
+
+| 检查 | 本轮实测与限制 |
+| --- | --- |
+| 修前新回归 | 14 failed、26 passed，分别暴露Bruno命令落闲聊、Alice唤醒词误触发Bruno、Bruno使用默认Alice prompt；生产修复后同批纳入下列通过结果 |
+| 修后相关回归 | 136 passed，18.86秒；范围为新文本路由、既有agent API、scoped动作/API、LLM意图与多角色隔离6个文件 |
+| 完整适用核心首轮 | 1492 passed、1 failed、11 skipped；失败为已有迁移报告断言写死Linux路径分隔符，Windows返回本机路径。仅将测试改为比较`Path.parts`，未改迁移业务、源文件处理或输出格式；数据库文件专项随后24 passed、2 skipped |
+| 完整适用核心最终 | **1493 passed、11 skipped、7 warnings，86.51秒**；Windows、CPython3.12.15，包含SQLite持久化与scoped回归。11跳过为5项未提供专用MySQL URL、5项POSIX/Linux权限/目录策略专项及缺可选faster-whisper模块；不冒充Linux或实际MySQL复验。7条为既有Starlette/httpx及422常量弃用提示 |
+| 环境与文档 | 独立venv按现有requirements-dev安装；`pip check`通过。两仓Markdown链接与`git diff --check`另行检查；仅更新文档和任务不改变原UE场景的未执行状态 |
+
+最终命令：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q --tb=short --junitxml=data/runtime/alignment-20261023/core-pytest-final.xml
+.\.venv\Scripts\python.exe -m pip check
+```
+
+原始JUnit位于本worktree忽略目录`data/runtime/alignment-20261023/`，首轮与最终XML分别保留。本次没有访问真实供应商或MySQL、运行UE、训练/选模、部署/合并远端main。遗留LLM SSE参数不匹配独立跟踪[#102](https://github.com/YYchainsAw/aesir-ai-service/issues/102)，未纳入本次文本修复。
+
+用户提供的AIRI清单20项逐项对照、支持边界与两仓任务在[交接基线](../planning/airi-learning-alignment-20261023.md)及[#103](https://github.com/YYchainsAw/aesir-ai-service/issues/103)维护。服务端子集、UE接入、实际动作及正式发布分别验收；本轮修复与文档对齐不关闭这些后续工作。
+
 本页于 2026-10-19 合并原 10 篇开发日志、旧需求/策划中的有效决策和 CHANGELOG 验证摘要。原日期、样本与测试数按当时记录保留；没有重新运行服务、测试、训练或 UE，也没有补造已丢失的原始输出。旧日志的推送代理、进程号、会话收尾和重复文件清单不再维护。课程建模过程见 [UML 入口](../design/uml/README.md)，当前需求见 [SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)，后续工作见[未决清单](../planning/todo.md)。
 
 <a id="scope"></a>

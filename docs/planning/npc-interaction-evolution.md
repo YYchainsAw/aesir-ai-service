@@ -4,7 +4,7 @@
 
 需求入口仍为[SDD v1.1](aesir-agent-sdd-v1.1.md)，部署位置、认证/同步完整规则仍在[部署指南](../guides/deployment.md)。本文的D1～C4是稳定演进项，`AT-EVO-*`是新增验收，不重编号原8REQ/7UC/45FR/12AT，也不将已有SSE、分层记忆、仲裁、白名单或熔断重新列为从零开发。
 
-2026-10-22提交集成按`main@4e2badc`校对：`a2dd426`是原研究/课程静态输入，不改写其历史结果。新版v0.4已合入可信开发身份、玩家/存档分区、显式run/encounter绑定、相对有效期、memory_epoch和有界内存去重/回执关联，服务端回归沿用已有记录；正式账号、数据库事务/跨重启幂等、离线同步、scoped SSE/语音和UE执行仍另验。当前字段及限制以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)与[开发交接](../guides/scoped-development.md)为准。本次集成只改文档与图，不重新宣称运行通过。
+历史集成曾按`main@4e2badc`校对；`a2dd426`是原研究/课程静态输入，不改写其历史结果。2026-10-23按`main@b641b2f`更新当前状态：DEP2作用域、DEP3排队/取消/反馈账本、DEP4 SQL事务/Bearer/持久幂等及事实/回执恢复均已合入，不能继续整体列作未来实现。UE `main@ea43abc`仍为0.3客户端，scoped SSE/语音、UE执行/本地队列和正式发布仍待。20项逐项证据、两仓固定基线、路由与最小验收见[AIRI学习点与两仓交接基线](airi-learning-alignment-20261023.md)。字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、[闭环增量](../protocols/npc-loop-contract-v0.4.md)、[持久化增量](../protocols/npc-persistence-contract-v0.4.md)为准；历史运行结果仍只由验证记录证明。
 
 ## 已有基础与新增范围
 
@@ -14,7 +14,7 @@
 | 实时语音 | 音频上传、ASR抽象、mock/faster-whisper、转写复用文本入口 | 先实现外部ASR与按键链路；VAD、流式转写、TTS有序播放和打断为已采纳的后置扩展 |
 | 游戏Agent | 心跳规则候选、禁打断、仲裁/节流、指令/有效期与回执JSONL | 事件合并/淘汰、条件指令跨端闭环、稳定命令身份和结果协调 |
 | 记忆 | 会话、摘要、档案/事实、模糊印象、注入预算和关系规则 | 索引按需读取对照、来源/确认状态、条目纠错、重置世代与同步约束 |
-| 云端服务 | FastAPI、适配/熔断，v0.4可信开发身份、玩家/档分区、显式绑定、memory_epoch及内存幂等 | 认证作用域覆盖全部状态、持久幂等/事务、游标补拉、取消传播与分阶段追踪 |
+| 云端服务 | FastAPI、适配/熔断，v0.4作用域/绑定/epoch、请求取消与追踪，SQL/Bearer、持久幂等/事务、快照/版本/按ID确认 | 复用已合并子集接入UE；补本地队列、恢复与真实阶段追踪。当前无通用游标feed，不能把目标“补拉”解释成已有cursor参数 |
 
 Boss冻结推理、BT和队友即时控制在本地；UE/GAS是世界、目标、技能和结果权威。Python只做语言理解、查证、记忆/关系和高层建议。纯心跳继续规则驱动、无主动推送；本计划不启用在线学习、任意脚本执行、单进程多游戏或跨设备存档自动合并。AIRI的浏览器/TypeScript实现提供参考机制，不成为更换Python/UE技术栈的要求。
 
@@ -61,7 +61,7 @@ TTS、VAD和播放打断不是原FR-026“转写复用文本”的既有实现�
 | UC-06 查询解释 | 关联生成、工具、取消、已播范围与实际动作回执；无记录返回未知，不用当前状态替代历史，查询仍受身份/作用域和保留策略限制 | NPC-UC06 |
 | UC-07 重置记忆 | 在现有清理范围上增加持久重置屏障及缓存/队列失效；与并发旧代写入协调。失败/部分完成如实报告；不重建人格、关系或扩大为全日志擦除 | NPC-UC07 |
 
-对话取消不是撤销已经发生的世界事实。已确认旧局事实可按原身份归档；未完成回复不能伪造为已告知或已兑现。生成、播放、命令接受、动作执行和命中是不同状态，不能共用一个success。现回执仍是`accepted/executed/rejected/expired/cancelled`；started/hit/completed、取消端点、游标/重置字段等须协议版本化后实现，不因本文出现概念而视为当前枚举或API。
+对话取消不是撤销已经发生的世界事实。已确认旧局事实可按原身份归档；未完成回复不能伪造为已告知或已兑现。生成、播放、命令接受、动作执行和命中是不同状态，不能共用一个success。现回执仍是`accepted/executed/rejected/expired/cancelled`；当前取消端点、epoch及恢复版本字段已经对应v0.4增量契约实现。started/hit/completed、条件登记/等待、音频片段和通用游标feed仍未实现，须先版本化，不能因本文出现概念便向strict请求追加字段。
 
 D4不扩大BR-02的重试路径：表达校验失败的重试在相应输出确认前执行；SSE已有可见输出后失败采用中断/错误终态。当前style guard在全文后执行，已发delta无法收回。TTS首版从meta确认的reply_text合成；若要边生成边播，先设计句级校验与最终修正语义，并记录时延代价。
 
@@ -80,7 +80,7 @@ M3的条目级更新/遗忘需明确授权与实际操作范围；不能由一�
 
 ## 新增验收定义
 
-以下全部未执行。每次记录服务/UE提交、配置/人格/策略、协议和迁移版本、供应商、硬件/并发、样本及原始证据，运行结果只写[验证记录](../logs/verification-records.md)。既有NFR/SC指标保持，新增阶段时延先明确起止和预算，不照搬AIRI默认数值或以服务响应证明UE已表现。
+以下完整跨端场景尚未整体验收；DEP2～4已有服务端子项回归不因此抹去，也不能替代全部AT-EVO。每次记录服务/UE提交、配置/人格/策略、协议和迁移版本、供应商、硬件/并发、样本及原始证据，运行结果只写[验证记录](../logs/verification-records.md)。既有NFR/SC指标保持，新增阶段时延先明确起止和预算，不照搬AIRI默认数值或以服务响应证明UE已表现。
 
 | ID | 场景 | 通过条件 |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ UE侧按[交互演进说明](../../../../Unreal-Projects/AesirWarden/Docs/02_Des
 
 ## 文档、协议与UML同步
 
-现行scoped JSON的精确端点、字段、枚举和错误码以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、对应schema与golden为准；[v0.3及其引用的旧版契约](../protocols/npc-contract-v0.3.md)只描述显式legacy开发兼容入口。先完成逻辑ID/尝试ID、代际、取消、条件目录、回执终态、幂等键与保留窗口、同步确认、转写/播放事件、错误码/版本的跨端对齐，再修改代码和样例。上述是待设计项，不是要求把所有概念一次性加入每个请求。
+现行scoped JSON的精确端点、字段、枚举和错误码以v0.4主契约及闭环/持久化增量、对应schema与golden为准；[v0.3及其引用的旧版契约](../protocols/npc-contract-v0.3.md)只描述显式legacy开发兼容入口。已发布的逻辑/尝试ID、绑定/epoch、取消、回执终态、幂等与同步确认先按[本次交接基线](airi-learning-alignment-20261023.md)接入UE；未实现的条件登记、转写/播放事件、条目纠错等先设计并版本化，再修改代码和样例，不要求把全部概念一次加入每个请求。
 
 2026-10-21用户后续授权后，UML-11/12/14/15共4源5页已通过MCP保存并由Desktop导出：保留7UC，补外部ASR/后置TTS、作用域与跨玩家对象例、来源/重置屏障、稳定命令和真实回执。完整部署与对话/语音生命周期由UE A11、A12a/b表达，源与预览入口见[UML索引](../design/uml/README.md)。图形目标已同步，v0.4已有范围按前述边界复用；剩余代码/schema/协议与完整运行验收尚未完成；整组Word由UE本轮同步，不以图形导出代替最终排版或成员接受。
 
@@ -118,4 +118,4 @@ UE侧按[交互演进说明](../../../../Unreal-Projects/AesirWarden/Docs/02_Des
 
 AIRI参考固定在`6876b0dcd94006f1092a2e0bd869ebdcddc7d50c`：[会话编排](https://github.com/moeru-ai/airi/tree/6876b0dcd94006f1092a2e0bd869ebdcddc7d50c/packages/core-agent/src/runtime)、[语音协调](https://github.com/moeru-ai/airi/blob/6876b0dcd94006f1092a2e0bd869ebdcddc7d50c/packages/core-agent/src/voice/controller.ts)、[游戏Agent](https://github.com/moeru-ai/airi/tree/6876b0dcd94006f1092a2e0bd869ebdcddc7d50c/integrations/minecraft/src/cognitive)、[记忆工具](https://github.com/moeru-ai/airi/blob/6876b0dcd94006f1092a2e0bd869ebdcddc7d50c/packages/stage-ui/src/tools/memory.ts)、[持久聊天](https://github.com/moeru-ai/airi/blob/6876b0dcd94006f1092a2e0bd869ebdcddc7d50c/server/apps/api/src/services/domain/chats.ts)。其Mineflayer路径正在迁移、memory-pgvector未接通完整RAG；学习机制不构成可运行复用或时延保证。
 
-仍需实现前对齐：会话排队/取消的可替代范围、整轮和阶段预算、命令与回执映射/终态、幂等保留与恢复、条件目录、数据保留和遗忘权限、音频供应商/声音/配额、VAD/回声与播放确认粒度。用户已采纳目标，这些工程参数不阻止记录计划，也不由文档静默冻结。
+当前已发布的排队/取消、预算、命令/回执、持久身份与恢复按v0.4契约交接，UE适用性和实际执行另验。仍需实施前设计的增量包括条件登记目录、来源/条目纠错权限、数据保留、音频供应商/声音/配额、VAD/回声与播放确认粒度。用户已采纳目标，这些工程参数不由文档静默冻结。

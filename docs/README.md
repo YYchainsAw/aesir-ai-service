@@ -9,7 +9,7 @@
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/getting-started.md) |
 | 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
 | 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |
-| 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
+| 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（已合入main，服务端回归通过，UE待验） |
 | 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/step-03-execution-loop-plan.md) · [闭环增量契约](protocols/npc-loop-contract-v0.4.md)（服务端回归通过，UE待验） |
 | 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/scoped-development.md) |
 | 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/step-04-persistence-access-plan.md) · [持久化开发指南](guides/persistent-development.md) · [增量契约](protocols/npc-persistence-contract-v0.4.md)（服务端验证通过，UE/正式发布待验） |
@@ -21,6 +21,7 @@
 | 当前范围、45FR、7UC、规则和验收 | [NPC需求主文](planning/aesir-agent-sdd-v1.1.md) |
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/todo.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/npc-interaction-evolution.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
+| AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/airi-learning-alignment-20261023.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/course-requirements-index.md) |
 | 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
