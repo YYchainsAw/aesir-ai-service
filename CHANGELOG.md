@@ -4,6 +4,12 @@
 
 历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
 
+## 2026-10-23 — DEP5本地推理与打包验证基础设施
+
+状态更正：用户明确Boss PPO模型尚未开发完成。当前包为研发快照的开发验证包，以下结果只覆盖基础设施和该快照，不表示正式模型定稿或第五步整体完成。正式候选确认后须重新构建并复验。
+
+新增固定候选及材料SHA门禁、有限观察/mask输出检查、CPU回环推理、Windows原生onedir EXE构建/校验/自测和冻结PPO逐局评估。原候选未重训/替换；实际Windows EXE17项检查通过，Windows Boss测试139 passed、1 skipped，服务器核心1553 passed、1 skipped（含5项真实MySQL）。持出1800条记录中PPO/模拟器Rule胜率0.815556/0.567778，原始结果与选模分开。发行ZIP、SHA、清单及许可已保管；UE身份/进程管理、KI-01/KI-06、实战及真实断网回退仍待验。见[第五步计划](docs/planning/step-05-boss-local-release-plan.md)、[发行指南](docs/guides/boss-local-release.md)与[本轮证据](docs/logs/verification-records.md#boss-release-20261023)。
+
 ## 2026-10-22 — DEP4结构门禁与开发库整改
 
 已合入的第四步后续补齐SQL启动/首次接入结构检查，运行时与离线审计共享metadata规则；只有空库能初始化DDL，已有错误库只读拒绝，损坏凭据到期数据拒绝认证。dev的expires_at可空偏差在私有备份后受检修复，8表业务数据不变，三个项目库结构审计通过。适用核心1463 passed、1 skipped（含5项真实MySQL），独立实际进程验证错误结构拒绝启动及恢复后健康/认证门禁；PDM源与预览同步。范围及后续UE/生产边界见[计划](docs/planning/step-04-persistence-access-plan.md)与[证据](docs/logs/verification-records.md#schema-gate-20261022)。

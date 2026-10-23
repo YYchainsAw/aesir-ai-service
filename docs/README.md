@@ -24,7 +24,7 @@
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/course-requirements-index.md) |
 | 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
-| Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
+| Boss本地打包验证、快照身份与逐局评估（模型研发未完成） | [第五步计划](planning/step-05-boss-local-release-plan.md) · [发行指南](guides/boss-local-release.md) · [RL说明](../rl/README.md) |
 | 真实测试/联调发生过什么 | [验证记录](logs/verification-records.md) · [里程碑](../CHANGELOG.md) |
 
 ## 字段定义看契约
