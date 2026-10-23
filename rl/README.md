@@ -46,7 +46,7 @@
 
 `selection_evaluation` 使用 `base_seed=50000`，aggressive、defensive、evasive 各 300 局，共 900 局；Boss 胜率为 0.8433，分画像 0.553 / 0.977 / 1.0。**这是选模汇总，不能再次充当独立测试集或 UE 成绩。** 未找到对应 900 局逐局原始输出；训练曲线、完整复现命令和独立测试数据仍需整理。2026-09-10 的“3 种子、2/3 达标、眩晕窗口施爆裂”属于旧队友实验，不能作为此 Boss 模型的上线依据，详见[验证记录](../docs/logs/verification-records.md)。
 
-`models/` 被 Git 忽略，新克隆没有默认 ZIP。当前没有仓库内可核验的公开下载入口；交付者需提供以上 ZIP、selection、训练 manifest 及依赖记录，并记录实际保管或获取位置。不要用同名空文件或新训练结果替代原候选。获取后在仓库根核对：
+`models/` 被 Git 忽略，新克隆没有默认 ZIP。当前没有仓库内公开模型下载入口；第五步已把原ZIP、selection、训练manifest及依赖随受控Windows运行包交付，本机和服务器私有制品位置、包SHA及取用边界见[本轮验证](../docs/logs/verification-records.md#boss-release-20261023)。Git clone仍只得到源码，模型原件不入Git。不要用同名空文件或新训练结果替代原候选。获取后在仓库根核对：
 
 ```powershell
 Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005.zip -Algorithm SHA256

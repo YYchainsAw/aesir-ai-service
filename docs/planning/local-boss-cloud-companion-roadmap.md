@@ -80,6 +80,8 @@
 
 ## 第五步：并行完成 Boss 本地发行
 
+2026-10-23本步在 `feature/boss-local-release` 实现固定候选身份门禁、Windows原生CPU运行包和无重训逐局评估；服务器核心1553 passed、1 skipped，Windows Boss139 passed、1 skipped，实际EXE17项检查通过。计划/材料见[第五步实施计划](step-05-boss-local-release-plan.md)、[本地发行指南](../guides/boss-local-release.md)及[证据](../logs/verification-records.md#boss-release-20261023)。本轮未修改/连接UE，游戏进程管理、KI-01/KI-06及实战回退仍待验，不能把独立运行包当作第五步游戏整体验收。
+
 - 保持现有独立 localhost HTTP 推理方案，冻结 Schema 4、26 维观测、9 动作契约；短期不为切换引擎内推理重写现有链路。
 - 交付冻结模型、运行时、schema/动作映射与版本清单、模型 SHA；模型不随 Git clone 自动到位，运行时须识别正确候选。
 - UE 管理本地推理进程的启动、就绪检测和退出；修复并复测 UE 已知问题 KI-01/KI-06 所涉回退与生命周期问题。异常时使用本地 BT，具体行为以 UE 契约为准。
