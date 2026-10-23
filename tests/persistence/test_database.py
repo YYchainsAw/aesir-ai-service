@@ -222,7 +222,9 @@ def test_import_dry_run_excludes_unowned_legacy_and_preserves_sources(database, 
     report = import_json(None, memory, relationship)
     assert report["mode"] == "dry-run"
     assert len(report["sources"]) == 2
-    assert report["excluded_unowned"] == ["aesir/companion.alice/memory.json"]
+    assert [Path(path).parts for path in report["excluded_unowned"]] == [
+        ("aesir", "companion.alice", "memory.json")
+    ]
     assert database.read_document("memory", scope) is None
     assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before
 

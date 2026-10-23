@@ -1,6 +1,6 @@
 # v0.4 作用域服务开发与交接
 
-2026-10-22更新：第二步基础已合入main；第三步增量适用于 `feature/npc-execution-loop`。字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、`app/schemas/scoped.py` 和运行实例 `/docs` 为准；本页只维护操作、实现限制与UE后续接入顺序。
+2026-10-23更新：第二至四步服务端已合入`main@b641b2f`，原分支名仅定位历史验证；UE `main@ea43abc`仍需迁移0.3客户端。字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)、闭环/持久化增量、对应schema和运行实例 `/docs` 为准；本页只维护操作、实现限制与UE后续接入顺序。两仓版本、Issue与完整验收清单见[本次交接基线](../planning/airi-learning-alignment-20261023.md)。
 
 ## 1. 配置与入口
 
@@ -22,9 +22,9 @@
 1. `GET /v1/scoped/context?save_id=...&companion_id=...` 获取服务实例、控制revision和记忆epoch。`run_id`为空时仅表示尚未绑定，普通业务请求不能隐式激活。
 2. `POST /v1/scoped/runs/bind` 提交新的逻辑run、当前服务实例、预期revision与预期旧run（可为null）。后续使用返回的绑定UUID。同档所有NPC共享一个活动run。
 3. 战斗前用 `POST /v1/scoped/encounters/control` 显式begin，结束时显式end；双方使用预期遭遇revision/ID，防止旧控制请求重新激活已结束遭遇。
-4. 通过 `/agent/step`、`/companion/chat` 或 `/world/events` 提交同版完整信封；`/combat/events` 是世界事件模型的别名。字段与完整样例见 `data/golden/scoped/`。
-5. 建议产生后，用 `/tactical/executions` 报告同归属、同绑定、同遭遇的已发布指令。202和`stored`只表示回执已记录，不表示技能启动或完成。
-6. 离开时调用 `/runs/end`。服务重启后重新发现并显式绑定，不重放旧实例的业务请求。
+4. 通过 `/v1/scoped/agent/step`、`/v1/scoped/companion/chat` 或 `/v1/scoped/world/events` 提交同版完整信封；`/v1/scoped/combat/events` 是世界事件模型的别名。字段与完整样例见 `data/golden/scoped/`。
+5. 建议产生后，用 `/v1/scoped/tactical/executions` 报告同归属、同绑定、同遭遇的已发布指令。202和`stored`只表示回执已记录，不表示技能启动或完成。
+6. 离开时调用 `/v1/scoped/runs/end`。服务重启后重新发现并显式绑定，不重放旧实例的业务请求。
 
 console只读查询需要 `save_id`、`companion_id`、`service_instance_id`、`run_id`、`run_binding_id`、`memory_epoch`，可附session/encounter。清理走 `/console/memory/reset` 的完整写请求。reset响应包含新epoch；同一reset请求可回放其结果，但只在该结果epoch仍为当前值时有效。另一reset发生后旧reset回放也拒绝。
 

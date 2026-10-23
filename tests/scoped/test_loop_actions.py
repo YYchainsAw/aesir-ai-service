@@ -106,7 +106,7 @@ def test_current_stunned_snapshot_can_satisfy_the_known_condition(h):
 @pytest.mark.parametrize("intent_id", ["follow_player", "support_heal_player"])
 def test_unspecified_condition_from_parser_cannot_be_erased(h, monkeypatch, intent_id):
     import app.services.tactical.llm_intent as parser
-    monkeypatch.setattr(parser, "parse_intent_with_source", lambda text: (
+    monkeypatch.setattr(parser, "parse_intent_with_source", lambda text, **kwargs: (
         TacticalIntent(intent_id=intent_id, timing="on_condition"), "llm"))
     context = h.bind()
     payload = combat_payload(h, context, "conditional command") if intent_id.startswith("support") else h.agent(context)
