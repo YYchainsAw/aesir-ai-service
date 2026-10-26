@@ -12,3 +12,7 @@ pydantic-settings==2.15.0
 # 第四步SQL事务后端。
 SQLAlchemy==2.1.6
 PyMySQL[rsa]==1.2.3
+
+# 阶段0b：易失调度后端外置。仅 coordination_backend=redis 时惰性导入；
+# memory 模式（默认）不依赖它，但 redis 部署需显式安装。
+redis==8.1.0

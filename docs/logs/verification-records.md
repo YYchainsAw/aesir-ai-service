@@ -1,9 +1,40 @@
 # 历史验证与决策记录
 
+<a id="stream-llm-fix-20261026"></a>
+## 2026-10-26 legacy SSE LLM 分支 TypeError 修复（issue #102）
+
+`stream_dialogue_reply` 把 `game_id=game_id` 传给 `_stream_llm_reply`，但后者签名不接收该参数（函数体内部自行从 `profile.game_name.lower()` 重算）。切到 `companion_backend=llm` 时立刻抛 `TypeError: _stream_llm_reply() got an unexpected keyword argument 'game_id'`，legacy SSE 的 LLM 分支完全不可达。现有 SSE 测试只覆盖 mock 后端，故未暴露。
+
+- **修法**：给 `_stream_llm_reply` 加 `game_id: str` 参数（与 `_stream_mock_reply` 签名对称）；删掉函数内部重算；fallback 路径直接复用调用方传入的 `game_id`。
+- **测试**：新增 3 个走真实 SSE 端点的 LLM 后端测试（无付费桩）——正常流 delta+meta（source=llm）、前置失败回退 mock（source=fallback）、已发 delta 后中断发 error 帧（不发 meta）。
+
+| 检查 | 本轮实测 |
+| --- | --- |
+| SSE 测试 | 6 passed（原 3 mock + 新 3 LLM） |
+| 相关回归 | 52 passed（test_companion_stream + test_llm_services + test_companion） |
+| 完整适用核心 | **1513 passed、10 skipped、78.95s**（whisper 需本地模型单独跑） |
+| 边界 | 未改动流式提交语义、未绕过认证、未把此修复当作 scoped SSE 已交付 |
+
+<a id="coord-0ab-20261026"></a>
+## 2026-10-26 请求协调器外置 0a/0b 与 Windows MAX_PATH 修复
+
+为支撑 50k 人规模，把请求协调器的易失调度态（全局生成槽/会话串行/排队深度/唤醒）从进程内存抽到可替换后端后，再外置到 Redis。用户拍板三项：阶段0保持同步（UE 契约零改动）、单实例 Redis+哨兵足够、`coordination_backend=redis` 但 `scope_storage_backend=json` 启动即拒绝。
+
+- **0a**：新增 `app/scoped/scheduling.py`（`SchedulerBackend` Protocol + `InMemoryScheduler` + `_Request`），`requests.py` 调度操作全部委托；默认后端逐字节保留原单进程语义。
+- **0b**：新增 `app/scoped/redis_scheduling.py`（`RedisScheduler`）。不用 Lua——用 `SET key token NX EX <lease>` 这条原子命令表达全局槽与会话锁（NX 即占槽 backstop，租约 TTL 崩溃自愈）；`exclusive()` 退化为进程内 RLock，`wait()` 退化为 50ms 轮询。`config.py` 新增 `coordination_backend`/`coordination_redis_url`/`coordination_lease_seconds` 及硬边界校验器；`reset_coordinator()` 惰性构造 Redis 客户端并 `ping()` 快速失败。
+- **Windows 65 失败真因**：之前误判为「刚 mkdir 紧接着 open 的线程竞争」，实为 **MAX_PATH(260)**。pytest 临时基座叠加 v0.4 分区（game/player/save/npc/run 三层 UUID）使信号 JSONL 路径达 ~265 字符，`mkdir` 报 exists 但 `open` 报 `FileNotFoundError[Errno 2]`。修法：`tests/conftest.py` 在 win32 把 `tempfile.tempdir` 指向短目录 `C:\aesir_pytmp`；同时把三个埋点（agent_step/dialogue/event）的 mkdir+open 收拢为 `storage.append_jsonl`（带瞬时错误有界重试）。
+
+| 检查 | 本轮实测 |
+| --- | --- |
+| 完整适用核心 | **1503 passed、0 failed、12 skipped、77.64s**；对比上轮基线 1430 passed/65 failed——65 个 Windows 失败全部恢复 + 8 个新增 0b 测试，零回归 |
+| RedisScheduler 单测 | 6 passed：全局槽上限、释放放行、同会话串行、排队深度上限、出队释放深度、走 RequestCoordinator 端到端 |
+| 配置硬边界 | redis+json 启动拒绝（match `scope_storage_backend=sql`）、redis+sql 放行 |
+| 未验证 | 跨 worker NX 抢占、真实 Redis 行为——本机无 Redis/无 docker，fakeredis 不支持 EVAL。留待 0c 影子模式双写比对、0d 双 worker 混沌测试 |
+
 <a id="text-routing-20261023"></a>
 ## 2026-10-23 文本角色入口修复与两仓交接
 
-本轮在独立Windows worktree从`main@b641b2f`建立`codex/npc-alignment-20261023`，代码与测试提交为`a0869b8106196956416d7626c46ae1cbd3b3606b`；该候选提交尚未合入main。原开发工作区及未提交内容未改动。两仓比较基线仍为服务`b641b2f`、UE`ea43abc`，实际接入使用包含本修复的服务提交并另记UE构建/资产。
+本轮在独立Windows worktree从`main@b641b2f`建立`codex/npc-alignment-20261023`，代码与测试提交为`a0869b8106196956416d7626c46ae1cbd3b3606b`；该候选提交已由 PR #104（`df0f4f9`）合入 main。原开发工作区及未提交内容未改动。两仓比较基线仍为服务`b641b2f`、UE`ea43abc`，实际接入使用包含本修复的服务提交并另记UE构建/资产。
 
 共享`agent/step`文本入口调用意图解析门面时漏传`companion_id`，使Bruno命令按Alice默认唤醒词/LLM prompt解析。现将已校验的请求角色传给原门面，legacy与scoped复用同一修复，不改变协议、能力目录或执行权。新增40例HTTP回归使用真实解析门面，LLM客户端仅使用无网络替身，覆盖双入口、Alice/Bruno中英文唤醒词、跨角色/闲聊无动作、LLM角色prompt与故障规则回退及快照目标。
 

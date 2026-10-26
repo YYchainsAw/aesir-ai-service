@@ -12,7 +12,7 @@ from typing import Literal
 from uuid import UUID
 
 from dotenv import load_dotenv
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     scope_session_queue_limit: int = Field(default=4, ge=1, le=16)
     scope_request_state_limit: int = Field(default=1024, ge=1, le=16384)
     request_traces_dir: str = "data/runtime/request_traces"
+
+    # -- 请求协调后端（阶段 0：易失调度态外置）-------------------------
+    # memory：单进程 InMemoryScheduler（默认，逐字节保留原语义）。
+    # redis：多 worker 共享全局槽/会话串行/排队深度；要求 scope_storage_backend=sql
+    #   ——JSON 幂等在内存，多 worker 必然双执行，启动期直接拒绝（见下方校验器）。
+    coordination_backend: Literal["memory", "redis"] = "memory"
+    coordination_redis_url: SecretStr = SecretStr("redis://127.0.0.1:6379/0")
+    coordination_lease_seconds: float = Field(default=30.0, gt=0)  # 槽/会话锁租约，崩溃自愈
 
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm
@@ -124,6 +132,19 @@ class Settings(BaseSettings):
     relationship_daily_cap: int = 15              # 每日正向净变化上限（防刷）
     relationship_event_cooldown_seconds: float = 60.0  # 同类事件冷却窗口（窗口内重复不计分）
     relationship_dialogue_cooldown_seconds: float = 120.0  # 对话信号专属冷却（T45/#62：300→120s，让陪伴感涨得动）
+
+    @model_validator(mode="after")
+    def _reject_redis_with_json_storage(self) -> "Settings":
+        # 用户拍板的硬边界：coordination_backend=redis 但 scope_storage_backend=json
+        # 时启动即拒绝。JSON 幂等在内存，多 worker 必然双执行——留一个"也许能用"
+        # 的坑，不如把边界写死。
+        if self.coordination_backend == "redis" and self.scope_storage_backend == "json":
+            raise ValueError(
+                "coordination_backend=redis 要求 scope_storage_backend=sql："
+                "JSON 幂等态留在单进程内存里，多 worker 共享调度必然导致同一逻辑"
+                "请求被双执行。请改用 sql 存储后端，或把 coordination_backend 设回 memory。"
+            )
+        return self
 
 
 def get_settings() -> Settings:

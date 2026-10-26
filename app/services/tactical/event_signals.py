@@ -20,7 +20,9 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.scoped.context import current_scope
-from app.scoped.storage import signal_directory, signal_metadata, guarded_commit, unavailable
+from app.scoped.storage import (
+    append_jsonl, signal_directory, signal_metadata, guarded_commit, unavailable,
+)
 
 _DEFAULT_GAME_ID = "aesir"
 
@@ -53,9 +55,7 @@ def record_event_resolved(
         }
         root = signal_directory(get_settings().event_signals_dir, game_id)
         record.update(signal_metadata())
-        root.mkdir(parents=True, exist_ok=True)
-        with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        append_jsonl(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False))
     except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞事件主流程
         if current_scope():
             raise unavailable() from error
