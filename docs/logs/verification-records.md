@@ -432,3 +432,18 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 ### 回归
 
 2026-10-26，Windows venv 3.12：**1536 passed、12 skipped、83.60s**（较 ① 的 1532 净增 4 个 prune 用例）。`scripts/check_database_design` 离线审计 `ok: true`（8表44列，metadata 与 DDL/字典/PDM 一致）。
+
+<a id="fewshot-lint-20261026"></a>
+## 2026-10-26 few-shot 一致性 lint（防「示例压过规则」复发）
+
+历史上 few-shot 权重三次压过 prompt honesty 规则（examples.yaml 五修/六修/七修注释），此前只靠 `test_examples_carry_no_unanswerable_riddle_or_time_assertion` 硬编码守住「口袋」「才认识几天」两个词。本轮把黑名单升级为机制性扫描。
+
+- 新增 `tests/services/test_fewshot_consistency.py`：
+  - `test_examples_carry_no_unverifiable_factual_claims`：遍历所有人格包（alice/bruno/demo-vn）examples.yaml，reply_text 命中四类无据事实信号即 fail——时长断言（才几天/认识多久）、无据谜题（猜猜/上次那个谜题）、无据世界状态（要下雨/我们现在在）、无据过往（上次我们一起/那天我答应）。每类信号注释了对应事故出处。
+  - `test_examples_reference_only_whitelisted_emotion_gesture_face`：已注册角色（alice/bruno）的示例表现 ID 必须在 presentation 白名单内；demo-vn narrator 未注册，按设计 skip。
+- 未动 `_build_system_prompt`（200 行函数内嵌大量实测复盘注释，整体模板化风险高、本期不做）。
+- 实测验证 lint 能抓到违规：构造含「才认识几天/上次那个谜题/今天要下雨」的 reply_text，四类信号命中三类。
+
+### 回归
+
+2026-10-26，Windows venv 3.12：services 套件 **630 passed、3 skipped**（含新增 6 个 lint 用例：5 过 1 skip）。
