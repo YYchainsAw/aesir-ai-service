@@ -1,5 +1,20 @@
 # 历史验证与决策记录
 
+<a id="stream-llm-fix-20261026"></a>
+## 2026-10-26 legacy SSE LLM 分支 TypeError 修复（issue #102）
+
+`stream_dialogue_reply` 把 `game_id=game_id` 传给 `_stream_llm_reply`，但后者签名不接收该参数（函数体内部自行从 `profile.game_name.lower()` 重算）。切到 `companion_backend=llm` 时立刻抛 `TypeError: _stream_llm_reply() got an unexpected keyword argument 'game_id'`，legacy SSE 的 LLM 分支完全不可达。现有 SSE 测试只覆盖 mock 后端，故未暴露。
+
+- **修法**：给 `_stream_llm_reply` 加 `game_id: str` 参数（与 `_stream_mock_reply` 签名对称）；删掉函数内部重算；fallback 路径直接复用调用方传入的 `game_id`。
+- **测试**：新增 3 个走真实 SSE 端点的 LLM 后端测试（无付费桩）——正常流 delta+meta（source=llm）、前置失败回退 mock（source=fallback）、已发 delta 后中断发 error 帧（不发 meta）。
+
+| 检查 | 本轮实测 |
+| --- | --- |
+| SSE 测试 | 6 passed（原 3 mock + 新 3 LLM） |
+| 相关回归 | 52 passed（test_companion_stream + test_llm_services + test_companion） |
+| 完整适用核心 | **1513 passed、10 skipped、78.95s**（whisper 需本地模型单独跑） |
+| 边界 | 未改动流式提交语义、未绕过认证、未把此修复当作 scoped SSE 已交付 |
+
 <a id="coord-0ab-20261026"></a>
 ## 2026-10-26 请求协调器外置 0a/0b 与 Windows MAX_PATH 修复
 
