@@ -417,3 +417,18 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 - 不配置 secrets：真实 MySQL（`AESIR_TEST_MYSQL_URL_FILE`）、faster-whisper、RL 依赖在 CI 默认环境天然 skip，与本地「无 ML/RL 依赖核心回归」边界一致。
 - 本地同命令复跑：**1532 passed、12 skipped、84.12s**（Windows venv 3.12.7）。skip 项为 faster-whisper 真机冒烟与 RL 门控用例。
 - 未覆盖：首次 push 到远端前 CI 实际跑次未经验证；如需缓存 pip、加 Linux 矩阵（3.13）、或把真实 MySQL 接成可选 job，留待后续。
+
+<a id="db-index-prune-20261026"></a>
+## 2026-10-26 operation_journal 二级索引与运维清理器
+
+针对 DB-GAP「高增长账本无索引、无清理」落地无争议的一半。
+
+- `app/persistence/journal.py`：operation_journal 加两个二级索引 `ix_operation_journal_state_created(state, created_at)`（恢复扫描遗留 running）、`ix_operation_journal_request_id(request_id)`（按请求查行）。均为普通列、跨方言可索引。
+- `app/persistence/prune.py`（新）：`prune_journal`（删终态 complete/failed/unknown 且 finished_at 早于 cutoff 的行，running 永不触碰）、`prune_quota_windows`（删 window_start 早于 cutoff 的额度窗口行）。清理是显式运维动作，服务不自动清理。
+- `scripts/persistence_data.py prune`：新增 CLI 子命令，`--journal-days`（默认30）/`--quota-days`（默认7），dry-run 只计数、`--apply` 才真删。
+- 同步：`001-initial-schema.sql` 用 `--print-sql` 重生成（注：CreateTable 渲染本就不含二级索引行，与 FK 索引一致）；`03-data-dictionary.md` 索引清单更新为「8主键+3二级+2外键」；`tests/persistence/test_prune.py` 4 项（终态过期删/running 永不碰/quota 过期删/默认 cutoff 删全部终态）。
+- 边界：documents 的 `scope_parts`/`key_parts` 是 JSON 列，spike 验证 SQLite 无 `JSON_UNQUOTE`、同一 Computed 表达式无法在两方言出一致 DDL，生成列索引留到有真实 MySQL 环境再做（方言分支 Computed 成本翻倍，本期不做）。
+
+### 回归
+
+2026-10-26，Windows venv 3.12：**1536 passed、12 skipped、83.60s**（较 ① 的 1532 净增 4 个 prune 用例）。`scripts/check_database_design` 离线审计 `ok: true`（8表44列，metadata 与 DDL/字典/PDM 一致）。

@@ -13,7 +13,8 @@ import json
 from threading import Condition, RLock
 import time
 
-from sqlalchemy import BigInteger, Column, Double, JSON, String, Table, delete, insert, select, update
+from sqlalchemy import (BigInteger, Column, Double, Index, JSON, String, Table,
+                        delete, insert, select, update)
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.persistence.database import get_database, parts_hash, read_document, write_document, unavailable
@@ -41,6 +42,13 @@ operations = Table(
     Column("confirmed_version", BigInteger, nullable=True),
     Column("created_at", Double, nullable=False),
     Column("finished_at", Double, nullable=True),
+    # Operational indexes: recovery scans running rows by (state, owner_instance)
+    # and the status-fallback / cleanup paths look rows up by request_id and age.
+    # scope_parts/key_parts remain JSON and are intentionally left unindexed (see
+    # docs/design/database DB-GAP); adding a JSON generated-column index requires a
+    # real MySQL environment because SQLite lacks JSON_UNQUOTE.
+    Index("ix_operation_journal_state_created", "state", "created_at"),
+    Index("ix_operation_journal_request_id", "request_id"),
     mysql_engine="InnoDB", mysql_charset="utf8mb4",
 )
 

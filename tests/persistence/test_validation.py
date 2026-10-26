@@ -211,6 +211,11 @@ class ReflectedMySQL:
             for fk in table.foreign_key_constraints] for table in tables}
         self.indexes = {table.name: [] for table in tables}
         self.indexes["access_credentials"] = [{"column_names": ["game_id", "player_id"], "unique": False}]
+        # operation_journal carries its own operational secondary indexes.
+        self.indexes["operation_journal"] = [
+            {"column_names": ["state", "created_at"], "unique": False},
+            {"column_names": ["request_id"], "unique": False},
+        ]
         self.checks = {table.name: [] for table in tables}
         self.options = {table.name: {"mysql_engine": "InnoDB", "mysql_default charset": "utf8mb4", "mysql_collate": "utf8mb4_0900_ai_ci"} for table in tables}
         self.markers = [(1, SCHEMA_VERSION)]

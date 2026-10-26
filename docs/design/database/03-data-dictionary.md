@@ -135,10 +135,10 @@ LLM等待期间不持有业务长事务。最终结果与业务状态原子提�
 | access_quotas | game_id, player_id, kind, window_start | 无 | 无 |
 | documents | namespace, key_hash | 无 | 无 |
 | state_versions | scope_hash | 无 | 无 |
-| operation_journal | identity_hash | 无 | 无 |
+| operation_journal | identity_hash | ix_operation_journal_state_created(state, created_at)、ix_operation_journal_request_id(request_id)，均非唯一 | 无 |
 | schema_versions | id | 无 | 无 |
 
-共8个主键索引、1个二级索引、2条复合外键。FK默认限制删除/更新父键，不级联删除凭据或授权。索引名不是SQLAlchemy显式稳定命名契约，后续迁移不要盲目写死自动生成名。
+共8个主键索引、3个二级索引、2条复合外键。FK默认限制删除/更新父键，不级联删除凭据或授权。索引名不是SQLAlchemy显式稳定命名契约，后续迁移不要盲目写死自动生成名。operation_journal 的两个索引服务于恢复扫描（按 state+created_at 找遗留 running）与按 request_id 查行；`scope_parts`/`key_parts` 仍是 JSON、无生成列索引（SQLite 缺 JSON_UNQUOTE，待真实 MySQL 环境再评估）。
 
 ## 11. 实际库核对与保密边界
 

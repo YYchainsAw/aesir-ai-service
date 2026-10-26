@@ -11,6 +11,7 @@ from importlib import import_module
 import json
 import os
 import stat
+import time
 from pathlib import Path
 from uuid import UUID
 
@@ -252,6 +253,13 @@ def main(argv=None):
     restore = commands.add_parser("restore")
     restore.add_argument("--input", required=True)
     restore.add_argument("--apply", action="store_true")
+    prune = commands.add_parser("prune", help="Prune old terminal journal rows and stale quota windows")
+    prune.add_argument("--journal-days", type=float, default=30.0,
+                       help="Delete terminal journal rows finished more than this many days ago (default 30)")
+    prune.add_argument("--quota-days", type=float, default=7.0,
+                       help="Delete quota window rows older than this many days (default 7)")
+    prune.add_argument("--apply", action="store_true",
+                       help="Actually delete; without it only report the counts that would be removed")
     args = parser.parse_args(argv)
     try:
         if args.command == "init":
@@ -267,6 +275,35 @@ def main(argv=None):
             result = import_json(database, args.memory_root, args.relationship_root, apply=args.apply)
         elif args.command == "backup":
             result = backup_database(get_database(), args.output)
+        elif args.command == "prune":
+            from app.persistence import prune as prune_mod
+            journal_cutoff = time.time() - args.journal_days * 86400
+            quota_cutoff = time.time() - args.quota_days * 86400
+            if args.apply:
+                journal_removed = prune_mod.prune_journal(cutoff_seconds=journal_cutoff)
+                quota_removed = prune_mod.prune_quota_windows(cutoff_seconds=quota_cutoff)
+            else:
+                # Dry-run: count matches without deleting. Reuse the same cutoff
+                # semantics via count queries rather than the delete functions.
+                from sqlalchemy import func, select
+                from app.persistence.database import get_database as _db
+                from app.persistence.journal import operations
+                from app.persistence.auth import quota_usage
+                terminal = ("complete", "failed", "unknown")
+                with _db().engine.connect() as connection:
+                    journal_removed = connection.execute(select(func.count()).select_from(
+                        operations).where(
+                        operations.c.state.in_(terminal),
+                        operations.c.finished_at.is_not(None),
+                        operations.c.finished_at < journal_cutoff,
+                    )).scalar_one()
+                    quota_removed = connection.execute(select(func.count()).select_from(
+                        quota_usage).where(quota_usage.c.window_start < quota_cutoff)).scalar_one()
+            result = {"mode": "apply" if args.apply else "dry-run",
+                      "journal_cutoff_age_days": args.journal_days,
+                      "quota_cutoff_age_days": args.quota_days,
+                      "journal_rows_removed" if args.apply else "journal_rows_matched": journal_removed,
+                      "quota_rows_removed" if args.apply else "quota_rows_matched": quota_removed}
         else:
             result = restore_database(get_database(), args.input, apply=args.apply)
         print(json.dumps(result, ensure_ascii=False, indent=2))

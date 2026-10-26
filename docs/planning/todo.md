@@ -20,7 +20,7 @@
 | DATA-GAP（本轮静态发现） | 默认对话日志保留完整输入/回复，与NFR只摘要目标不一致；记忆清理范围和部分失败状态需明确 | 先确认保留/清除策略及目标范围；不宣称关闭或摘要化已生效，关系档案不因清记忆自动清除 |
 | DEP-01 | SQL/Bearer服务端及迁移/恢复工具已有受控证据；正式数据切换、OS隔离与HTTPS发布由[#99](https://github.com/YYchainsAw/aesir-ai-service/issues/99)验收 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
 | DEP-02 | SQL持久身份、确认版本、事实/回执归档与epoch分项已实现；UE缓存/本地队列和完整恢复/冲突流程待接入 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
-| DB-GAP / DEP4后续 | 高增长账本拆表/索引、长期清理、大小写标识策略及正式数据切换仍需按容量与发布要求设计 | 需求追踪、ER/PDM、8表44列字典和保留DDL已补齐；dev到期列漂移已备份后修复，三库审计通过，运行时/离线共享结构门禁，见[数据库设计](../design/database/README.md)及[本轮证据](../logs/verification-records.md#schema-gate-20261022)；不把受控验证等同正式容量/UE通过 |
+| DB-GAP / DEP4后续 | 高增长账本拆表/索引、长期清理、大小写标识策略及正式数据切换仍需按容量与发布要求设计 | 需求追踪、ER/PDM、8表44列字典和保留DDL已补齐；dev到期列漂移已备份后修复，三库审计通过，运行时/离线共享结构门禁，见[数据库设计](../design/database/README.md)及[本轮证据](../logs/verification-records.md#schema-gate-20261022)；2026-10-26已补 operation_journal(state,created_at)/(request_id) 二级索引与 `scripts/persistence_data.py prune` 运维清理器（终态journal行按天数、quota窗口行按天数，dry-run/apply）；documents 的 JSON scope_parts 生成列索引因 SQLite 缺 JSON_UNQUOTE 跨方言分歧，待真实 MySQL 环境再评估；不把受控验证等同正式容量/UE通过 |
 | DEP-03 | 外部ASR、模型可信发布/下载回滚、生产守护及容量采样 | DEP-REQ-04/05/06/08；AT-DEP-07/09/10；只记录真实运行证据 |
 | EVO-01 | 请求生命周期、旧代取消、逻辑命令幂等与UE真实反馈；关联认证作用域和事务结果 | D1/D2/D4、G3/G4、C1/C2；先对齐协议/样例；AT-EVO-01/02/07/09，原EXT-01/MODEL-GAP不因此关闭 |
 | EVO-02 | [#100](https://github.com/YYchainsAw/aesir-ai-service/issues/100)负责上下文来源、事件合并/过期、条件/阶段追踪余项；[#98](https://github.com/YYchainsAw/aesir-ai-service/issues/98)负责外部ASR首期 | D3、G1/G2/G3、C4、V1；AT-EVO-03/05/07/10和AT-DEP-07；沿用纯心跳规则及无主动推送，不把当前即时条件校验当成本地条件登记 |
