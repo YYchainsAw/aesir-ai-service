@@ -292,6 +292,55 @@ class DurableIdempotencyStore:
                 "origin_service_instance_id": row["owner_instance"],
                 "reason_code": row["error"].get("code") if row.get("error") else ("REQUEST_OUTCOME_UNKNOWN" if state == "unknown" else None)}
 
+    # 阶段 1：coordinator.status() 内存 miss 时的跨进程 fallback。
+    # 与 recover() 的区别：recover() 是 /recovery/operations 端点的权威查询（含
+    # confirmed_version / origin_service_instance_id）；read_status 把 journal
+    # row 折成 coordinator._record() 的同形状字段，供 status 端点在非粘性部署
+    # 下读到别的 worker 完成的请求。
+    _STATE_TO_COORDINATOR = {
+        "running": "running", "complete": "completed", "failed": "failed",
+        "unknown": "unknown", "cancelled": "cancelled",
+    }
+
+    def read_status(self, scope, operation, request_id) -> dict | None:
+        """内存 miss 时读 journal；journal 也没有则返回 None（真正 404）。
+
+        不抛 404——由调用方（coordinator.status）在 None 时统一抛。
+        scope 不匹配仍抛 409（与内存 _same_scope 同语义）。
+        """
+        npc = scope.npc
+        key = (*npc.key, str(scope.run_id), operation, str(request_id))
+        row = self._read(self._identity(key))
+        if row is None:
+            cancelled = read_document("request_cancel", key)
+            if cancelled is None:
+                return None
+            return {
+                "target_request_id": str(request_id), "operation": operation,
+                "state": "cancelled", "reason_code": "REQUEST_CANCELLED",
+                "queue_ms": 0, "processing_ms": 0, "total_ms": 0,
+                "upstream_attempts": 0, "cancel_requested": True,
+            }
+        if tuple(row["scope_parts"]) != npc.key:
+            raise ScopeError(409, "REQUEST_ID_CONFLICT",
+                             "The logical ID is bound to another request scope.", request_id)
+        state = row["state"]
+        if state == "running" and row["owner_instance"] != str(get_runtime().service_instance_id):
+            # 别的 worker 还在跑：本进程不知道它的进度，报 unknown（与 recover 同口径）。
+            state = "unknown"
+        finished_at = row.get("finished_at")
+        total_ms = int((finished_at - row["created_at"]) * 1000) if finished_at else 0
+        error = row.get("error")
+        return {
+            "target_request_id": str(request_id), "operation": operation,
+            "state": self._STATE_TO_COORDINATOR.get(state, state),
+            "reason_code": error.get("code") if error else ("REQUEST_OUTCOME_UNKNOWN" if state == "unknown" else None),
+            # journal 不存 started_at，无法区分排队/处理耗时；只给总耗时。
+            "queue_ms": 0, "processing_ms": 0, "total_ms": max(0, total_ms),
+            "upstream_attempts": 0,
+            "cancel_requested": state == "cancelled",
+        }
+
 
 _requests = DurableIdempotencyStore("request")
 _events = DurableIdempotencyStore("event")

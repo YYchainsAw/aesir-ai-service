@@ -4,7 +4,7 @@ from threading import Event
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import insert, select, update
 
 from app.persistence.database import Database, read_document, reset_database, write_document
 from app.persistence.journal import DurableIdempotencyStore, operations, stage_active_result, stage_cancel_target
@@ -238,3 +238,90 @@ def test_losing_replay_clock_rejects_instead_of_refreshing_old_result(sql):
         store.execute(logical(scope, request_id), {}, lambda: transaction(scope, {}), timing=timing())
         store.clear()
         rejected(lambda: store.execute(logical(scope, request_id), {}, lambda: pytest.fail("reexecuted"), timing=timing()), "REQUEST_EXPIRED")
+
+
+# ---------------------------------------------------------------------------
+# 阶段 1：read_status —— coordinator.status() 内存 miss 时的跨进程 fallback
+# ---------------------------------------------------------------------------
+
+
+def test_read_status_returns_completed_record_from_journal(sql):
+    """请求在本进程完成；read_status 应返回 completed 记录（含耗时字段）。"""
+    _, scope = sql
+    store, request_id = DurableIdempotencyStore(), uuid4()
+    with use_scope(scope):
+        store.execute(logical(scope, request_id), {}, lambda: transaction(scope, {"ok": True}))
+
+    record = store.read_status(scope, "chat", str(request_id))
+    assert record is not None
+    assert record["state"] == "completed"
+    assert record["target_request_id"] == str(request_id)
+    assert record["cancel_requested"] is False
+    assert record["total_ms"] >= 0
+
+
+def test_read_status_returns_none_for_unknown_request(sql):
+    """journal 里没有该请求（也没有 cancel tombstone）→ 返回 None（调用方 404）。"""
+    _, scope = sql
+    store = DurableIdempotencyStore()
+    assert store.read_status(scope, "chat", str(uuid4())) is None
+
+
+def test_read_status_detects_cancel_tombstone(sql):
+    """请求从未执行但有 cancel tombstone → 返回 cancelled 记录。"""
+    _, scope = sql
+    store, request_id = DurableIdempotencyStore(), uuid4()
+    with use_scope(scope):
+        with use_unit_of_work(scope) as unit:
+            stage_cancel_target(scope, "chat", str(request_id))
+            unit.commit()
+    record = store.read_status(scope, "chat", str(request_id))
+    assert record is not None
+    assert record["state"] == "cancelled"
+    assert record["cancel_requested"] is True
+    assert record["reason_code"] == "REQUEST_CANCELLED"
+
+
+def test_read_status_reports_abandoned_running_as_unknown(sql):
+    """running 请求的 owner 不是本实例 → 报 unknown（与 recover 同口径）。"""
+    database, scope = sql
+    store, request_id = DurableIdempotencyStore(), uuid4()
+
+    # 直接插一行 running 状态、owner 为别的实例（模拟 worker A 崩溃）。
+    key = logical(scope, request_id)
+    identity = store._identity(key)
+    with database.engine.begin() as connection:
+        connection.execute(insert(operations).values(
+            identity_hash=identity, kind="request", key_parts=list(key),
+            scope_parts=list(scope.npc.key), request_id=str(request_id),
+            fingerprint="fp", owner_instance="worker-a-crashed",
+            state="running", created_at=1000.0,
+        ))
+
+    # 本实例读：running 且 owner 不是本实例 → unknown。
+    record = store.read_status(scope, "chat", str(request_id))
+    assert record is not None
+    assert record["state"] == "unknown"
+    assert record["reason_code"] == "REQUEST_OUTCOME_UNKNOWN"
+
+
+def test_read_status_mismatched_scope_parts_raises_conflict(sql):
+    """row 存在但 scope_parts 与查询 npc 不一致 → 409（防御性检查）。"""
+    database, scope = sql
+    store, request_id = DurableIdempotencyStore(), uuid4()
+
+    # 正常完成一行。
+    with use_scope(scope):
+        store.execute(logical(scope, request_id), {}, lambda: transaction(scope, {}))
+
+    # 篡改 row 的 scope_parts（模拟跨 scope 碰撞）。
+    with database.engine.begin() as connection:
+        connection.execute(operations.update().where(
+            operations.c.identity_hash == store._identity(logical(scope, request_id))
+        ).values(scope_parts=["tampered", "scope"]))
+
+    from app.scoped.errors import ScopeError
+    with pytest.raises(ScopeError) as exc:
+        store.read_status(scope, "chat", str(request_id))
+    assert exc.value.status_code == 409
+    assert exc.value.code == "REQUEST_ID_CONFLICT"

@@ -119,7 +119,8 @@ class RequestCoordinator:
                  session_queue_limit: int = 4, max_entries: int = 1024,
                  retention_seconds: float = 300,
                  clock: Callable[[], float] = time.monotonic,
-                 scheduler: SchedulerBackend | None = None) -> None:
+                 scheduler: SchedulerBackend | None = None,
+                 status_fallback: Callable[[RequestScope, str, str], dict | None] | None = None) -> None:
         if (max_generation_concurrency < 1 or queue_limit < 1 or session_queue_limit < 1
                 or max_entries < 1 or retention_seconds <= 0):
             raise ValueError("Request coordination limits must be positive.")
@@ -131,6 +132,9 @@ class RequestCoordinator:
         self.clock = clock
         # 请求注册表（含完成态保留）。SQL 模式下其权威版本由 journal 承担。
         self._entries: OrderedDict[tuple[str, ...], _Request] = OrderedDict()
+        # 阶段 1：status 内存 miss 时的跨进程 fallback（仅 SQL 模式注入）。
+        # 返回 None 表示 journal 也没有该请求 → 真正 404。
+        self._status_fallback = status_fallback
         # 易失调度后端。默认 InMemoryScheduler 逐字节保留原单进程语义；
         # 0b 将注入 RedisScheduler。
         self.scheduler: SchedulerBackend = scheduler or InMemoryScheduler(
@@ -189,6 +193,12 @@ class RequestCoordinator:
             self._prune()
             entry = self._entries.get(key)
         if entry is None:
+            # 阶段 1：多 worker 非粘性部署下，请求可能在别的 worker 完成。
+            # 内存 miss 时 fallback 到 journal（仅 SQL 模式注入了回调）。
+            if self._status_fallback is not None:
+                record = self._status_fallback(scope, operation, str(target_request_id))
+                if record is not None:
+                    return record
             raise ScopeError(404, "REQUEST_UNKNOWN", "The logical request is not retained.", target_request_id)
         self._same_scope(entry, scope)
         return self._record(entry)
@@ -391,12 +401,28 @@ def _build_scheduler(settings) -> SchedulerBackend | None:
 def reset_coordinator() -> RequestCoordinator:
     global _coordinator
     settings = get_settings()
+    # 阶段 1：SQL 模式下注入 journal status fallback（内存 miss 时跨进程查）。
+    # 惰性导入避免循环依赖：journal 已反向依赖 scoped.context / errors。
+    status_fallback = None
+    try:
+        from app.persistence.database import database_enabled
+        if database_enabled():
+            from app.persistence.journal import get_durable_request_store
+
+            def _status_fallback(scope, operation, request_id):
+                return get_durable_request_store().read_status(scope, operation, request_id)
+
+            status_fallback = _status_fallback
+    except Exception:
+        # 数据库不可用时退化为纯内存 status（与阶段 0 前行为一致）。
+        status_fallback = None
     coordinator = RequestCoordinator(
         max_generation_concurrency=getattr(settings, "scope_max_generation_concurrency", 2),
         queue_limit=getattr(settings, "scope_request_queue_limit", 16),
         session_queue_limit=getattr(settings, "scope_session_queue_limit", 4),
         max_entries=getattr(settings, "scope_request_state_limit", 1024),
         scheduler=_build_scheduler(settings),
+        status_fallback=status_fallback,
     )
     with _singleton_lock:
         _coordinator = coordinator
