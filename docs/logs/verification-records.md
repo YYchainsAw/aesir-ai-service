@@ -380,3 +380,40 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 原始记录位于服务器忽略目录 `data/runtime/remote-dev/verification`：`step4-followup-repair.json`、`step4-followup-audits.json`、`step4-followup-mysql-gate.json/.log`及 `-process.log`、`step4-followup-pytest.xml/.log/-result.json`、`step4-followup-diagrams.json`。回归前后303份源码/样例SHA256一致；`.env`、Python版本文件和历史Linux锁SHA256与本轮开始一致，原未提交文件保留。最终提交后再把证据源码SHA与Git核对。
 
 本轮完成第四步已知服务端门禁与dev结构整改，单worker边界不变。未切换原开发.env为SQL/Bearer，未迁移真实玩家数据，也未测试UE连接；UE凭据/缓存/事实队列、完整跨端恢复，HTTPS/OS隔离、自动备份/保留、真实容量和正式RPO继续按既定步骤验收。
+
+
+<a id="stage1-status-fallback-20261026"></a>
+## 2026-10-26 50k 人架构改造 · 阶段 1（status journal fallback）
+
+阶段 0（易失调度外置 Redis）闭环后，多 worker 非粘性部署的真实剩余缺口收敛为一个：**GET /requests/{id} 的内存 miss**。`coordinator._entries` 是进程内存，请求在 worker A 完成、status 打到 worker B 时直接 404。原本设想的「结果写 journal / 重放读 journal / 取消跨进程」已由 `DurableIdempotencyStore`（SQL 模式外层）实现，无需重复建设。
+
+本次改动（commit `5d003c9`，develop-dyh）：
+
+- `app/persistence/journal.py`：新增 `DurableIdempotencyStore.read_status(scope, operation, request_id)`。把 journal row 折成 `coordinator._record()` 同形状字段（state/reason_code/queue_ms/processing_ms/total_ms/upstream_attempts/cancel_requested）。running 且 `owner_instance` 不是本实例 → 报 unknown（与 `recover()` 同口径，不 mutate SQL）；row 存在但 `scope_parts` 与查询 npc 不一致 → 409 `REQUEST_ID_CONFLICT`（防御性检查，正常调用因 identity 含 npc.key 而不可达）；row 不存在但有 `request_cancel` tombstone → 返回 cancelled 记录。journal 不存 `started_at`，queue_ms/processing_ms 只能给 0，total_ms 用 `finished_at - created_at` 估算。
+- `app/scoped/requests.py`：`RequestCoordinator.__init__` 加 `status_fallback` 回调参数；`status()` 在 entry 为 None 时先调它，返回 None 再抛 404。`reset_coordinator()` 在 SQL 模式惰性注入 `journal.read_status`（try/except 包住，数据库不可用时退化为纯内存 status，与阶段 0 前行为一致）。
+- 测试：`tests/scoped/test_status_fallback.py` 4 个（内存命中跳过 fallback / memory miss 读 journal / 都 miss 抛 404 `REQUEST_UNKNOWN` / 无 fallback 保持经典 404）；`tests/persistence/test_journal.py` 追加 5 个 read_status 用例（completed 含耗时 / 无该请求返回 None / cancel tombstone / abandoned running 直插 row 模拟 worker A 崩溃→unknown / 篡改 scope_parts 触发 409）。
+
+### 回归
+
+2026-10-26，Windows venv Python 3.12：**1539 passed、10 skipped、7 warnings，82.37 秒**。相比阶段 0e 的 1530 净增 9 项（4 + 5）。跳过项仍是未安装可选 faster-whisper。
+
+| 核对点 | 结果 |
+| --- | --- |
+| 内存命中不打数据库 | 测试 `test_status_memory_hit_skips_fallback`：fallback_calls == [] |
+| 跨 worker 完成可读 | worker A 执行 `store.execute(...)` 完成后，worker B 的 `coordinator.status()` 经 fallback 读到 completed 记录 |
+| 真 404 语义不变 | fallback 返回 None 时仍抛 404 `REQUEST_UNKNOWN`；memory 模式不注入 fallback 时行为零变化 |
+| 崩溃 owner 不被误读为 running | 直插 running row（owner='worker-a-crashed'）→ read_status 返回 unknown + `REQUEST_OUTCOME_UNKNOWN` |
+| 跨 scope 碰撞防御 | 篡改 row.scope_parts 后抛 409 `REQUEST_ID_CONFLICT` |
+
+边界与未做：本次只覆盖 status 读路径；取消的跨进程语义已由 `request_cancel` tombstone + `DurableIdempotencyStore._claim` 守卫实现，未重复建设。阶段 2（异步化，UE 契约变更）仍未启动；真实 MySQL 上的跨 worker 演练待 Linux 环境验证。
+
+<a id="ci-gate-20261026"></a>
+## 2026-10-26 最小核心回归 CI（GitHub Actions）
+
+此前 1463→1539 全量回归一直靠人工本地跑、手工记入 CHANGELOG。本轮补最小门禁：新增 `.github/workflows/core-tests.yml`（ubuntu-latest + Python 3.12，push/PR 到 develop-dyh 与 main 触发）。
+
+- 安装：`pip install -r requirements-dev.txt -c requirements-sql-linux-py312.lock`（与 Linux 服务器 3.12.15 实测锁对齐，不引入新依赖）。
+- 测试命令即 README「检查改动」原句：`tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q`。
+- 不配置 secrets：真实 MySQL（`AESIR_TEST_MYSQL_URL_FILE`）、faster-whisper、RL 依赖在 CI 默认环境天然 skip，与本地「无 ML/RL 依赖核心回归」边界一致。
+- 本地同命令复跑：**1532 passed、12 skipped、84.12s**（Windows venv 3.12.7）。skip 项为 faster-whisper 真机冒烟与 RL 门控用例。
+- 未覆盖：首次 push 到远端前 CI 实际跑次未经验证；如需缓存 pip、加 Linux 矩阵（3.13）、或把真实 MySQL 接成可选 job，留待后续。

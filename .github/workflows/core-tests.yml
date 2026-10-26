@@ -1,0 +1,33 @@
+# 最小核心回归门禁。
+# 只跑 README「检查改动」列出的、无需 ML/RL 依赖的核心测试目录；
+# 真实 MySQL / faster-whisper / RL 依赖的用例在默认环境天然 skip，不配置 secrets。
+# 触发：develop-dyh / main 分支推送，以及向这些分支的 PR。
+name: core-tests
+
+on:
+  push:
+    branches: [develop-dyh, main]
+  pull_request:
+    branches: [develop-dyh, main]
+
+jobs:
+  pytest-core:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt -c requirements-sql-linux-py312.lock
+      - name: Core pytest (no ML/RL deps)
+        run: >-
+          python -m pytest tests/api tests/services tests/schemas
+          tests/scripts tests/rl/boss/test_contract.py tests/scoped
+          tests/persistence -q
