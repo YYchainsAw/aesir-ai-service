@@ -141,9 +141,9 @@ def _stream_llm_reply(
     memories: list[MemoryEntry],
     impressions: list,
     stage: str,
+    game_id: str,
 ) -> Iterator[StreamEvent]:
     service = LLMCompanionDialogueService(profile=profile)
-    game_id = profile.game_name.lower()
     emitted_delta = False
     try:
         for event in service.stream_reply(
@@ -182,7 +182,7 @@ def _stream_llm_reply(
             return
         yield from _stream_mock_reply(
             request, profile=profile, source="fallback", stage=stage,
-            memories=memories, impressions=impressions, game_id=profile.game_name.lower(),
+            memories=memories, impressions=impressions, game_id=game_id,
         )
 
 
