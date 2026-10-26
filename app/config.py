@@ -60,11 +60,12 @@ class Settings(BaseSettings):
     scope_request_state_limit: int = Field(default=1024, ge=1, le=16384)
     request_traces_dir: str = "data/runtime/request_traces"
 
-    # -- 请求协调后端（阶段 0：易失调度态外置）-------------------------
-    # memory：单进程 InMemoryScheduler（默认，逐字节保留原语义）。
-    # redis：多 worker 共享全局槽/会话串行/排队深度；要求 scope_storage_backend=sql
-    #   ——JSON 幂等在内存，多 worker 必然双执行，启动期直接拒绝（见下方校验器）。
-    coordination_backend: Literal["memory", "redis"] = "memory"
+    # -- 请求协调后端（阶段 0e：默认 Redis）---------------------------
+    # redis（默认）：多 worker 共享全局槽/会话串行/排队深度；要求
+    #   scope_storage_backend=sql——JSON 幂等在内存，多 worker 必然双执行，
+    #   启动期直接拒绝（见下方校验器）。
+    # memory：单进程 InMemoryScheduler（测试/开发回退用）。
+    coordination_backend: Literal["memory", "redis"] = "redis"
     coordination_redis_url: SecretStr = SecretStr("redis://127.0.0.1:6379/0")
     coordination_lease_seconds: float = Field(default=30.0, gt=0)  # 槽/会话锁租约，崩溃自愈
 

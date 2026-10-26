@@ -1,5 +1,20 @@
 # 历史验证与决策记录
 
+<a id="shadow-0c-20261026"></a>
+## 2026-10-26 阶段 0c 影子模式双写比对
+
+`ShadowScheduler` 同时委托 `InMemoryScheduler`（权威基线）与 `RedisScheduler`（fakeredis 替身），每次调度操作后比对决策返回值与状态快照（running/waiting/sessions 编码域）。任一不一致即抛 `ShadowMismatchError`。
+
+- **9 个测试**：5 个调度原语比对（槽上限/释放放行/同会话串行/排队深度/出队释放）+ 3 个 RequestCoordinator 端到端（串行/并发/取消排队）+ 1 个故意污染状态验证 Shadow 确实能抓到偏差。
+- **关键设计**：`try_acquire` 成功后必须立即 `start()`（与协调器控制流一致——内存后端 try_acquire 只判定不占槽，Redis 后端原子占槽）；`wait()` 退化为 sleep（与 Redis 后端一致），不依赖内存 Condition 唤醒时序。
+- **验证结论**：两个后端在 fakeredis 上单机单 worker 语义逐字节一致。跨 worker NX 抢占与真实 Redis 行为仍留待 0d。
+
+| 检查 | 本轮实测 |
+| --- | --- |
+| shadow 单测 | 9 passed |
+| scoped 全量 | 490 passed |
+| 完整适用核心 | **1522 passed、10 skipped、80.25s** |
+
 <a id="stream-llm-fix-20261026"></a>
 ## 2026-10-26 legacy SSE LLM 分支 TypeError 修复（issue #102）
 
