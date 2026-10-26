@@ -7,6 +7,7 @@
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,14 @@ from fastapi.testclient import TestClient
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
+
+# Windows 下把临时基座指向短目录。pytest 默认基座 %TEMP%/pytest-of-<user>/...
+# 本身已 ~90 字符，叠加 v0.4 作用域信号目录（game/player/save/npc/run 三层 UUID）
+# 会突破 MAX_PATH(260)，使 open() 报 FileNotFoundError[Errno 2]——这不是时序竞争，
+# 是路径长度。Linux/macOS 无此限制，保持默认。
+if sys.platform == "win32":
+    os.makedirs(r"C:\aesir_pytmp", exist_ok=True)
+    tempfile.tempdir = r"C:\aesir_pytmp"
 
 from app.main import app  # noqa: E402
 

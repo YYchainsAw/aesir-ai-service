@@ -2,3 +2,5 @@
 # 安装：.venv\Scripts\python -m pip install -r requirements-dev.txt
 -r requirements.txt
 pytest==9.1.1
+# 阶段0b：RedisScheduler 的本地替身（不依赖真实 Redis 即可验证单机语义）
+fakeredis==2.40.0

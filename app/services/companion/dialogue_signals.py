@@ -34,7 +34,9 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.scoped.context import current_scope
-from app.scoped.storage import signal_directory, signal_metadata, guarded_commit, unavailable
+from app.scoped.storage import (
+    append_jsonl, signal_directory, signal_metadata, guarded_commit, unavailable,
+)
 
 # 玩家负面反馈模式（记错/编造/复读的玩家侧表述——实测日志出现过的形态）。
 _NEGATIVE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
@@ -209,9 +211,7 @@ def record_turn_signal(
             record["facts_rejected"] = facts_rejected
         root = signal_directory(get_settings().dialogue_signals_dir, game_id)
         record.update(signal_metadata())
-        root.mkdir(parents=True, exist_ok=True)
-        with (root / f"{companion_id}.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        append_jsonl(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False))
     except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞对话主流程
         if current_scope():
             raise unavailable() from error

@@ -4,6 +4,7 @@ from functools import wraps
 import json
 import os
 from pathlib import Path
+import time
 from threading import RLock
 from uuid import UUID, uuid4
 
@@ -65,6 +66,28 @@ def signal_metadata() -> dict[str, str]:
             "service_instance_id": str(scope.service_instance_id),
             "run_binding_id": str(scope.run_binding_id),
             **({"encounter_id": str(scope.encounter_id)} if scope.encounter_id else {})}
+
+
+def append_jsonl(root: str | Path, filename: str, line: str) -> None:
+    """向 ``root/filename`` 追加一行 JSONL（``line`` 不应自带换行）。
+
+    Windows 下刚 ``mkdir(parents=True, exist_ok=True)`` 紧接着 ``open("a")``，
+    在 anyio 线程池高并发时偶发 ``FileNotFoundError``（目录刚建、杀软/索引尚未
+    对该线程可见）。仅对这一瞬时错误做有界重试；其余 ``OSError`` 原样上抛，
+    交给调用方既有的错误策略（scoped 请求下由调用方记为 STATE_UNAVAILABLE）。
+    """
+    directory = Path(root)
+    payload = line + "\n"
+    for attempt in range(3):
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            with (directory / filename).open("a", encoding="utf-8") as stream:
+                stream.write(payload)
+            return
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def memory_path(scope: NpcScope, root: str | Path | None = None) -> Path:
