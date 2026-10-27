@@ -347,6 +347,8 @@ class DurableIdempotencyStore:
             "queue_ms": 0, "processing_ms": 0, "total_ms": max(0, total_ms),
             "upstream_attempts": 0,
             "cancel_requested": state == "cancelled",
+            # 阶段 2 第一步：completed 时从 journal row 回放业务结果（跨 worker）。
+            "result": row.get("result") if state == "complete" else None,
         }
 
 

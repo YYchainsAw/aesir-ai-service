@@ -22,5 +22,10 @@
   "processing_ms": 35,
   "total_ms": 37,
   "upstream_attempts": 1,
-  "cancel_requested": false
+  "cancel_requested": false,
+  "result": {
+    "text": "你好呀，今天想聊点什么？",
+    "emotion_id": "emotion.bright",
+    "source": "llm"
+  }
 }

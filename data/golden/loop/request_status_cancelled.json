@@ -22,5 +22,6 @@
   "processing_ms": 15,
   "total_ms": 17,
   "upstream_attempts": 1,
-  "cancel_requested": true
+  "cancel_requested": true,
+  "result": null
 }

@@ -459,10 +459,30 @@ def test_status_has_only_fixed_safe_fields_and_unknown_is_404(scope):
     coordinator.execute(scope, "chat", request_id, lambda: {"text": "private conversation"})
     record = coordinator.status(scope, "chat", request_id)
     assert set(record) == {"target_request_id", "operation", "state", "reason_code", "queue_ms",
-                           "processing_ms", "total_ms", "upstream_attempts", "cancel_requested"}
-    assert record["reason_code"] is None and "private" not in repr(record)
+                           "processing_ms", "total_ms", "upstream_attempts", "cancel_requested",
+                           "result"}
+    # 阶段 2 契约：completed 时 result 回放业务结果（异步轮询出口）。
+    assert record["reason_code"] is None
+    assert record["state"] == "completed" and record["result"] == {"text": "private conversation"}
     coordinator.clear()
     assert state(coordinator, scope, "chat", request_id) is None
+
+
+def test_status_result_is_none_for_non_completed_states(scope):
+    """failed / cancelled / queued 的 status 一律不回放业务结果。"""
+    coordinator = RequestCoordinator()
+    # failed：action 抛 ScopeError
+    request_id = uuid4()
+    with pytest.raises(ScopeError):
+        coordinator.execute(scope, "chat", request_id,
+                            lambda: (_ for _ in ()).throw(ScopeError(503, "REQUEST_FAILED", "boom")))
+    record = coordinator.status(scope, "chat", request_id)
+    assert record["state"] == "failed" and record["result"] is None
+    # cancelled 墓碑
+    tombstone = uuid4()
+    coordinator.cancel(scope, "chat", tombstone)
+    record = coordinator.status(scope, "chat", tombstone)
+    assert record["state"] == "cancelled" and record["result"] is None
 
 
 def test_helpers_without_active_token_keep_legacy_behavior():
