@@ -99,7 +99,9 @@ def apply_relationship_event_ex(
     last_at = state.last_event_at.get(event_type)
     if last_at is not None:
         elapsed = (moment - _parse(last_at)).total_seconds()
-        if 0 <= elapsed < cooldown:
+        # elapsed < 0：客户端时钟回拨/重放旧事件，旧于上次计分--视为重复，
+        # 不得绕过冷却（否则旧 occurred_at 可反复计分并把冷却基准回拨）。
+        if elapsed < 0 or elapsed < cooldown:
             return state, 0, "cooldown_blocked"
 
     delta = policy.events[event_type]
