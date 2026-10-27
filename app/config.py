@@ -61,12 +61,13 @@ class Settings(BaseSettings):
     request_traces_dir: str = "data/runtime/request_traces"
 
     # -- 请求协调后端（阶段 0e：多 worker 部署用 Redis）----------------
-    # memory（默认）：单进程 InMemoryScheduler，本地开发/单机测试开箱即跑。
-    # redis：多 worker 共享全局槽/会话串行/排队深度；要求
+    # redis（默认）：反映多 worker 生产部署意图；要求
     #   scope_storage_backend=sql——JSON 幂等在内存，多 worker 必然双执行，
     #   启动期直接拒绝（见下方校验器）。
-    # 部署时显式设 AESIR_COORDINATION_BACKEND=redis + AESIR_SCOPE_STORAGE_BACKEND=sql。
-    coordination_backend: Literal["memory", "redis"] = "memory"
+    # memory：单进程 InMemoryScheduler。本地开发/单机测试用
+    #   AESIR_COORDINATION_BACKEND=memory 显式覆盖（start.bat 已自动设；
+    #   测试由 conftest autouse fixture 统一覆盖，不依赖本默认）。
+    coordination_backend: Literal["memory", "redis"] = "redis"
     coordination_redis_url: SecretStr = SecretStr("redis://127.0.0.1:6379/0")
     coordination_lease_seconds: float = Field(default=30.0, gt=0)  # 槽/会话锁租约，崩溃自愈
 
