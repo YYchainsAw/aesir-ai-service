@@ -38,3 +38,5 @@
 2026-10-22第三步服务端增量在 `feature/npc-execution-loop` 通过适用核心回归，工作包见[DEP3里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/7)。同会话FIFO、取消屏障、并发/预算、最小反馈账本及只读查询已有受控证据；EXT-01、MODEL-GAP、EVO-01/02的跨端余项和第四步生产目标仍保留，UE连接继续后置。具体待验见[交接指南](../guides/scoped-development.md#loop-usage)。
 
 2026-10-22第四步服务端在 `feature/npc-persistence-access` 已通过1404 passed、1 skipped适用核心回归，含5项真实MySQL测试；另完成独立SQL HTTP进程重启、源JSON不改导入与私有备份空库恢复。见[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)、[契约](../protocols/npc-persistence-contract-v0.4.md)和[验证记录](../logs/verification-records.md#persist-20261022)。EVO-01/03与DEP完整生产/UE目标不因服务端受控通过而关闭；恢复较旧快照的RPO/后续reset收敛、本地队列与发布门禁继续保留。
+
+2026-10-27：50k人改造阶段0（Redis外置调度）与阶段1（status journal fallback）已闭环（1539绿）；**阶段2异步化UE契约设计草案**已出（[npc-async-loop-v0.5-draft](../protocols/npc-async-loop-v0.5-draft.md)）——v0.5 opt-in：chat/agent-step提交即202、后台池执行、`GET /requests/{id}` completed时回放业务结果；world/events与控制入口保持同步。待UE侧对齐三个开放问题（轮询节奏与保留期、result是否附completed_at、预算上限默认值）后再动代码；v0.4同步模式不下线。同日#54/T39对话RL导演层经用户批准进入立项评估（issue已加status:in-progress）。
