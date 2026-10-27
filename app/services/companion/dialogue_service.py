@@ -145,6 +145,7 @@ def _stream_llm_reply(
 ) -> Iterator[StreamEvent]:
     service = LLMCompanionDialogueService(profile=profile)
     emitted_delta = False
+    delta_parts: list[str] = []
     try:
         for event in service.stream_reply(
             request,
@@ -156,6 +157,7 @@ def _stream_llm_reply(
         ):
             if event.kind == "delta":
                 emitted_delta = True
+                delta_parts.append(event.text)
                 yield event
                 continue
             event.response.relationship_delta = _record_turn(
@@ -178,6 +180,26 @@ def _stream_llm_reply(
             return
     except LLMClientError:
         if emitted_delta:
+            # #110：style_guard 拦截（已发 delta 无法收回）也落一行信号——否则拦截
+            # 事件对 dialogue_signals 完全失明，回归报告永远报 0 拦截。不写会话记忆
+            # （中断轮不进历史），只记录观测；非 style 类中断保持原行为不落盘。
+            blocked = getattr(service, "last_style_violations", None) or []
+            if blocked:
+                record_turn_signal(
+                    request.companion_id,
+                    request.session_id,
+                    player_text=request.text,
+                    reply_text="".join(delta_parts),
+                    source="llm_blocked",
+                    emotion_id="",
+                    gesture_id="",
+                    facial_expression_id="",
+                    game_state=request.game_state,
+                    previous_player_texts=[t.user_text for t in history],
+                    previous_reply_texts=[t.reply_text for t in history],
+                    style_violations=blocked,
+                    game_id=game_id,
+                )
             yield StreamEvent(kind="error", text="LLM stream interrupted; this turn is incomplete.")
             return
         yield from _stream_mock_reply(

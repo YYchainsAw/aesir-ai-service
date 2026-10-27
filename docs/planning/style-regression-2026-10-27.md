@@ -46,7 +46,14 @@
    是人工盯着 chat_console 逐轮核对，不是脚本。
 
 **follow-up**：拦截轮应落一行 `style_violations` 非空的信号记录（流式路径也
-应单独埋一行，不写会话记忆），回归脚本才能真正计数。已另开 issue 跟踪。
+应单独埋一行，不写会话记忆），回归脚本才能真正计数。
+
+**同日已修复（#110）**：`LLMCompanionDialogueService` 在拦截路径
+（流式抛错前 / 非流式重试失败）把违规快照 `list[dict]` 存入
+`last_style_violations`；`dialogue_service._stream_llm_reply` 在 error 帧分支检出
+非空快照后补落一行 `source=llm_blocked` 信号（reply_text=用户实际看到的违规
+增量，不写会话记忆）。非流式回退轮随之带上非空 violations。端到端复核：3 探针
+落盘 violations=[系统/指令/NPC]，回归报告首次独立输出「已拦截违规」分布。
 
 ## 副产品观察（不属 #55，留档）
 
