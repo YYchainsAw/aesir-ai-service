@@ -1,0 +1,14 @@
+{
+  "release_id": "boss-policy-schema-v4-sim005-seed1-dd79ceca0e0f",
+  "model_id": "boss_policy_schema_v4_sim005",
+  "model_file": "boss_policy_schema_v4_sim005.zip",
+  "model_sha256": "dd79ceca0e0f079634364754d1959212b0cdb357439ab9ef8e36d3ba4ed64add",
+  "selection_file": "boss_policy_schema_v4_sim005.selection.json",
+  "selection_sha256": "06ac233ea7998017c22cdf7aef9923607b62cb20174afe6223750c7312acfd33",
+  "training_file": "boss_policy_schema_v4_sim005.training.manifest.json",
+  "training_sha256": "9698eacaadad72b31f34b438719beb22467e6899fc2f337103dcc263bc6b6cff",
+  "schema_version": 4,
+  "simulation_revision": "boss-sim-005",
+  "reward_revision": "boss-reward-003",
+  "source_seed": 1
+}

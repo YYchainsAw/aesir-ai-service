@@ -1,10 +1,13 @@
 """Standalone FastAPI app for frozen Boss policy inference."""
 
 from contextlib import asynccontextmanager
+from math import isfinite
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from rl.boss.contract import OBSERVATION_DIM, SCHEMA_VERSION
 from rl.boss.inference import (
@@ -17,10 +20,12 @@ PROTOCOL_VERSION = "1.0"
 
 
 class BossPolicyRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
     protocol_version: Literal["1.0"] = PROTOCOL_VERSION
     request_id: str = Field(min_length=1, max_length=128)
     schema_version: Literal[4] = SCHEMA_VERSION
-    sequence: int = Field(ge=0)
+    sequence: int = Field(ge=0, strict=True)
     observation: list[float]
 
     @field_validator("observation")
@@ -30,7 +35,7 @@ class BossPolicyRequest(BaseModel):
             raise ValueError(
                 f"schema v{SCHEMA_VERSION} requires {OBSERVATION_DIM} values"
             )
-        if any(value < 0.0 or value > 1.0 for value in values):
+        if any(not isfinite(value) or value < 0.0 or value > 1.0 for value in values):
             raise ValueError("observation values must be within [0, 1]")
         return values
 
@@ -41,6 +46,8 @@ class BossPolicyResponse(BaseModel):
     schema_version: Literal[4] = SCHEMA_VERSION
     sequence: int
     model_id: str
+    model_sha256: str
+    release_id: str
     actionable: bool
     action_id: int | None = Field(default=None, ge=0, le=8)
     action_name: str | None = None
@@ -62,6 +69,14 @@ def create_app(runtime: BossPolicyRuntime | None = None) -> FastAPI:
         description="Frozen high-level Boss policy inference. GAS remains authoritative.",
         lifespan=lifespan,
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(_request, exc: RequestValidationError):
+        # Raw non-finite inputs cannot be echoed through a JSON error response.
+        return JSONResponse(status_code=422, content={
+            "detail": [{key: error[key] for key in ("type", "loc", "msg")}
+                       for error in exc.errors()]
+        })
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, object]:
@@ -87,6 +102,8 @@ def create_app(runtime: BossPolicyRuntime | None = None) -> FastAPI:
             request_id=request.request_id,
             sequence=request.sequence,
             model_id=policy_runtime.model_id,
+            model_sha256=str(policy_runtime.provenance.get("model_sha256", "")),
+            release_id=str(policy_runtime.provenance.get("release_id", "")),
             actionable=decision.actionable,
             action_id=int(decision.action) if decision.action is not None else None,
             action_name=(

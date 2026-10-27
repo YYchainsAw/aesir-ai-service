@@ -1,13 +1,69 @@
-"""Reproducible metrics for Behavior Tree versus RL Boss experiments."""
+"""Reproducible simulator metrics for rule and frozen RL Boss policies.
+
+The rule policy is a Python simulator baseline, not a measurement of UE BT.
+"""
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 import statistics
+from typing import TYPE_CHECKING
 
 from rl.boss.contract import BossAction
 from rl.boss.policy import BossPolicy
 from rl.boss.rewards import REWARD_REVISION, compute_reward
 from rl.boss.sim import SIMULATION_REVISION, BossPolicySim, PLAYER_PROFILES
+
+if TYPE_CHECKING:
+    from rl.boss.inference import BossPolicyRuntime
+
+
+# These explicit seeds were used to select the existing frozen candidate.
+# Training resets draw from a broad RNG domain; this exclusion only establishes
+# a separate post-freeze evaluation protocol, not mathematical seed disjointness
+# from every training episode.
+SELECTION_SEED_FIRST = 50_000
+SELECTION_SEED_LAST = 50_299
+DEFAULT_HOLDOUT_SEED = 200_000
+
+
+class FrozenBossPolicy:
+    """Use the production runtime's validation, masks and deterministic predictor."""
+
+    def __init__(self, runtime: "BossPolicyRuntime") -> None:
+        self.runtime = runtime
+
+    @classmethod
+    def from_model(cls, model_path: Path) -> "FrozenBossPolicy":
+        from rl.boss.inference import BossPolicyRuntime
+
+        runtime = BossPolicyRuntime(model_path)
+        runtime.load()
+        return cls(runtime)
+
+    def select_action(self, observation, state) -> BossAction:
+        del state
+        decision = self.runtime.decide(list(observation))
+        if decision.actionable:
+            if decision.action is None:
+                raise ValueError("actionable frozen decision has no action")
+            return BossAction(decision.action)
+        if decision.reason != "state_locked" or decision.action is not None:
+            raise ValueError("unexpected non-actionable frozen decision")
+        # The simulator explicitly ignores the placeholder in a locked state;
+        # run_episode records it as state_locked, outside action distribution.
+        return BossAction.PURSUE
+
+
+def validate_holdout_seeds(base_seed: int, episodes_per_profile: int) -> None:
+    if episodes_per_profile <= 0:
+        raise ValueError("episodes_per_profile must be positive")
+    if base_seed < 0:
+        raise ValueError("base_seed must be nonnegative")
+    last_seed = base_seed + episodes_per_profile - 1
+    if base_seed <= SELECTION_SEED_LAST and last_seed >= SELECTION_SEED_FIRST:
+        raise ValueError("held-out seeds overlap candidate selection seeds 50000..50299")
 
 
 @dataclass(frozen=True)
@@ -124,15 +180,18 @@ def evaluate_policy(
     policy_name: str,
     episodes_per_profile: int = 20,
     base_seed: int = 0,
+    episode_sink: Callable[[EpisodeMetrics], None] | None = None,
 ) -> EvaluationReport:
     if episodes_per_profile <= 0:
         raise ValueError("episodes_per_profile must be positive")
 
-    episodes = [
-        run_episode(policy, seed=base_seed + index, player_profile=profile)
-        for profile in PLAYER_PROFILES
-        for index in range(episodes_per_profile)
-    ]
+    episodes = []
+    for profile in PLAYER_PROFILES:
+        for index in range(episodes_per_profile):
+            episode = run_episode(policy, seed=base_seed + index, player_profile=profile)
+            episodes.append(episode)
+            if episode_sink is not None:
+                episode_sink(episode)
     results_by_profile: dict[str, dict[str, int]] = {}
     for episode in episodes:
         profile_results = results_by_profile.setdefault(episode.player_profile, {})

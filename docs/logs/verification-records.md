@@ -380,3 +380,67 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 原始记录位于服务器忽略目录 `data/runtime/remote-dev/verification`：`step4-followup-repair.json`、`step4-followup-audits.json`、`step4-followup-mysql-gate.json/.log`及 `-process.log`、`step4-followup-pytest.xml/.log/-result.json`、`step4-followup-diagrams.json`。回归前后303份源码/样例SHA256一致；`.env`、Python版本文件和历史Linux锁SHA256与本轮开始一致，原未提交文件保留。最终提交后再把证据源码SHA与Git核对。
 
 本轮完成第四步已知服务端门禁与dev结构整改，单worker边界不变。未切换原开发.env为SQL/Bearer，未迁移真实玩家数据，也未测试UE连接；UE凭据/缓存/事实队列、完整跨端恢复，HTTPS/OS隔离、自动备份/保留、真实容量和正式RPO继续按既定步骤验收。
+
+
+<a id="boss-release-20261023"></a>
+## 2026-10-23 第五步Boss本地发行与冻结评估
+
+用户授权推进第五步；PR #90合入main后，服务器更新到 `b641b2f` 并创建 `feature/boss-local-release`。跟踪为[DEP5里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/9)与#91～#94，范围见[实施计划](../planning/step-05-boss-local-release-plan.md)，操作见[本地发行指南](../guides/boss-local-release.md)。模型保持schema4/sim005/reward003/seed1，未重训、换候选或修改选模材料。代码提交 `774b8f92302b616db3225062305bec1348407ea5`，以下测试和实际构建源SHA均与其核对。
+
+### 状态补充：模型仍在开发
+
+2026-10-23用户明确Boss PPO模型尚未开发完成。本节保留本轮实际运行、构建和模拟器评估证据；这些结果只证明当前研发快照及基础设施在记录环境中通过相应检查。运行包应视为开发验证包，不是最终Boss模型或正式发行完成的证明。第五步保持进行中；后续需完成模型研发、训练/选模证据及正式候选确认，更新身份材料后重新构建、复验，并完成UE验收。
+
+### 冻结身份与运行包
+
+本机原模型及selection/training三文件SHA分别为 `dd79ceca0e0f079634364754d1959212b0cdb357439ab9ef8e36d3ba4ed64add`、`06ac233ea7998017c22cdf7aef9923607b62cb20174afe6223750c7312acfd33`、`9698eacaadad72b31f34b438719beb22467e6899fc2f337103dcc263bc6b6cff`。三者原字节复制到服务器忽略的models目录，不入Git。版本库的 `rl/boss/deployment.json` 固定这些摘要，先验证模型及材料再反序列化；同时核对Schema/sim/reward/来源seed、原模型路径、26有序特征/9动作映射，再核对实际模型空间。CPU加载关闭训练模式/梯度，Torch线程1/1，预测必须是mask允许的整数；锁态合法无动作，NaN/Inf不再穿透范围检查。
+
+在原生Windows x64用独立Python3.11.9构建venv、PyInstaller6.22.3，只读复用已验证的原RL依赖。Torch安装metadata为2.7.1，实际运行时为2.7.1+cpu且CUDA为None，构建器分别验证二者；SB3/SB3-Contrib2.7.1、Gymnasium1.2.3、NumPy2.4.6、FastAPI0.141.1、Uvicorn0.52.4及实际分发/许可清单随包记录。未向服务器NPC环境安装NumPy/Torch/RL依赖，NPC继续Python3.12.15。构建日志、source SHA、第三方许可及逐文件SHA完整保留，不宣称可变清单等于发布签名。
+
+最终目录为本机 `D:\YYchainsaw\Builds\AesirBoss\20261023\Aesir Boss Offline win64`，13549个文件（含发行清单），共1681115609字节；压缩包 `aesir-boss-policy-win64-dd79ceca0e0f.zip` 为403035304字节。ZIP SHA256为 `4ae407bd04cc2f101d482b09130aac60c6ed4a5287904869d91ff76c47709626`，EXE SHA256为 `37036ec3608a6060155bda66c2d1c0f4897fce200524496c5848c49259683faf`，发行清单SHA256为 `90fc425f03d1e9dd8f63f7ac2320e043a7a0c913676df4a81a9f15c47319ddd5`。ZIP全部13549项CRC通过；完整目录再次移动到最终D盘路径后 `--verify` 通过，不能只分发EXE。
+
+PyInstaller实际CArchive14项、PYZ5568模块只读审计，项目运行模块仅rl.boss的契约/推理/材料校验/模拟器常量等；没有app、sqlalchemy、pymysql或仓库tests模块，实目录无.env或NPC配置。冻结包不是从源码venv启动的替代截图：下面各路径使用真正EXE，工作目录在包外、PYTHON环境变量清除，PATH仅System32。
+
+### 实际Windows验证与测试范围
+
+| 验证 | 实际结果 |
+| --- | --- |
+| 字节校验/CPU自测 | 移到含空格新路径后 `--verify` 成功且model_loaded=false；`--self-test`真模型九个单动作mask与重复确定性、锁态全通过 |
+| 真实HTTP | 本地随机端口health200并核对固定SHA/release；onehot动作8及同观察重复结果一致，锁态200/无动作 |
+| 坏输入 | 错长度、超范围、原始NaN JSON均422，无NaN回显序列化500 |
+| 监听/覆盖 | `--host 0.0.0.0`和模型环境覆盖退出2；占用中的同端口启动明确Errno10048、退出3，原服务仍可用 |
+| 缺/错材料与文件树 | 篡改ZIP、缺模型、附加未登记文件均拒绝；还原后完整verify成功，未加载未验证模型 |
+| 退出/重启 | 两次实际服务进程均按测试终止并回收监听，随后重启健康；17项检查全通过，不声称已经完成UE的进程管理或优雅退出协议 |
+| Windows源码回归 | 完整 `tests/rl/boss` 为139 passed、1 skipped、1 warning，2.16秒；跳过当前权限无法创建symlink的专项，warning为既有Starlette提示 |
+| 服务器适用核心 | 1553 passed、1 skipped、7 warnings，76.95秒，含5项实际MySQL；跳过仍为缺可选faster-whisper的模块，warnings为既有Starlette提示 |
+
+Windows成品检查发生在11:27～11:29（Asia/Shanghai）。测试未关闭宿主机公网网卡，实际只发送回环HTTP、不下载依赖或模型、不调用Provider；真实断网战斗仍待UE。成品中的GPU/模型更新或在线学习没有被启用。Windows源码测试与EXE独立进程结果分开记录，不能把139项全当作真模型请求。
+
+服务器11:22～11:23的命令为：
+
+```bash
+AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
+  .venv/bin/python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/rl/boss/test_release.py tests/rl/boss/test_evaluation.py tests/rl/boss/test_release_packaging.py tests/scoped tests/persistence -q --tb=short --junitxml=data/runtime/remote-dev/verification/step5-core-pytest.xml
+```
+
+308份源码/样例在回归前后及提交中SHA完全一致，.env、原Python版本文件和Linux锁SHA保留。服务器没有执行需要NumPy的Boss环境/推理测试；这部分在原生Windows RL环境执行。新建完整Windows运行包不等于服务器安装了这些依赖，旧MySQL5.7及UE工作区未改。
+
+### 独立持出评估
+
+命令为独立Windows解释器 `-m scripts.rl.boss.eval --policy compare --model <固定ZIP> --episodes 300 --seed 200000 --out <新目录>`。每策略三画像各300局，共1800条JSONL，900组相同画像/初始seed配对，种子200000～200299，与选模50000～50299分开。模型从生产严格runtime加载，未训练或重新选模；原900局选模材料仍原样保留。
+
+| 模拟器Boss胜率 | Rule | 冻结PPO |
+| --- | --- | --- |
+| 汇总（每策略900局） | 0.567778 | 0.815556 |
+| 描述性95% Wilson区间 | [0.535193, 0.599787] | [0.788894, 0.839535] |
+| aggressive（各300局） | 0.140000 | 0.483333 |
+| defensive（各300局） | 0.693333 | 0.963333 |
+| evasive（各300局） | 0.870000 | 1.000000 |
+
+从1800逐局记录重算全部汇总字段与summary逐项一致；manifest的全部工件SHA匹配，并归档原selection/training材料。实验在无Git的Windows源码快照执行，原manifest的Git字段保持原状，以独立 `source-commit-verification.json` 证明9份实际源SHA与774b8f9完全一致；不伪造实验时已有干净Git检出。
+
+Rule是Python模拟器基线，不是UE BT。相同初始seed不保证不同动作下整局消耗相同随机流；训练reset覆盖广域，不能证明与全部训练种子数学无交集。胜率区间是描述性统计，不是成对差异显著性或游戏上线结论；没有因结果好坏变更候选。
+
+原始JUnit、构建日志、EXE17项证明与归档审计位于服务器忽略目录 `data/runtime/remote-dev/verification` 的 `step5-*`、`build.log` 和 `boss-exe-*.log`；评估全套在 `step5-evaluation-200000`。可交付ZIP/摘要/清单另保管于站点根外 `/var/lib/aesir-ai-dev/artifacts/boss/20261023`，不作为公网下载端点。后续可信发布及传输入口留第六步。
+
+本轮完成模型身份门禁、Windows打包和模拟器评估基础设施，以及当前研发快照的开发验证。Boss PPO模型研发与正式候选确认尚未完成，第五步整体仍在进行中；最终候选须另行构建并复验。UE余项仍保留：UE预期SHA/release核验、进程启动/就绪/退出管理、KI-01连续错误计数和KI-06终局停止/晚到回包，以及真实断网战斗、BT回退和同条件实战对照。用户继续将UE连接测试后置，本轮未修改或连接UE，也未宣称这些已通过。

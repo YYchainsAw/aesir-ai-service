@@ -5,7 +5,7 @@
 | 编号 | 尚需解决的内容 | 处理边界 |
 | --- | --- | --- |
 | EXT-01 | 真实玩家输入→解析→UE 接收→实际启动/命中/完成→回执闭环；Alice/Bruno 技能声明与 UE 可执行能力逐项对照 | 服务端返回 200、接收回执或临时心跳通道均不代表技能已完成；按实际能力拒绝越界，不擅自冻结技能数量 |
-| EXT-02 | Boss 冻结候选部署身份校验、无重训独立 PPO 评估入口、逐局输出、UE 同条件 BT 对照与故障回退复测 | 当前候选为 schema4/sim005/reward003 seed1；900 局属于选模；旧队友“2/3达标”不能作 Boss 上线依据，见 [RL 说明](../../rl/README.md) |
+| EXT-02 / DEP5 | Boss PPO模型仍在研发；当前仅有模型快照的身份门禁、Windows开发验证包和逐局评估基础设施。正式选模/候选确认及重新构建复验见[DEP5-05 / #96](https://github.com/YYchainsAw/aesir-ai-service/issues/96)；UE预期身份/进程管理、KI-01/KI-06、同条件BT/PPO实战也待完成 | schema4/sim005/reward003 seed1仅为本轮验证基线，不代表研发定稿；独立持出结果与900局选模分开；见[第五步计划](step-05-boss-local-release-plan.md)、[发行指南](../guides/boss-local-release.md)及实际证据 |
 | EXT-03 / OUT-05 | 对话RL导演层是否立项（#54 / T39） | 仍待批准；现有信号可分析，不能据此启用在线学习或自演化人格 |
 | EXT-07 | 已采纳外部ASR转接；首期供应商/scoped音频/文本兜底由[#98](https://github.com/YYchainsAw/aesir-ai-service/issues/98)交付，VAD/TTS/播放打断由[#56](https://github.com/YYchainsAw/aesir-ai-service/issues/56)后置 | 见BR-DEP-05、V1～V4及AT-EVO-03/04；mock/本机Whisper不代替正式外部ASR，真实语音总预算不套300ms文本口径，供应商/声音/保留与播出门槛启用前记录 |
 | EXT-08 | 读档、快进、跨存档的时间/衰减业务（[#57](https://github.com/YYchainsAw/aesir-ai-service/issues/57) / T42），以及UE缓存/持久队列/恢复接入 | DEP2绑定/epoch及DEP4 SQL持久确认、真实事实/历史回执归档和只读恢复均已合入main；复用[持久化契约](../protocols/npc-persistence-contract-v0.4.md)，不重排为待开发数据库。服务重启须重新context/bind；UE端到端恢复、任意分支合并及#57完整时间/衰减范围未由服务端通过代替 |

@@ -1,0 +1,3 @@
+# Native Windows x64; standalone Boss runtime uses Python 3.11.9.
+# Install in an isolated build environment; no project install is required.
+PyInstaller==6.22.3
