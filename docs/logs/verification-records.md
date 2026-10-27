@@ -380,3 +380,70 @@ AESIR_TEST_MYSQL_URL_FILE=/etc/aesir-ai/dev/mysql84-test-runtime.url \
 原始记录位于服务器忽略目录 `data/runtime/remote-dev/verification`：`step4-followup-repair.json`、`step4-followup-audits.json`、`step4-followup-mysql-gate.json/.log`及 `-process.log`、`step4-followup-pytest.xml/.log/-result.json`、`step4-followup-diagrams.json`。回归前后303份源码/样例SHA256一致；`.env`、Python版本文件和历史Linux锁SHA256与本轮开始一致，原未提交文件保留。最终提交后再把证据源码SHA与Git核对。
 
 本轮完成第四步已知服务端门禁与dev结构整改，单worker边界不变。未切换原开发.env为SQL/Bearer，未迁移真实玩家数据，也未测试UE连接；UE凭据/缓存/事实队列、完整跨端恢复，HTTPS/OS隔离、自动备份/保留、真实容量和正式RPO继续按既定步骤验收。
+
+
+<a id="stage1-status-fallback-20261026"></a>
+## 2026-10-26 50k 人架构改造 · 阶段 1（status journal fallback）
+
+阶段 0（易失调度外置 Redis）闭环后，多 worker 非粘性部署的真实剩余缺口收敛为一个：**GET /requests/{id} 的内存 miss**。`coordinator._entries` 是进程内存，请求在 worker A 完成、status 打到 worker B 时直接 404。原本设想的「结果写 journal / 重放读 journal / 取消跨进程」已由 `DurableIdempotencyStore`（SQL 模式外层）实现，无需重复建设。
+
+本次改动（commit `5d003c9`，develop-dyh）：
+
+- `app/persistence/journal.py`：新增 `DurableIdempotencyStore.read_status(scope, operation, request_id)`。把 journal row 折成 `coordinator._record()` 同形状字段（state/reason_code/queue_ms/processing_ms/total_ms/upstream_attempts/cancel_requested）。running 且 `owner_instance` 不是本实例 → 报 unknown（与 `recover()` 同口径，不 mutate SQL）；row 存在但 `scope_parts` 与查询 npc 不一致 → 409 `REQUEST_ID_CONFLICT`（防御性检查，正常调用因 identity 含 npc.key 而不可达）；row 不存在但有 `request_cancel` tombstone → 返回 cancelled 记录。journal 不存 `started_at`，queue_ms/processing_ms 只能给 0，total_ms 用 `finished_at - created_at` 估算。
+- `app/scoped/requests.py`：`RequestCoordinator.__init__` 加 `status_fallback` 回调参数；`status()` 在 entry 为 None 时先调它，返回 None 再抛 404。`reset_coordinator()` 在 SQL 模式惰性注入 `journal.read_status`（try/except 包住，数据库不可用时退化为纯内存 status，与阶段 0 前行为一致）。
+- 测试：`tests/scoped/test_status_fallback.py` 4 个（内存命中跳过 fallback / memory miss 读 journal / 都 miss 抛 404 `REQUEST_UNKNOWN` / 无 fallback 保持经典 404）；`tests/persistence/test_journal.py` 追加 5 个 read_status 用例（completed 含耗时 / 无该请求返回 None / cancel tombstone / abandoned running 直插 row 模拟 worker A 崩溃→unknown / 篡改 scope_parts 触发 409）。
+
+### 回归
+
+2026-10-26，Windows venv Python 3.12：**1539 passed、10 skipped、7 warnings，82.37 秒**。相比阶段 0e 的 1530 净增 9 项（4 + 5）。跳过项仍是未安装可选 faster-whisper。
+
+| 核对点 | 结果 |
+| --- | --- |
+| 内存命中不打数据库 | 测试 `test_status_memory_hit_skips_fallback`：fallback_calls == [] |
+| 跨 worker 完成可读 | worker A 执行 `store.execute(...)` 完成后，worker B 的 `coordinator.status()` 经 fallback 读到 completed 记录 |
+| 真 404 语义不变 | fallback 返回 None 时仍抛 404 `REQUEST_UNKNOWN`；memory 模式不注入 fallback 时行为零变化 |
+| 崩溃 owner 不被误读为 running | 直插 running row（owner='worker-a-crashed'）→ read_status 返回 unknown + `REQUEST_OUTCOME_UNKNOWN` |
+| 跨 scope 碰撞防御 | 篡改 row.scope_parts 后抛 409 `REQUEST_ID_CONFLICT` |
+
+边界与未做：本次只覆盖 status 读路径；取消的跨进程语义已由 `request_cancel` tombstone + `DurableIdempotencyStore._claim` 守卫实现，未重复建设。阶段 2（异步化，UE 契约变更）仍未启动；真实 MySQL 上的跨 worker 演练待 Linux 环境验证。
+
+<a id="ci-gate-20261026"></a>
+## 2026-10-26 最小核心回归 CI（GitHub Actions）
+
+此前 1463→1539 全量回归一直靠人工本地跑、手工记入 CHANGELOG。本轮补最小门禁：新增 `.github/workflows/core-tests.yml`（ubuntu-latest + Python 3.12，push/PR 到 develop-dyh 与 main 触发）。
+
+- 安装：`pip install -r requirements-dev.txt -c requirements-sql-linux-py312.lock`（与 Linux 服务器 3.12.15 实测锁对齐，不引入新依赖）。
+- 测试命令即 README「检查改动」原句：`tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q`。
+- 不配置 secrets：真实 MySQL（`AESIR_TEST_MYSQL_URL_FILE`）、faster-whisper、RL 依赖在 CI 默认环境天然 skip，与本地「无 ML/RL 依赖核心回归」边界一致。
+- 本地同命令复跑：**1532 passed、12 skipped、84.12s**（Windows venv 3.12.7）。skip 项为 faster-whisper 真机冒烟与 RL 门控用例。
+- 未覆盖：首次 push 到远端前 CI 实际跑次未经验证；如需缓存 pip、加 Linux 矩阵（3.13）、或把真实 MySQL 接成可选 job，留待后续。
+
+<a id="db-index-prune-20261026"></a>
+## 2026-10-26 operation_journal 二级索引与运维清理器
+
+针对 DB-GAP「高增长账本无索引、无清理」落地无争议的一半。
+
+- `app/persistence/journal.py`：operation_journal 加两个二级索引 `ix_operation_journal_state_created(state, created_at)`（恢复扫描遗留 running）、`ix_operation_journal_request_id(request_id)`（按请求查行）。均为普通列、跨方言可索引。
+- `app/persistence/prune.py`（新）：`prune_journal`（删终态 complete/failed/unknown 且 finished_at 早于 cutoff 的行，running 永不触碰）、`prune_quota_windows`（删 window_start 早于 cutoff 的额度窗口行）。清理是显式运维动作，服务不自动清理。
+- `scripts/persistence_data.py prune`：新增 CLI 子命令，`--journal-days`（默认30）/`--quota-days`（默认7），dry-run 只计数、`--apply` 才真删。
+- 同步：`001-initial-schema.sql` 用 `--print-sql` 重生成（注：CreateTable 渲染本就不含二级索引行，与 FK 索引一致）；`03-data-dictionary.md` 索引清单更新为「8主键+3二级+2外键」；`tests/persistence/test_prune.py` 4 项（终态过期删/running 永不碰/quota 过期删/默认 cutoff 删全部终态）。
+- 边界：documents 的 `scope_parts`/`key_parts` 是 JSON 列，spike 验证 SQLite 无 `JSON_UNQUOTE`、同一 Computed 表达式无法在两方言出一致 DDL，生成列索引留到有真实 MySQL 环境再做（方言分支 Computed 成本翻倍，本期不做）。
+
+### 回归
+
+2026-10-26，Windows venv 3.12：**1536 passed、12 skipped、83.60s**（较 ① 的 1532 净增 4 个 prune 用例）。`scripts/check_database_design` 离线审计 `ok: true`（8表44列，metadata 与 DDL/字典/PDM 一致）。
+
+<a id="fewshot-lint-20261026"></a>
+## 2026-10-26 few-shot 一致性 lint（防「示例压过规则」复发）
+
+历史上 few-shot 权重三次压过 prompt honesty 规则（examples.yaml 五修/六修/七修注释），此前只靠 `test_examples_carry_no_unanswerable_riddle_or_time_assertion` 硬编码守住「口袋」「才认识几天」两个词。本轮把黑名单升级为机制性扫描。
+
+- 新增 `tests/services/test_fewshot_consistency.py`：
+  - `test_examples_carry_no_unverifiable_factual_claims`：遍历所有人格包（alice/bruno/demo-vn）examples.yaml，reply_text 命中四类无据事实信号即 fail——时长断言（才几天/认识多久）、无据谜题（猜猜/上次那个谜题）、无据世界状态（要下雨/我们现在在）、无据过往（上次我们一起/那天我答应）。每类信号注释了对应事故出处。
+  - `test_examples_reference_only_whitelisted_emotion_gesture_face`：已注册角色（alice/bruno）的示例表现 ID 必须在 presentation 白名单内；demo-vn narrator 未注册，按设计 skip。
+- 未动 `_build_system_prompt`（200 行函数内嵌大量实测复盘注释，整体模板化风险高、本期不做）。
+- 实测验证 lint 能抓到违规：构造含「才认识几天/上次那个谜题/今天要下雨」的 reply_text，四类信号命中三类。
+
+### 回归
+
+2026-10-26，Windows venv 3.12：services 套件 **630 passed、3 skipped**（含新增 6 个 lint 用例：5 过 1 skip）。

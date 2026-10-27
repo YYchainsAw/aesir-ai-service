@@ -173,3 +173,19 @@ def test_cooldown_survives_recent_events_eviction() -> None:
         state, "gift_given", t_after, cooldown_seconds=60, daily_cap=100000
     )
     assert d2 == 3
+
+
+def test_stale_occurred_at_does_not_bypass_cooldown() -> None:
+    """#57: client clock rollback must not let a stale occurred_at bypass cooldown."""
+    from app.services.relationship.rules import apply_relationship_event_ex
+
+    state = _state()
+    state, _, _ = apply_relationship_event_ex(state, "gift_given", "2026-09-14T10:00:00Z")
+    state, _, _ = apply_relationship_event_ex(state, "gift_given", "2026-09-14T10:10:00Z")
+    assert state.value == 26
+    state, delta, reason = apply_relationship_event_ex(
+        state, "gift_given", "2026-09-14T10:05:00Z"
+    )
+    assert delta == 0
+    assert reason == "cooldown_blocked"
+    assert state.value == 26

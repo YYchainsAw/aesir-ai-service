@@ -20,7 +20,7 @@
 | DATA-GAP（本轮静态发现） | 默认对话日志保留完整输入/回复，与NFR只摘要目标不一致；记忆清理范围和部分失败状态需明确 | 先确认保留/清除策略及目标范围；不宣称关闭或摘要化已生效，关系档案不因清记忆自动清除 |
 | DEP-01 | SQL/Bearer服务端及迁移/恢复工具已有受控证据；正式数据切换、OS隔离与HTTPS发布由[#99](https://github.com/YYchainsAw/aesir-ai-service/issues/99)验收 | DEP-REQ-01/02/06；AT-DEP-01/02/03/11/12；固定开发身份不替代正式账号或生产多worker |
 | DEP-02 | SQL持久身份、确认版本、事实/回执归档与epoch分项已实现；UE缓存/本地队列和完整恢复/冲突流程待接入 | DEP-REQ-03/07；AT-DEP-04/05/06/08；不得重放过期命令或复活已清记忆 |
-| DB-GAP / DEP4后续 | 高增长账本拆表/索引、长期清理、大小写标识策略及正式数据切换仍需按容量与发布要求设计 | 需求追踪、ER/PDM、8表44列字典和保留DDL已补齐；dev到期列漂移已备份后修复，三库审计通过，运行时/离线共享结构门禁，见[数据库设计](../design/database/README.md)及[本轮证据](../logs/verification-records.md#schema-gate-20261022)；不把受控验证等同正式容量/UE通过 |
+| DB-GAP / DEP4后续 | 高增长账本拆表/索引、长期清理、大小写标识策略及正式数据切换仍需按容量与发布要求设计 | 需求追踪、ER/PDM、8表44列字典和保留DDL已补齐；dev到期列漂移已备份后修复，三库审计通过，运行时/离线共享结构门禁，见[数据库设计](../design/database/README.md)及[本轮证据](../logs/verification-records.md#schema-gate-20261022)；2026-10-26已补 operation_journal(state,created_at)/(request_id) 二级索引与 `scripts/persistence_data.py prune` 运维清理器（终态journal行按天数、quota窗口行按天数，dry-run/apply）；documents 的 JSON scope_parts 生成列索引因 SQLite 缺 JSON_UNQUOTE 跨方言分歧，待真实 MySQL 环境再评估；不把受控验证等同正式容量/UE通过 |
 | DEP-03 | 外部ASR、模型可信发布/下载回滚、生产守护及容量采样 | DEP-REQ-04/05/06/08；AT-DEP-07/09/10；只记录真实运行证据 |
 | EVO-01 | 请求生命周期、旧代取消、逻辑命令幂等与UE真实反馈；关联认证作用域和事务结果 | D1/D2/D4、G3/G4、C1/C2；先对齐协议/样例；AT-EVO-01/02/07/09，原EXT-01/MODEL-GAP不因此关闭 |
 | EVO-02 | [#100](https://github.com/YYchainsAw/aesir-ai-service/issues/100)负责上下文来源、事件合并/过期、条件/阶段追踪余项；[#98](https://github.com/YYchainsAw/aesir-ai-service/issues/98)负责外部ASR首期 | D3、G1/G2/G3、C4、V1；AT-EVO-03/05/07/10和AT-DEP-07；沿用纯心跳规则及无主动推送，不把当前即时条件校验当成本地条件登记 |
@@ -38,3 +38,5 @@
 2026-10-22第三步服务端增量在 `feature/npc-execution-loop` 通过适用核心回归，工作包见[DEP3里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/7)。同会话FIFO、取消屏障、并发/预算、最小反馈账本及只读查询已有受控证据；EXT-01、MODEL-GAP、EVO-01/02的跨端余项和第四步生产目标仍保留，UE连接继续后置。具体待验见[交接指南](../guides/scoped-development.md#loop-usage)。
 
 2026-10-22第四步服务端在 `feature/npc-persistence-access` 已通过1404 passed、1 skipped适用核心回归，含5项真实MySQL测试；另完成独立SQL HTTP进程重启、源JSON不改导入与私有备份空库恢复。见[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)、[契约](../protocols/npc-persistence-contract-v0.4.md)和[验证记录](../logs/verification-records.md#persist-20261022)。EVO-01/03与DEP完整生产/UE目标不因服务端受控通过而关闭；恢复较旧快照的RPO/后续reset收敛、本地队列与发布门禁继续保留。
+
+2026-10-27：50k人改造阶段0（Redis外置调度）与阶段1（status journal fallback）已闭环（1539绿）；**阶段2异步化UE契约设计草案**已出（[npc-async-loop-v0.5-draft](../protocols/npc-async-loop-v0.5-draft.md)）——v0.5 opt-in：chat/agent-step提交即202、后台池执行、`GET /requests/{id}` completed时回放业务结果；world/events与控制入口保持同步。待UE侧对齐三个开放问题（轮询节奏与保留期、result是否附completed_at、预算上限默认值）后再动代码；v0.4同步模式不下线。同日#54/T39对话RL导演层经用户批准进入立项评估（issue已加status:in-progress）。
