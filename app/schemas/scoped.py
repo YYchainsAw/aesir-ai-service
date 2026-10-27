@@ -166,6 +166,9 @@ class _RealtimeRequest(_NpcRequest):
 
 
 class ScopedAgentRequest(_RealtimeRequest):
+    # 阶段 2 v0.5 opt-in：发 "0.5" 异步提交（立即 202，UE 轮询拿终态）；
+    # "0.4" 或不发保持同步 200 行为永久不变。其余请求模型不放开 "0.5"。
+    protocol_version: Literal["0.4", "0.5"] = "0.4"
     world_context: ScopedWorldContext
     text: str | None = Field(default=None, min_length=1, max_length=500)
 
@@ -176,6 +179,8 @@ class ScopedAgentRequest(_RealtimeRequest):
 
 
 class ScopedChatRequest(_RealtimeRequest):
+    # 同上：仅 chat/agent-step 接受 v0.5 异步 opt-in。
+    protocol_version: Literal["0.4", "0.5"] = "0.4"
     text: str = Field(min_length=1, max_length=500)
     game_state: Literal["exploration", "conversation"] = "exploration"
     world_context: ScopedWorldContext | None = None

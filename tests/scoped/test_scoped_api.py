@@ -409,3 +409,82 @@ def test_closed_encounter_rejects_cached_realtime_event(h):
                expected_encounter_id=p["encounter_id"])
     assert h.client.post("/v1/scoped/encounters/control", json=end).status_code == 200
     code(h.client.post("/v1/scoped/world/events", json=p), 409, "ENCOUNTER_INACTIVE")
+
+
+# --- 阶段 2 v0.5 异步提交（opt-in）-------------------------------------
+
+def test_v05_chat_returns_202_immediately_and_polls_to_completed(h):
+    """v0.5 opt-in：POST 立即 202，业务后台执行，轮询 GET /requests/{id} 拿 completed+result。"""
+    import time
+    ctx = h.bind()
+    p = h.chat(ctx, protocol_version="0.5")
+    submit = h.client.post("/v1/scoped/companion/chat", json=p)
+    assert submit.status_code == 202, submit.text
+    body = submit.json()
+    assert body["protocol_version"] == "0.5"
+    assert body["state"] in {"queued", "running"}
+    assert "reply_text" not in body  # 202 不含业务结果
+
+    # 轮询直到 completed（后台池跑 mock 对话，毫秒级）。
+    request_id = p["request_id"]
+    status = None
+    for _ in range(50):
+        r = h.client.get(f"/v1/scoped/requests/{request_id}",
+                        params={"operation": "chat", **{k: ctx[k] for k in
+                                ("service_instance_id", "run_id", "run_binding_id", "memory_epoch")},
+                                "save_id": ctx["scope"]["save_id"],
+                                "companion_id": ctx["scope"]["companion_id"]})
+        assert r.status_code == 200, r.text
+        status = r.json()
+        if status["state"] in {"completed", "failed", "expired", "unknown"}:
+            break
+        time.sleep(0.05)
+    assert status["state"] == "completed", status
+    assert status["result"] is not None
+    assert "reply_text" in status["result"]
+
+
+def test_v04_chat_still_returns_200_synchronously(h):
+    """v0.4（默认）永久保留同步 200 行为，不进入异步分支。"""
+    ctx = h.bind()
+    p = h.chat(ctx)  # 默认 protocol_version="0.4"
+    r = h.client.post("/v1/scoped/companion/chat", json=p)
+    assert r.status_code == 200, r.text
+    assert "reply_text" in r.json()
+
+
+def test_v05_rejected_on_non_async_endpoints(h):
+    """异步 opt-in 只放开 chat/agent-step；world/event/control 发 0.5 必须 422。"""
+    ctx = h.bind()
+    # world/events 继承 _ControlRequest（只认 "0.4"）。
+    p = h.event(ctx)
+    p["protocol_version"] = "0.5"
+    assert h.client.post("/v1/scoped/world/events", json=p).status_code == 422
+    # encounters/control 同理。
+    c = dict(protocol_version="0.5", request_id=str(uuid4()), save_id=ctx["scope"]["save_id"],
+             service_instance_id=ctx["service_instance_id"], run_id=ctx["run_id"],
+             run_binding_id=ctx["run_binding_id"], op="begin", expected_encounter_revision=0,
+             expected_encounter_id=None, encounter_id=str(uuid4()))
+    assert h.client.post("/v1/scoped/encounters/control", json=c).status_code == 422
+
+
+def test_v05_duplicate_submit_does_not_reexecute(h):
+    """同 request_id 重试：幂等账本返回在途/已完成状态，不重复投递后台。"""
+    import time
+    ctx = h.bind()
+    p = h.chat(ctx, protocol_version="0.5")
+    first = h.client.post("/v1/scoped/companion/chat", json=p)
+    assert first.status_code == 202
+    # 立即重试同 ID：应拿到 202（在途）或 200（已完成），不重复执行业务。
+    second = h.client.post("/v1/scoped/companion/chat", json=p)
+    assert second.status_code in {200, 202}
+    # 等终态。
+    for _ in range(50):
+        r = h.client.get(f"/v1/scoped/requests/{p['request_id']}",
+                        params={"operation": "chat", **{k: ctx[k] for k in
+                                ("service_instance_id", "run_id", "run_binding_id", "memory_epoch")},
+                                "save_id": ctx["scope"]["save_id"],
+                                "companion_id": ctx["scope"]["companion_id"]})
+        if r.json()["state"] == "completed":
+            break
+        time.sleep(0.05)

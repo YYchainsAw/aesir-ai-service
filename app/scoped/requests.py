@@ -246,6 +246,104 @@ class RequestCoordinator:
                 raise ScopeError(entry.error.status_code, entry.error.code, entry.error.message, entry.request_id)
             return deepcopy(entry.result)
 
+    def submit(self, scope, operation, request_id, *, serial=True,
+               budget=None, validate=None) -> str:
+        """阶段 2 v0.5：只做校验 + 容量准入 + 登记入队，不执行业务。
+
+        返回登记后的状态（``queued`` 或 ``running``——立即获槽时）。业务闭包
+        由后台池拿同一 entry 跑 ``run_submitted``。容量不足抛 NotStartedError
+        （与 execute 同一出口）。同 request_id 重复提交走幂等账本，不在此
+        重复入队。
+        """
+        budget = budget if budget is not None else current_budget()
+        probe = _Request(scope, operation, str(request_id), self.clock(), budget=budget, validate=validate)
+        _check(probe)
+        key = self._key(scope, operation, request_id)
+        with self.scheduler.exclusive():
+            self._prune()
+            entry = self._entries.get(key)
+            if entry is not None:
+                self._same_scope(entry, scope)
+                # 已登记（含重复提交）：直接返回当前状态，不重复入队。
+                return entry.state
+            if len(self._entries) >= self.max_entries:
+                raise self._capacity(request_id)
+            entry = probe
+            entry.serial = serial
+            immediate = (not serial or self.scheduler.try_acquire(key, entry))
+            if serial and not immediate:
+                if not self.scheduler.try_enqueue(key, entry):
+                    raise self._capacity(request_id)
+            self._entries[key] = entry
+            if serial and immediate:
+                self.scheduler.start(key, entry)
+            return entry.state
+
+    def run_submitted(self, scope, operation, request_id, action) -> None:
+        """后台池执行已登记的请求：占槽等待 → 跑业务 → 落结果/错误。
+
+        与 ``execute`` 的执行段逐字节一致，区别只在 entry 已由 ``submit``
+        登记（而非本方法内登记）。完成后 UE 通过 ``status`` 轮询拿终态。
+        """
+        key = self._key(scope, operation, request_id)
+        with self.scheduler.exclusive():
+            entry = self._entries.get(key)
+        if entry is None or entry.scope != scope:
+            # submit 与 run 之间 entry 被清（进程重启/clear）：由调用方把
+            # 状态折为 unknown，UE 不得自动重发。
+            raise ScopeError(503, "REQUEST_OUTCOME_UNKNOWN", "Submitted entry is gone.", request_id)
+
+        active_token = _active.set(entry)
+        try:
+            with use_budget(entry.budget):
+                serial = entry.serial
+                while serial:
+                    _check(entry)
+                    with self.scheduler.exclusive():
+                        if self.scheduler.owns_running_slot(key, entry):
+                            break
+                        if self.scheduler.try_acquire(key, entry):
+                            self.scheduler.start(key, entry)
+                            break
+                        self.scheduler.wait(0.05)
+                with entry.lock:
+                    _cancelled(entry)
+                    entry.started_at, entry.state = self.clock(), "running"
+                _check(entry)
+                result = action()
+                _check(entry)
+                cached = deepcopy(result)
+                with entry.lock:
+                    _cancelled(entry)
+                    entry.result = cached
+                    entry.state, entry.finished_at = "completed", self.clock()
+                return result
+        except Exception as error:
+            with entry.lock:
+                if entry.commit_started:
+                    entry.state, entry.reason_code = "unknown", "REQUEST_OUTCOME_UNKNOWN"
+                    terminal_error = ScopeError(503, "REQUEST_OUTCOME_UNKNOWN", "Request outcome is uncertain; do not automatically retry.", request_id)
+                elif entry.cancel_requested:
+                    entry.state = "cancelled"
+                    terminal_error = ScopeError(409, "REQUEST_CANCELLED", "The logical request was cancelled.", request_id)
+                elif isinstance(error, ScopeError):
+                    entry.state = "expired" if error.code in {"REQUEST_EXPIRED", "SNAPSHOT_EXPIRED"} else "failed"
+                    entry.reason_code, terminal_error = error.code, error
+                else:
+                    entry.state, entry.reason_code = "failed", "REQUEST_FAILED"
+                    terminal_error = ScopeError(503, "REQUEST_FAILED", "Request processing failed.", request_id)
+                entry.error, entry.finished_at = terminal_error, self.clock()
+            # 与 execute 一致：把终态错误抛给调用方（后台任务据此 settle 幂等账本）。
+            if terminal_error is error:
+                raise
+            raise terminal_error from error
+        finally:
+            _active.reset(active_token)
+            with self.scheduler.exclusive():
+                entry.inflight = False
+                self.scheduler.release(key, entry)
+                self.scheduler.notify_all()
+
     def execute(self, scope, operation, request_id, action, *, serial=True,
                 budget=None, validate=None) -> Any:
         budget = budget if budget is not None else current_budget()

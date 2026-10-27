@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     scope_session_queue_limit: int = Field(default=4, ge=1, le=16)
     scope_request_state_limit: int = Field(default=1024, ge=1, le=16384)
     request_traces_dir: str = "data/runtime/request_traces"
+    # 阶段 2 v0.5 异步提交：进程内后台执行池大小。与全局生成槽解耦——
+    # 池 >= 全局槽 × 预期 worker 数即可，真正并发上限仍由 Redis 槽裁决。
+    scope_async_pool_size: int = Field(default=8, ge=2, le=64)
 
     # -- 请求协调后端（阶段 0e：多 worker 部署用 Redis）----------------
     # redis（默认）：反映多 worker 生产部署意图；要求
