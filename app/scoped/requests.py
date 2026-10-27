@@ -185,6 +185,11 @@ class RequestCoordinator:
                 "total_ms": max(0, int((end - entry.created_at) * 1000)),
                 "upstream_attempts": entry.upstream_attempts,
                 "cancel_requested": entry.cancel_requested,
+                # 阶段 2 第一步：completed 时回放业务结果（异步轮询出口；
+                # 同步模式 UE 也可拿 POST 结果回查）。其余状态为 None。
+                "result": (deepcopy(entry.result)
+                           if entry.state == "completed" and entry.result is not None
+                           else None),
             }
 
     def status(self, scope, operation, target_request_id) -> dict:

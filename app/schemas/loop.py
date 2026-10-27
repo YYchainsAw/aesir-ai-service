@@ -34,7 +34,12 @@ class ScopedCancelResponse(ScopedResponseBase):
 
 
 class ScopedRequestStatusResponse(ScopedReadResponseBase):
-    """Observe a known request; the read does not replay its business result."""
+    """Observe a known request; ``result`` replays the business payload only when state=completed.
+
+    异步化契约 v0.5（阶段 2 第一步）：同步模式下 UE 已从 POST 拿到结果；
+    异步模式下轮询本端点，completed 时 ``result`` 与原同步响应逐字段相同。
+    queued/running/failed/cancelled/unknown 时为 None。
+    """
 
     target_request_id: UUID
     operation: LoopOperation
@@ -45,6 +50,7 @@ class ScopedRequestStatusResponse(ScopedReadResponseBase):
     total_ms: int = Field(ge=0, strict=True)
     upstream_attempts: int = Field(ge=0, strict=True)
     cancel_requested: bool
+    result: dict | None = None
 
 
 class ScopedDirectiveStateResponse(ScopedReadResponseBase):

@@ -1,7 +1,8 @@
 # NPC 异步请求契约 v0.5（设计草案 · 待 UE 对齐）
 
-> 2026-10-27 起草。本页是 [50k 人架构改造阶段 2](../planning/stage0-cde-followup.md#阶段-2异步化ue-契约变更) 的 UE 契约设计稿，**尚未实现**。
+> 2026-10-27 起草。本页是 [50k 人架构改造阶段 2](../planning/stage0-cde-followup.md#阶段-2异步化ue-契约变更) 的 UE 契约设计稿。
 > 基线：develop-dyh@`9c25895`，阶段 0（Redis 外置调度）+ 阶段 1（status journal fallback）已闭环。
+> **2026-10-27 进展**：§4 的 result 回放已实现（`ScopedRequestStatusResponse` 加 `result` 字段；内存 `_record()` 与 journal `read_status()` 在 completed 时回放业务结果，其余状态为 None）。同步模式下 UE 也可拿 POST 结果回查。§3 的 202 提交仍是待实现的契约设计。
 > 阅读前提：[闭环增量契约 v0.4](npc-loop-contract-v0.4.md) 的请求生命周期与状态机全部沿用，本页只定义异步化带来的增量变更，未提及字段保持 v0.4 原样。
 
 ## 1. 为什么要异步

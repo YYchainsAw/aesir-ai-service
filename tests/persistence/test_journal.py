@@ -246,7 +246,7 @@ def test_losing_replay_clock_rejects_instead_of_refreshing_old_result(sql):
 
 
 def test_read_status_returns_completed_record_from_journal(sql):
-    """请求在本进程完成；read_status 应返回 completed 记录（含耗时字段）。"""
+    """请求在本进程完成；read_status 应返回 completed 记录（含耗时字段与业务结果）。"""
     _, scope = sql
     store, request_id = DurableIdempotencyStore(), uuid4()
     with use_scope(scope):
@@ -258,6 +258,8 @@ def test_read_status_returns_completed_record_from_journal(sql):
     assert record["target_request_id"] == str(request_id)
     assert record["cancel_requested"] is False
     assert record["total_ms"] >= 0
+    # 阶段 2 第一步：completed 时跨 worker 回放业务结果。
+    assert record["result"] == {"ok": True}
 
 
 def test_read_status_returns_none_for_unknown_request(sql):

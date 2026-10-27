@@ -22,5 +22,6 @@
   "processing_ms": 0,
   "total_ms": 0,
   "upstream_attempts": 0,
-  "cancel_requested": false
+  "cancel_requested": false,
+  "result": null
 }
