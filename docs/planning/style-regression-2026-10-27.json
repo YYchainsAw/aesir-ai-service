@@ -1,0 +1,21 @@
+{
+  "total_turns": 33,
+  "by_companion": {
+    "companion.alice": 30,
+    "companion.bruno": 3
+  },
+  "by_scene": {
+    "conversation": 27,
+    "exploration": 6
+  },
+  "intercepted": {
+    "category_dist": {},
+    "term_dist": {},
+    "examples": {}
+  },
+  "potential_misses": {
+    "term_dist": {},
+    "examples": []
+  },
+  "candidate_extension_hits": {}
+}
