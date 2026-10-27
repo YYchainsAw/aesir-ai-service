@@ -2,7 +2,8 @@
 
 > 2026-10-27 起草。本页是 [50k 人架构改造阶段 2](../planning/stage0-cde-followup.md#阶段-2异步化ue-契约变更) 的 UE 契约设计稿。
 > 基线：develop-dyh@`9c25895`，阶段 0（Redis 外置调度）+ 阶段 1（status journal fallback）已闭环。
-> **2026-10-27 进展**：§4 的 result 回放已实现（`ScopedRequestStatusResponse` 加 `result` 字段；内存 `_record()` 与 journal `read_status()` 在 completed 时回放业务结果，其余状态为 None）。同步模式下 UE 也可拿 POST 结果回查。§3 的 202 提交仍是待实现的契约设计。
+> **2026-10-27 进展**：§4 的 result 回放已实现（`ScopedRequestStatusResponse` 加 `result` 字段；内存 `_record()` 与 journal `read_status()` 在 completed 时回放业务结果，其余状态为 None）。同步模式下 UE 也可拿 POST 结果回查。
+> **§3 的 202 提交已落地服务端（develop-dyh@`d0b6ffe`，受控 1566 绿，未经 UE 联调）**：`chat`/`agent-step` 发 `protocol_version="0.5"` opt-in——提交线程只做校验/配额/容量准入即返回 §3.2 信封（202，不含业务结果），业务闭包投递进程内守护池（`app/scoped/async_pool.py`，contextvars 捕获 scope/principal/budget）执行；`coordinator.submit()`/`run_submitted()` 把登记入队与执行段拆开；幂等 `begin/settle/settle_failure` 不等待，同 request_id 网络重试在 `running` 时**不重复投递后台**（否则两 worker 把同一 action 跑两遍）。其余入口不放开 0.5（422）；v0.4 同步 200 永久保留。**第 8 节三个开放问题仍待 UE 拍板，服务端默认值尚未冻结。**
 > 阅读前提：[闭环增量契约 v0.4](npc-loop-contract-v0.4.md) 的请求生命周期与状态机全部沿用，本页只定义异步化带来的增量变更，未提及字段保持 v0.4 原样。
 
 ## 1. 为什么要异步
