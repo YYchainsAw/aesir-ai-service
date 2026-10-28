@@ -488,3 +488,60 @@ def test_v05_duplicate_submit_does_not_reexecute(h):
         if r.json()["state"] == "completed":
             break
         time.sleep(0.05)
+
+
+# --- 阶段 2 v0.5：completed_at 墙钟（可配置，默认关）---------------------
+
+def _status(h, ctx, request_id):
+    return h.client.get(f"/v1/scoped/requests/{request_id}",
+                        params={"operation": "chat", **{k: ctx[k] for k in
+                                ("service_instance_id", "run_id", "run_binding_id", "memory_epoch")},
+                                "save_id": ctx["scope"]["save_id"],
+                                "companion_id": ctx["scope"]["companion_id"]}).json()
+
+
+def test_completed_at_absent_by_default(h):
+    """默认关：completed 时 completed_at 为 None（信封形状不增字段值）。"""
+    ctx = h.bind()
+    p = h.chat(ctx)
+    assert h.client.post("/v1/scoped/companion/chat", json=p).status_code == 200
+    s = _status(h, ctx, p["request_id"])
+    assert s["state"] == "completed"
+    assert s["completed_at"] is None
+
+
+def test_completed_at_output_when_config_enabled(h, monkeypatch):
+    """开 config：completed 时 completed_at 是合法 UTC ISO 字符串。"""
+    from datetime import datetime
+    monkeypatch.setenv("AESIR_SCOPE_ASYNC_COMPLETED_AT", "true")
+    ctx = h.bind()
+    p = h.chat(ctx)
+    assert h.client.post("/v1/scoped/companion/chat", json=p).status_code == 200
+    s = _status(h, ctx, p["request_id"])
+    assert s["state"] == "completed"
+    assert s["completed_at"] is not None
+    parsed = datetime.fromisoformat(s["completed_at"].replace("Z", "+00:00"))
+    assert parsed.tzinfo is not None
+
+
+def test_completed_at_none_for_non_completed_states(h, monkeypatch):
+    """开 config 但非终态（queued/running）：completed_at 仍为 None。"""
+    monkeypatch.setenv("AESIR_SCOPE_ASYNC_COMPLETED_AT", "true")
+    ctx = h.bind()
+    p = h.chat(ctx, protocol_version="0.5")
+    r = h.client.post("/v1/scoped/companion/chat", json=p)
+    assert r.status_code == 202
+    # 立即轮询：此时大概率 queued/running（后台池刚拿到任务）。
+    s = _status(h, ctx, p["request_id"])
+    assert s["state"] in {"queued", "running", "completed"}
+    if s["state"] != "completed":
+        assert s["completed_at"] is None
+    # 等终态确认有值。
+    import time
+    for _ in range(50):
+        s = _status(h, ctx, p["request_id"])
+        if s["state"] == "completed":
+            break
+        time.sleep(0.05)
+    assert s["state"] == "completed"
+    assert s["completed_at"] is not None
