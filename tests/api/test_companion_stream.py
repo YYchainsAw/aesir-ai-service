@@ -188,3 +188,86 @@ def test_stream_llm_mid_failure_emits_error_frame(_llm_backend) -> None:
     kinds = [kind for kind, _ in frames]
     assert "error" in kinds
     assert "meta" not in kinds  # 中途失败不发权威 meta
+
+
+# --- #110：style_guard 拦截轮必须落埋点 --------------------------------
+
+_BLOCKED_LLM_REPLY = (
+    '{"reply_text": "这个系统真好用。", '
+    '"emotion_id": "emotion.bright", '
+    '"gesture_id": "gesture.cheerful_idle", '
+    '"facial_expression_id": "face.bright_smile", '
+    '"interruptible": true, '
+    '"topics": ["高塔"], "facts": ["玩家怕高"]}'
+)
+
+
+def _signal_records(tmp_path) -> list[dict]:
+    """读取本测试隔离目录下的对话信号记录（conftest 把目录指向 tmp_path/signals）。"""
+    signal_file = tmp_path / "signals" / "aesir" / "companion.alice.jsonl"
+    if not signal_file.exists():
+        return []
+    return [json.loads(line) for line in signal_file.open(encoding="utf-8")]
+
+
+def test_stream_llm_style_block_logs_blocked_signal(_llm_backend, tmp_path) -> None:
+    """#110：流式 style_guard 拦截（error 帧）也落一行 source=llm_blocked 信号。"""
+    chunks = [_BLOCKED_LLM_REPLY[i:i + 7] for i in range(0, len(_BLOCKED_LLM_REPLY), 7)]
+    _llm_backend(chunks)
+
+    response = client.post(
+        "/v1/companion/chat/stream",
+        json={"text": "你好", "session_id": "stream-llm-blocked"},
+    )
+    assert response.status_code == 200
+    frames = _parse_frames(response.text)
+    kinds = [kind for kind, _ in frames]
+    assert "error" in kinds
+    assert "meta" not in kinds
+
+    records = _signal_records(tmp_path)
+    blocked = [r for r in records if r.get("source") == "llm_blocked"]
+    assert blocked, f"expected a llm_blocked record, got: {records}"
+    record = blocked[-1]
+    assert record["player_text"] == "你好"
+    assert "系统" in record["reply_text"]  # 落盘的是用户实际看到的违规增量
+    terms = [v["matched_term"] for v in record["style_violations"]]
+    assert "系统" in terms
+
+
+class _StubJSONClient:
+    """非流式桩：每次 generate_json 都返回同一（违规）payload。"""
+
+    def __init__(self, payload: str) -> None:
+        self._payload = payload
+
+    def generate_json(self, *, system_prompt, user_prompt, temperature=0.2):
+        return json.loads(self._payload)
+
+    def stream_completion(self, **kwargs):
+        raise AssertionError("non-stream path must not stream")
+
+
+def test_non_stream_style_block_fallback_logs_violations(
+    _llm_backend, monkeypatch, tmp_path
+) -> None:
+    """#110：非流式拦截重试失败回退 mock，落盘记录 style_violations 非空。"""
+    from app.services.companion import llm_dialogue_service as llm_module
+
+    monkeypatch.setattr(
+        llm_module, "create_llm_client", lambda: _StubJSONClient(_BLOCKED_LLM_REPLY)
+    )
+
+    response = client.post(
+        "/v1/companion/chat",
+        json={"text": "你好", "session_id": "chat-blocked-1"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] == "fallback"  # 拦截→重试仍违规→回退 mock
+
+    records = _signal_records(tmp_path)
+    target = [r for r in records if r.get("player_text") == "你好"]
+    assert target, f"expected a logged turn, got: {records}"
+    terms = [v.get("matched_term") for v in target[-1].get("style_violations") or []]
+    assert "系统" in terms

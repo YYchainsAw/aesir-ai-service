@@ -32,6 +32,15 @@ from app.services.tactical.policy import get_policy
 _MAX_FACT_CHARS = 60
 
 
+def _violation_snapshot(violation: style_guard.StyleViolation) -> dict:
+    """StyleViolation → 可落盘 dict（埋点/回归报告按 category/matched_term 计数）。"""
+    return {
+        "category": violation.category,
+        "matched_term": violation.matched_term,
+        "message": violation.message,
+    }
+
+
 @dataclass(frozen=True)
 class StreamEvent:
     """流式对话事件：delta 携带文本增量，meta 携带权威完整响应。"""
@@ -172,8 +181,9 @@ class LLMCompanionDialogueService:
         self.last_reply_topics: list[str] | None = None
         self.last_relationship_signal: str = "none"
         self.last_salient: bool = False
-        # T083 风格校验：成功时为空列表；如上层需要，可从抛出的异常 detail 中读取失败原因。
-        self.last_style_violations: list[str] = []
+        # T083 风格校验：成功时为空列表；拦截时为违规快照 dict（#110）——
+        # 非流式回退轮与流式 error 帧轮都靠它把拦截事件透传给埋点落盘。
+        self.last_style_violations: list[dict] = []
         # T38 / SC-008：最近一轮查证的 ToolResult（无查证轮为 None）。
         # 原先用完即弃（只进第二轮 prompt），现在透传给埋点落盘。
         self.last_lookup: ToolResult | None = None
@@ -263,6 +273,9 @@ class LLMCompanionDialogueService:
                 return response_payload
 
             last_violations = violations
+            # #110：失败轮也把违规快照留给上层——否则回退 mock 后落盘的
+            # style_violations 仍是初始空列表，拦截轮与干净通过无法区分。
+            self.last_style_violations = [_violation_snapshot(v) for v in violations]
 
         # 两次尝试均失败：把违规原因带给上层日志/观测。
         detail = "; ".join(f"{v.category}: {v.message}" for v in last_violations)
@@ -409,6 +422,9 @@ class LLMCompanionDialogueService:
             injected_impressions=impressions or None,
         )
         if violations:
+            # #110：先留快照再抛——dialogue_service 在 error 帧分支据此落一行
+            # source=llm_blocked 的信号记录，拦截事件不再对数据集失明。
+            self.last_style_violations = [_violation_snapshot(v) for v in violations]
             detail = "; ".join(f"{v.category}: {v.message}" for v in violations)
             raise LLMClientError(f"LLM streamed response failed style guard: {detail}")
 

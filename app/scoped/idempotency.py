@@ -58,6 +58,66 @@ class IdempotencyStore:
             self._entries.clear()
             self._condition.notify_all()
 
+    def begin(self, key: Hashable, payload: Any, *,
+              timing: TimingBudget | None = None, request_id=None,
+              conflict_code: str = "REQUEST_ID_CONFLICT") -> tuple[str, Any]:
+        """阶段 2 v0.5：登记一个将在后台执行的请求，不等待。
+
+        返回 ``(state, replay_result)``：
+        - ``("accepted", None)``：首次登记，调用方应把闭包投递到后台池。
+        - ``("running", None)``：同 request_id 已有在途请求，不重复投递。
+        - ``("complete", result)``：已完成，直接回放结果（UE 不必再轮询）。
+        指纹冲突（同 ID 不同 payload）抛 409。
+        """
+        fp = fingerprint(payload)
+        with self._condition:
+            now = self.clock()
+            expired = [k for k, v in self._entries.items()
+                       if v.state != "running" and v.expires_at <= now]
+            for k in expired:
+                del self._entries[k]
+            entry = self._entries.get(key)
+            if entry is None:
+                if len(self._entries) >= self.max_entries:
+                    raise NotStartedError(503, "IDEMPOTENCY_CAPACITY", "No completed retention slots are available.", request_id)
+                entry = _Entry(fp, timing=timing)
+                self._entries[key] = entry
+                return "accepted", None
+            if entry.fingerprint != fp:
+                raise ScopeError(409, conflict_code, "The logical ID is already bound to another payload.", request_id)
+            if entry.state == "running":
+                if entry.timing is not None and timing is not None:
+                    entry.timing.retry(timing.input)
+                return "running", None
+            if entry.error is not None:
+                raise ScopeError(entry.error.status_code, entry.error.code, entry.error.message, request_id)
+            return "complete", deepcopy(entry.result)
+
+    def settle(self, key: Hashable, result: Any) -> None:
+        """后台执行成功后落结果（与 execute 成功分支同语义）。"""
+        with self._condition:
+            entry = self._entries.get(key)
+            if entry is None or entry.state != "running":
+                return
+            entry.result = deepcopy(result)
+            entry.state = "complete"
+            entry.expires_at = self.clock() + self.retention_seconds
+            self._condition.notify_all()
+
+    def settle_failure(self, key: Hashable, error: Exception) -> None:
+        """后台执行失败后折状态（与 execute 失败分支同语义）。"""
+        with self._condition:
+            entry = self._entries.get(key)
+            if entry is None or entry.state != "running":
+                return
+            entry.expires_at = self.clock() + self.retention_seconds
+            if isinstance(error, ScopeError) and error.status_code < 500:
+                entry.state = "failed"
+                entry.error = error
+            else:
+                entry.state = "unknown"
+            self._condition.notify_all()
+
     def execute(self, key: Hashable, payload: Any, operation: Callable[[], Any], *,
                 validate: Callable[[], Any] | None = None, timing: TimingBudget | None = None,
                 request_id=None, conflict_code: str = "REQUEST_ID_CONFLICT",

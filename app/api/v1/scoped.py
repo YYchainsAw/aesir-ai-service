@@ -5,7 +5,10 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from fastapi.responses import JSONResponse
+
 from app.config import get_settings
+from app.scoped import async_pool
 from app.scoped.context import RequestScope, safe_segment, use_scope
 from app.scoped.directives import registry
 from app.scoped.errors import ScopeError
@@ -108,6 +111,18 @@ def _execute(request, principal, operation, action):
                 code = "HEARTBEAT_RATE_LIMITED" if error.status_code == 429 else "BUSINESS_REJECTED"
                 raise ScopeError(error.status_code, code, str(error.detail), request.request_id) from error
 
+        # 阶段 2 v0.5：opt-in 异步提交。仅 chat/agent-step 且 protocol_version="0.5"
+        # 进入此分支；其余入口与 "0.4" 请求走同步路径（下方），契约永久保留。
+        async_mode = (
+            getattr(request, "protocol_version", "0.4") == "0.5"
+            and operation in {"chat", "agent-step"}
+        )
+        if async_mode:
+            return _execute_async(
+                request, principal, operation, action, scope,
+                validate=validate, budget=budget, business=business,
+            )
+
         def invoke():
             reserve_request_quota(principal, scope.npc.game_id)
             if operation in {"chat", "agent-step"}:
@@ -129,6 +144,59 @@ def _execute(request, principal, operation, action):
                 )
             ) if operation in {"chat", "agent-step"} else None,
         )
+
+
+def _execute_async(request, principal, operation, action, scope, *,
+                   validate, budget, business):
+    """阶段 2 v0.5：提交线程只做校验/配额/容量准入，立即 202；业务闭包进后台池。
+
+    不做跨进程 work-stealing：闭包只活在接收进程，跨进程只经 Redis 槽位仲裁。
+    UE 轮询 ``GET /v1/scoped/requests/{target_request_id}`` 拿终态（completed 时
+    ``result`` 与同步响应逐字段相同）。
+    """
+    reserve_request_quota(principal, scope.npc.game_id)
+
+    key = (*scope.key, operation, str(request.request_id))
+    store = get_durable_request_store() if database_enabled() else get_request_store()
+
+    # 容量准入（coordinator 占位入队）：失败抛 NotStartedError -> 503，不登记幂等。
+    serial = operation == "chat" or request.text is not None
+    queued_state = get_coordinator().submit(
+        scope, operation, request.request_id, serial=serial, budget=budget, validate=validate,
+    )
+
+    # 幂等账本登记（不等待）：同 request_id 网络重试不重复投递。
+    idem_state, replay = store.begin(key, request, timing=budget, request_id=request.request_id)
+    if idem_state == "complete":
+        # 已完成：直接回放（UE 重试 POST 拿到 200 + 原结果）。
+        return replay
+
+    def background_task():
+        try:
+            result = get_coordinator().run_submitted(
+                scope, operation, request.request_id, business,
+            )
+            store.settle(key, result)
+        except Exception as error:  # noqa: BLE001 - 终态已折进 coordinator/journal
+            store.settle_failure(key, error)
+
+    # 仅首次登记（accepted）才投递后台。running（同 request_id 网络重试）
+    # 时原请求在途，绝不能再投一个闭包——否则两个 worker 会先后占槽把同一
+    # 业务 action 跑两遍。重复 POST 直接回 202 当前状态，UE 轮询拿终态。
+    if idem_state == "accepted":
+        async_pool.submit(background_task)
+
+    # 202 受理信封：不含业务结果；state 只能是 queued/running。
+    # _base 读 current_budget() 取 valid_for_ms——提交线程内需先包进 contextvar
+    # （后台池跑业务时由 coordinator.run_submitted 自行管理 budget context）。
+    from app.scoped.timing import use_budget
+    with use_budget(budget):
+        envelope = {
+            **_base(scope, request.request_id, getattr(request, "world_context", None)),
+            "protocol_version": "0.5",
+            "state": queued_state,
+        }
+    return JSONResponse(status_code=202, content=envelope)
 
 
 def _directive(scope, request, directive):

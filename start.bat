@@ -16,6 +16,11 @@ REM       pre-chcp codepage and garbles multi-byte sequences.
 setlocal
 cd /d "%~dp0"
 
+REM Local dev bypass: code default is redis (deploy intent); this machine has
+REM no Redis/MySQL, so force the in-memory scheduler for server + chat_console.
+REM Unset / override in a real deployment shell.
+set AESIR_COORDINATION_BACKEND=memory
+
 set MODE=%1
 set PORT=%2
 if "%PORT%"=="" set PORT=8011

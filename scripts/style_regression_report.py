@@ -126,6 +126,13 @@ def build_report(root: Path) -> dict:
     }
 
 
+def _utf8_stdio() -> None:
+    """Windows 控制台默认 GBK：✅/⚠️ 等字符直接崩 UnicodeEncodeError。"""
+    for stream in (sys.stdout, sys.stderr):
+        if stream.encoding and stream.encoding.lower() not in ("utf-8", "utf8"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 def _print_human(report: dict) -> None:
     print("=== style_guard 词表定夺报告（#55 / T40）===")
     print(f"总轮数: {report['total_turns']}  按角色: {report['by_companion']}  按场景: {report['by_scene']}")
@@ -173,6 +180,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=_DEFAULT_ROOT, help="信号根目录")
     args = parser.parse_args()
 
+    _utf8_stdio()
     report = build_report(args.root)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

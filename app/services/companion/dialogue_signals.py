@@ -134,7 +134,7 @@ def record_turn_signal(
     injected_topics: list[str] | None = None,
     previous_player_texts: list[str] = (),
     previous_reply_texts: list[str] = (),
-    style_violations: list[str] | None = None,
+    style_violations: list[str | dict] | None = None,
     game_id: str = _DEFAULT_GAME_ID,
     memory_cited: bool | None = None,
     relationship_stage: str = "",

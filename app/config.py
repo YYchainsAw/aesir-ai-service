@@ -59,12 +59,17 @@ class Settings(BaseSettings):
     scope_session_queue_limit: int = Field(default=4, ge=1, le=16)
     scope_request_state_limit: int = Field(default=1024, ge=1, le=16384)
     request_traces_dir: str = "data/runtime/request_traces"
+    # 阶段 2 v0.5 异步提交：进程内后台执行池大小。与全局生成槽解耦——
+    # 池 >= 全局槽 × 预期 worker 数即可，真正并发上限仍由 Redis 槽裁决。
+    scope_async_pool_size: int = Field(default=8, ge=2, le=64)
 
-    # -- 请求协调后端（阶段 0e：默认 Redis）---------------------------
-    # redis（默认）：多 worker 共享全局槽/会话串行/排队深度；要求
+    # -- 请求协调后端（阶段 0e：多 worker 部署用 Redis）----------------
+    # redis（默认）：反映多 worker 生产部署意图；要求
     #   scope_storage_backend=sql——JSON 幂等在内存，多 worker 必然双执行，
     #   启动期直接拒绝（见下方校验器）。
-    # memory：单进程 InMemoryScheduler（测试/开发回退用）。
+    # memory：单进程 InMemoryScheduler。本地开发/单机测试用
+    #   AESIR_COORDINATION_BACKEND=memory 显式覆盖（start.bat 已自动设；
+    #   测试由 conftest autouse fixture 统一覆盖，不依赖本默认）。
     coordination_backend: Literal["memory", "redis"] = "redis"
     coordination_redis_url: SecretStr = SecretStr("redis://127.0.0.1:6379/0")
     coordination_lease_seconds: float = Field(default=30.0, gt=0)  # 槽/会话锁租约，崩溃自愈
