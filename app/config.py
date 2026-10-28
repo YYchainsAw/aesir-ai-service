@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     # 阶段 2 v0.5 异步提交：进程内后台执行池大小。与全局生成槽解耦——
     # 池 >= 全局槽 × 预期 worker 数即可，真正并发上限仍由 Redis 槽裁决。
     scope_async_pool_size: int = Field(default=8, ge=2, le=64)
+    # 阶段 2 v0.5：completed 状态轮询响应是否输出 completed_at（UTC ISO 墙钟，
+    # 供 UE 算"提交→完成"端到端延迟）。默认 False——response model 永远预留
+    # 此字段（null），UE 拍板要时再开，不返工。
+    scope_async_completed_at: bool = False
 
     # -- 请求协调后端（阶段 0e：多 worker 部署用 Redis）----------------
     # redis（默认）：反映多 worker 生产部署意图；要求

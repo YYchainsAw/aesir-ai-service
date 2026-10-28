@@ -460,7 +460,9 @@ def test_status_has_only_fixed_safe_fields_and_unknown_is_404(scope):
     record = coordinator.status(scope, "chat", request_id)
     assert set(record) == {"target_request_id", "operation", "state", "reason_code", "queue_ms",
                            "processing_ms", "total_ms", "upstream_attempts", "cancel_requested",
-                           "result"}
+                           "result", "completed_at"}
+    # 阶段 2 v0.5：默认关时 completed_at 为 None（字段预留，不输出值）。
+    assert record["completed_at"] is None
     # 阶段 2 契约：completed 时 result 回放业务结果（异步轮询出口）。
     assert record["reason_code"] is None
     assert record["state"] == "completed" and record["result"] == {"text": "private conversation"}

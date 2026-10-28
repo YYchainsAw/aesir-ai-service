@@ -23,5 +23,6 @@
   "total_ms": 17,
   "upstream_attempts": 1,
   "cancel_requested": true,
-  "result": null
+  "result": null,
+  "completed_at": null
 }

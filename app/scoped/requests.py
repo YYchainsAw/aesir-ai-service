@@ -15,6 +15,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
+from datetime import datetime, timezone
 import threading
 import time
 from typing import Any
@@ -29,6 +30,18 @@ from app.scoped.timing import TimingBudget, current_budget, use_budget
 
 
 _active: ContextVar[_Request | None] = ContextVar("scoped_active_request", default=None)
+
+
+def _utc_now_iso() -> str:
+    """Completed 请求的 UTC 墙钟（ISO8601）。与 monotonic 的 finished_at 区分：
+    UE 拿它和自己 POST 时刻对比算端到端延迟（SC-011 采样）。"""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _output_completed_at() -> bool:
+    """config 开关：是否在状态轮询响应里输出 completed_at。默认 False——
+    response model 永远预留此字段（null），开了才在 completed 时填 ISO。"""
+    return bool(getattr(get_settings(), "scope_async_completed_at", False))
 
 
 def _cancelled(entry: _Request) -> None:
@@ -190,6 +203,11 @@ class RequestCoordinator:
                 "result": (deepcopy(entry.result)
                            if entry.state == "completed" and entry.result is not None
                            else None),
+                # 阶段 2 v0.5：completed 时的 UTC 墙钟（SC-011 端到端延迟采样）。
+                # 由 config scope_async_completed_at 控制是否输出；默认关时为 None。
+                "completed_at": (entry.completed_at_wall
+                                 if entry.state == "completed" and _output_completed_at()
+                                 else None),
             }
 
     def status(self, scope, operation, target_request_id) -> dict:
@@ -317,6 +335,7 @@ class RequestCoordinator:
                     _cancelled(entry)
                     entry.result = cached
                     entry.state, entry.finished_at = "completed", self.clock()
+                    entry.completed_at_wall = _utc_now_iso()
                 return result
         except Exception as error:
             with entry.lock:
@@ -405,6 +424,7 @@ class RequestCoordinator:
                     _cancelled(entry)
                     entry.result = cached
                     entry.state, entry.finished_at = "completed", self.clock()
+                    entry.completed_at_wall = _utc_now_iso()
                 return result
         except Exception as error:
             with entry.lock:

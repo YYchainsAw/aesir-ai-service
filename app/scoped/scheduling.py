@@ -50,6 +50,10 @@ class _Request:
     reason_code: str | None = None
     started_at: float | None = None
     finished_at: float | None = None
+    # 阶段 2 v0.5：completed 时的 UTC 墙钟（ISO8601）。与 monotonic 的
+    # finished_at 不同——UE 拿它和自己 POST 时刻对比算端到端延迟（SC-011）。
+    # 总是打戳（成本可忽略），是否随 _record() 输出由 config 控制。
+    completed_at_wall: str | None = None
     upstream_attempts: int = 0
     cancel_requested: bool = False
     commit_started: bool = False

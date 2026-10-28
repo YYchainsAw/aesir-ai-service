@@ -332,24 +332,34 @@ def _record_turn(
             emotion_id=response.emotion_id,
             companion_id=request.companion_id,
         )
-    if topics is None:
-        topics = extract_topics(request.text)
-    if salient is None:
-        salient = looks_salient(request.text)
-    if salient:
-        _remember_fact(request.companion_id, request.text, game_id=game_id)
-    _grounded_count, facts_rejected = _remember_facts(
-        request.companion_id,
-        facts or [],
-        # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
-        # 也能落地，但凭空捏造的仍会被拦下）。
-        sources=[request.text, *(t.user_text for t in prior_history)],
-        game_id=game_id,
-    )
-    salience_boost = _care_scaled_boost(request.companion_id, game_id=game_id) if salient else None
-    _remember_turn(
-        request.companion_id, topics, salient=salient, salience_boost=salience_boost, game_id=game_id
-    )
+    # 六修（#110 后续）：style_guard 拦截轮（style_violations 非空）的玩家输入
+    # 是出戏探针（"系统/指令/npc 区别"等），不是真实对话内容——跳过玩家侧
+    # topics/salient/fact 挖掘，否则探针碎片会被挖成"玩家印象"注入后续 prompt。
+    blocked = bool(style_violations)
+    if not blocked:
+        if topics is None:
+            topics = extract_topics(request.text)
+        if salient is None:
+            salient = looks_salient(request.text)
+        if salient:
+            _remember_fact(request.companion_id, request.text, game_id=game_id)
+        _grounded_count, facts_rejected = _remember_facts(
+            request.companion_id,
+            facts or [],
+            # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
+            # 也能落地，但凭空捏造的仍会被拦下）。
+            sources=[request.text, *(t.user_text for t in prior_history)],
+            game_id=game_id,
+        )
+        salience_boost = _care_scaled_boost(request.companion_id, game_id=game_id) if salient else None
+        _remember_turn(
+            request.companion_id, topics, salient=salient, salience_boost=salience_boost, game_id=game_id
+        )
+    else:
+        topics = []
+        salient = False
+        _grounded_count, facts_rejected = 0, 0
+        salience_boost = None
     if reply_topics is None:
         # mock/回退路径没有 LLM 自述主题，规则提取兜底（玩家侧规则路径维持现状）。
         reply_topics = extract_topics(response.reply_text)

@@ -39,6 +39,10 @@ class ScopedRequestStatusResponse(ScopedReadResponseBase):
     异步化契约 v0.5（阶段 2 第一步）：同步模式下 UE 已从 POST 拿到结果；
     异步模式下轮询本端点，completed 时 ``result`` 与原同步响应逐字段相同。
     queued/running/failed/cancelled/unknown 时为 None。
+
+    ``completed_at`` 是阶段 2 v0.5 预留的 UTC 墙钟（ISO8601）：默认 None，
+    开 ``AESIR_SCOPE_ASYNC_COMPLETED_AT=true`` 后 completed 时填值，供 UE 算
+    "提交→完成"端到端延迟（SC-011 采样）。其余状态恒为 None。
     """
 
     target_request_id: UUID
@@ -51,6 +55,7 @@ class ScopedRequestStatusResponse(ScopedReadResponseBase):
     upstream_attempts: int = Field(ge=0, strict=True)
     cancel_requested: bool
     result: dict | None = None
+    completed_at: str | None = None
 
 
 class ScopedDirectiveStateResponse(ScopedReadResponseBase):

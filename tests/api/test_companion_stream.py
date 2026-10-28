@@ -271,3 +271,33 @@ def test_non_stream_style_block_fallback_logs_violations(
     assert target, f"expected a logged turn, got: {records}"
     terms = [v.get("matched_term") for v in target[-1].get("style_violations") or []]
     assert "系统" in terms
+
+
+def test_blocked_turn_does_not_mine_player_topics(
+    _llm_backend, monkeypatch, tmp_path
+) -> None:
+    """#101 M3：style_guard 拦截轮（style_violations 非空）不把玩家输入切词入印象层。
+
+    玩家输入"我喜欢在雨天钓鱼"能切出"钓鱼"；LLM 回复被拦截（含"系统"）。
+    修复前：印象层会出现"钓鱼"（探针碎片污染）；修复后：拦截轮跳过玩家侧
+    topics 挖掘，印象层不含"钓鱼"。
+    """
+    from app.services.companion import llm_dialogue_service as llm_module
+    from app.services.memory.store import get_memory_store
+
+    monkeypatch.setattr(
+        llm_module, "create_llm_client", lambda: _StubJSONClient(_BLOCKED_LLM_REPLY)
+    )
+
+    response = client.post(
+        "/v1/companion/chat",
+        json={"text": "我喜欢在雨天钓鱼", "session_id": "chat-blocked-impression"},
+    )
+    assert response.status_code == 200
+    assert response.json()["source"] == "fallback"
+
+    store = get_memory_store("companion.alice")
+    topics = [i.topic for i in store.snapshot().impressions]
+    assert "钓鱼" not in topics, (
+        f"拦截轮不应把玩家输入切词入印象层，但印象层含: {topics}"
+    )
