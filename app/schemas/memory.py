@@ -39,6 +39,10 @@ class MemoryEntry(BaseModel):
     game_time: str = ""
     real_time: str = Field(default_factory=_utc_now_iso)
     tags: list[str] = Field(default_factory=list)
+    # 矛盾纠错：玩家后来说"我没去过港口小镇"时，旧条目"在港口小镇认识"被
+    # 这条新事实纠正。旧条目不删除（留档可追溯），但检索时跳过（注入给 LLM
+    # 时不能新旧矛盾同时出现）。None = 未被纠正。
+    superseded_by: UUID | None = None
 
 
 class TopicImpression(BaseModel):

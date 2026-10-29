@@ -233,3 +233,30 @@ def test_concurrent_append_is_thread_safe(tmp_path) -> None:
     reloaded = MemoryStore("companion.alice", root=str(tmp_path))
     reloaded.load()
     assert len(reloaded.snapshot().short_term) == 40
+
+
+def test_mark_superseded_excludes_old_fact(store: MemoryStore) -> None:
+    """玩家改口：旧事实被标记纠正后，检索不再注入，但条目仍留档。"""
+    old = MemoryEntry(content="玩家说在港口小镇认识的", source="player_statement")
+    store.record_fact(old)
+    new = MemoryEntry(content="玩家说从没去过港口小镇", source="player_statement")
+    store.record_fact(new)
+
+    # 纠正前：两条都在档案
+    assert len(store.snapshot().archive) == 2
+
+    marked = store.mark_superseded("玩家说在港口小镇认识的", by_entry_id=new.entry_id)
+    assert marked == 1
+
+    # 旧条目标记了，但没被删
+    snap = store.snapshot()
+    assert len(snap.archive) == 2
+    old_entry = next(e for e in snap.archive if "港口小镇认识" in e.content)
+    assert old_entry.superseded_by == new.entry_id
+
+    # 检索时跳过被纠正的
+    from app.services.memory.retrieval import retrieve
+    retrieved = retrieve(store, budget=10)
+    contents = [e.content for e in retrieved]
+    assert "玩家说从没去过港口小镇" in contents
+    assert not any("港口小镇认识" in c for c in contents)

@@ -37,6 +37,8 @@ def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[Mem
         return []
 
     merged = list(snapshot.archive) + list(snapshot.summaries) + list(snapshot.short_term)
+    # 被纠正的旧事实不注入（玩家已改口，新旧矛盾不能同时给 LLM）
+    merged = [e for e in merged if e.superseded_by is None]
     merged.sort(
         key=lambda e: (_IMPORTANCE_ORDER.get(e.importance, 2), e.real_time),
         reverse=True,

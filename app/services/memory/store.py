@@ -342,6 +342,25 @@ class MemoryStore:
             self._persist_locked()
 
     @guarded_commit
+    def mark_superseded(self, old_content: str, by_entry_id) -> int:
+        """把内容匹配的旧档案条目标记为已被新事实纠正（不删除，检索时跳过）。
+
+        用于玩家改口场景：先说"在港口小镇认识"，后说"没去过港口小镇"。
+        旧条目留档可追溯（audit），但不再注入给 LLM，避免新旧矛盾同时出现。
+        返回标记的条数。
+        """
+        key = dedup_key(old_content)
+        marked = 0
+        with self._lock:
+            for entry in self._snapshot.archive:
+                if dedup_key(entry.content) == key and entry.superseded_by is None:
+                    entry.superseded_by = by_entry_id
+                    marked += 1
+            if marked:
+                self._persist_locked()
+            return marked
+
+    @guarded_commit
     def drop_impressions(self, topics: set[str]) -> int:
         """按主题名移除印象条目，返回移除数（旧数据清洗用）。
 
