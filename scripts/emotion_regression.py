@@ -7,8 +7,13 @@
     .venv/Scripts/python -m scripts.emotion_regression                  # 跑全部 75 条
     .venv/Scripts/python -m scripts.emotion_regression --bucket deep     # 只跑某一桶
     .venv/Scripts/python -m scripts.emotion_regression --limit 5        # 每桶限 5 条（快速冒烟）
+    .venv/Scripts/python -m scripts.emotion_regression --delay 130        # 每条间隔 130s（Phase C 拿真实 delta）
 
 前置：.env 需有真实 LLM 配置（COMPANION_BACKEND=llm + API key）。
+
+--delay 说明：关系评分有 120s 冷却 + 每日上限。连发 75 条时后 74 条 delta 全压成 0，
+混淆矩阵的"delta 分布"段全是假的。Phase C 要拿真实 delta 分布就用 --delay 130
+（120s 冷却 + 余量），但 75 条 ≈ 2.7 小时，按需用 --bucket 单桶跑。
 """
 from __future__ import annotations
 
@@ -49,10 +54,13 @@ def load_seeds(bucket: str | None, limit: int | None) -> list[dict]:
     return seeds
 
 
-def run(client: TestClient, seeds: list[dict]) -> list[dict]:
-    """逐条喂 chat，返回每条的 response 摘要。"""
+def run(client: TestClient, seeds: list[dict], delay: float = 0.0) -> list[dict]:
+    """逐条喂 chat，返回每条的 response 摘要。delay>0 时每条之间 sleep 以绕过关系冷却。"""
     results = []
     for i, seed in enumerate(seeds, 1):
+        if delay > 0 and i > 1:
+            print(f"  ... 冷却等待 {delay:.0f}s（绕过 120s 关系评分冷却）")
+            time.sleep(delay)
         session_id = str(uuid.uuid4())  # 每条独立 session，避免会话记忆串
         t0 = time.time()
         r = client.post(
@@ -159,10 +167,12 @@ def main():
     parser = argparse.ArgumentParser(description="情感桶回归回放")
     parser.add_argument("--bucket", choices=BUCKETS, default=None, help="只跑指定桶")
     parser.add_argument("--limit", type=int, default=None, help="每桶限 N 条（快速冒烟）")
+    parser.add_argument("--delay", type=float, default=0.0,
+                        help="每条之间 sleep N 秒（绕过 120s 关系冷却，Phase C 拿真实 delta；75 条≈2.7h）")
     args = parser.parse_args()
 
     seeds = load_seeds(args.bucket, args.limit)
-    print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}）")
+    print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}, delay={args.delay}s）")
 
     # 记录 signals 文件当前行数，跑完只读新增
     baseline_lines = len(SIGNALS_PATH.read_text(encoding="utf-8").splitlines()) if SIGNALS_PATH.exists() else 0
@@ -171,7 +181,7 @@ def main():
     from app.main import app
     client = TestClient(app)
     print("开始回放...\n")
-    results = run(client, seeds)
+    results = run(client, seeds, delay=args.delay)
 
     print("\n读取 signals...")
     signals = read_signals(baseline_lines)
