@@ -4,16 +4,20 @@
 判定桶与期望桶对角线命中率 ≥80% 视为合格。
 
 用法：
-    .venv/Scripts/python -m scripts.emotion_regression                  # 跑全部 75 条
+    .venv/Scripts/python -m scripts.emotion_regression                  # 跑全部 75 条（艾莉）
     .venv/Scripts/python -m scripts.emotion_regression --bucket deep     # 只跑某一桶
     .venv/Scripts/python -m scripts.emotion_regression --limit 5        # 每桶限 5 条（快速冒烟）
     .venv/Scripts/python -m scripts.emotion_regression --delay 130        # 每条间隔 130s（Phase C 拿真实 delta）
+    .venv/Scripts/python -m scripts.emotion_regression --companion companion.bruno  # Bruno 验收（Phase B）
 
 前置：.env 需有真实 LLM 配置（COMPANION_BACKEND=llm + API key）。
 
 --delay 说明：关系评分有 120s 冷却 + 每日上限。连发 75 条时后 74 条 delta 全压成 0，
 混淆矩阵的"delta 分布"段全是假的。Phase C 要拿真实 delta 分布就用 --delay 130
 （120s 冷却 + 余量），但 75 条 ≈ 2.7 小时，按需用 --bucket 单桶跑。
+
+--companion 说明：Phase B 人格出场验收。同一批种子跑不同人格 yaml，
+混淆矩阵对角线 ≥80% 即合格。默认 companion.alice；新人格出场前先跑这个。
 """
 from __future__ import annotations
 
@@ -33,7 +37,7 @@ for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 SEEDS_PATH = Path(__file__).resolve().parents[1] / "data" / "test_scripts" / "emotion_seeds.json"
-SIGNALS_PATH = Path(__file__).resolve().parents[1] / "data" / "runtime" / "dialogue_signals" / "aesir" / "companion.alice.jsonl"
+SIGNALS_DIR = Path(__file__).resolve().parents[1] / "data" / "runtime" / "dialogue_signals" / "aesir"
 
 BUCKETS = ("deep", "warm", "cold", "hurtful", "none")
 
@@ -54,7 +58,7 @@ def load_seeds(bucket: str | None, limit: int | None) -> list[dict]:
     return seeds
 
 
-def run(client: TestClient, seeds: list[dict], delay: float = 0.0) -> list[dict]:
+def run(client: TestClient, seeds: list[dict], delay: float = 0.0, *, companion_id: str = "companion.alice") -> list[dict]:
     """逐条喂 chat，返回每条的 response 摘要。delay>0 时每条之间 sleep 以绕过关系冷却。"""
     results = []
     for i, seed in enumerate(seeds, 1):
@@ -65,7 +69,7 @@ def run(client: TestClient, seeds: list[dict], delay: float = 0.0) -> list[dict]
         t0 = time.time()
         r = client.post(
             "/v1/companion/chat",
-            json={"text": seed["input"], "session_id": session_id, "companion_id": "companion.alice"},
+            json={"text": seed["input"], "session_id": session_id, "companion_id": companion_id},
             timeout=90.0,
         )
         elapsed = time.time() - t0
@@ -89,11 +93,11 @@ def run(client: TestClient, seeds: list[dict], delay: float = 0.0) -> list[dict]
     return results
 
 
-def read_signals(since_line: int) -> list[dict]:
+def read_signals(signals_path: Path, since_line: int) -> list[dict]:
     """读 signals 文件从 since_line 开始的新增行。"""
-    if not SIGNALS_PATH.exists():
+    if not signals_path.exists():
         return []
-    lines = SIGNALS_PATH.read_text(encoding="utf-8").splitlines()
+    lines = signals_path.read_text(encoding="utf-8").splitlines()
     return [json.loads(l) for l in lines[since_line:] if l.strip()]
 
 
@@ -169,22 +173,25 @@ def main():
     parser.add_argument("--limit", type=int, default=None, help="每桶限 N 条（快速冒烟）")
     parser.add_argument("--delay", type=float, default=0.0,
                         help="每条之间 sleep N 秒（绕过 120s 关系冷却，Phase C 拿真实 delta；75 条≈2.7h）")
+    parser.add_argument("--companion", default="companion.alice",
+                        help="人格 ID（Phase B 验收：换 Bruno 跑同一批种子）")
     args = parser.parse_args()
 
+    signals_path = SIGNALS_DIR / f"{args.companion}.jsonl"
     seeds = load_seeds(args.bucket, args.limit)
-    print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}, delay={args.delay}s）")
+    print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}, delay={args.delay}s, companion={args.companion}）")
 
     # 记录 signals 文件当前行数，跑完只读新增
-    baseline_lines = len(SIGNALS_PATH.read_text(encoding="utf-8").splitlines()) if SIGNALS_PATH.exists() else 0
-    print(f"signals 基线行: {baseline_lines}")
+    baseline_lines = len(signals_path.read_text(encoding="utf-8").splitlines()) if signals_path.exists() else 0
+    print(f"signals 基线行: {baseline_lines}（{signals_path.name}）")
 
     from app.main import app
     client = TestClient(app)
     print("开始回放...\n")
-    results = run(client, seeds, delay=args.delay)
+    results = run(client, seeds, delay=args.delay, companion_id=args.companion)
 
     print("\n读取 signals...")
-    signals = read_signals(baseline_lines)
+    signals = read_signals(signals_path, baseline_lines)
     print(f"本次新增 signals: {len(signals)} 条")
 
     report(results, signals)
