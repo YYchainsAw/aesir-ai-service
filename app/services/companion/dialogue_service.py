@@ -58,6 +58,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
             )
             topics = service.last_topics
             facts = service.last_facts
+            corrected_facts = service.last_corrected_facts
             salient = service.last_salient
             reply_topics = service.last_reply_topics
             relationship_signal = service.last_relationship_signal
@@ -65,6 +66,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
             topics = None
             facts = None
+            corrected_facts = None
             salient = None
             reply_topics = None
             relationship_signal = None
@@ -72,6 +74,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
         topics = None
         facts = None
+        corrected_facts = None
         salient = None
         reply_topics = None
         relationship_signal = None
@@ -83,6 +86,7 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
         response,
         topics=topics,
         facts=facts,
+        corrected_facts=corrected_facts,
         salient=salient,
         reply_topics=reply_topics,
         relationship_signal=relationship_signal,
@@ -165,6 +169,7 @@ def _stream_llm_reply(
                 event.response,
                 topics=service.last_topics,
                 facts=service.last_facts,
+                corrected_facts=service.last_corrected_facts,
                 salient=service.last_salient,
                 reply_topics=service.last_reply_topics,
                 relationship_signal=service.last_relationship_signal,
@@ -293,6 +298,7 @@ def _record_turn(
     *,
     topics: list[str] | None = None,
     facts: list[str] | None = None,
+    corrected_facts: list[str] | None = None,
     salient: bool | None = None,
     reply_topics: list[str] | None = None,
     relationship_signal: str | None = None,
@@ -351,6 +357,11 @@ def _record_turn(
             sources=[request.text, *(t.user_text for t in prior_history)],
             game_id=game_id,
         )
+        # #101 矛盾纠错：玩家改口时，把被纠正的旧事实标记为 superseded（检索时跳过）
+        if corrected_facts:
+            store = get_memory_store(request.companion_id, game_id=game_id)
+            for old_fact in corrected_facts:
+                store.mark_superseded(old_fact, by_entry_id=None)
         salience_boost = _care_scaled_boost(request.companion_id, game_id=game_id) if salient else None
         _remember_turn(
             request.companion_id, topics, salient=salient, salience_boost=salience_boost, game_id=game_id
