@@ -39,6 +39,7 @@ def generation(monkeypatch):
         def __init__(self, *, profile):
             self.last_topics = []
             self.last_facts = []
+            self.last_corrected_fact_ids = []
             self.last_reply_topics = []
             self.last_relationship_signal = "none"
             self.last_salient = False
