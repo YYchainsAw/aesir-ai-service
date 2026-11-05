@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import uuid
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -340,6 +341,62 @@ class MemoryStore:
         with self._lock:
             self._snapshot = MemorySnapshot()
             self._persist_locked()
+
+    @guarded_commit
+    def mark_superseded(self, old_content: str, by_entry_id) -> int:
+        """把内容匹配的旧档案条目标记为已被新事实纠正（不删除，检索时跳过）。
+
+        用于玩家改口场景：先说"在港口小镇认识"，后说"没去过港口小镇"。
+        旧条目留档可追溯（audit），但不再注入给 LLM，避免新旧矛盾同时出现。
+        返回标记的条数。
+        """
+        key = dedup_key(old_content)
+        marked = 0
+        with self._lock:
+            for entry in self._snapshot.archive:
+                if dedup_key(entry.content) == key and entry.superseded_by is None:
+                    entry.superseded_by = by_entry_id
+                    marked += 1
+            if marked:
+                self._persist_locked()
+            return marked
+
+    @guarded_commit
+    def mark_superseded_by_entry_id(self, entry_id: str) -> int:
+        """按 LLM 回传的短 ID（``[ID:xxxxxxxx]`` 的前 8 位）标记旧事实为 superseded。
+
+        #101 实测：让 LLM 照抄旧事实原文再走 ``mark_superseded`` 的 dedup_key
+        精确匹配，失败率高——LLM 会换标点/换同义词，导致归档文本和回传文本
+        对不上。改成在 prompt 里给每条记忆标短 ID，让 LLM 直接回传 ID，匹配
+        变成 ``entry_id.hex.startswith(prefix)``，零措辞依赖。
+
+        匹配规则：``entry_id`` 大小写不敏感、支持 ``xxxxxxxx`` 或带 ``[ID:...]``
+        包裹；按前 8 位十六进制前缀匹配（prompt 里展示的就是 8 位短码）。
+        找不到匹配时返回 0（LLM 幻觉 ID 不抛错，只记 0）。
+        """
+        if not entry_id:
+            return 0
+        # 容错：剥掉可能的 [ID:...] 包裹、取前 8 位 hex、小写
+        raw = entry_id.strip().lower()
+        raw = raw.removeprefix("[id:").removeprefix("[").removesuffix("]")
+        prefix = raw.replace("-", "")[:8]
+        if not prefix:
+            return 0
+        # 哨兵 UUID：LLM 纠错路径下我们没有新事实的 entry_id（同轮刚写入），
+        # 用全零 UUID 表示「被 LLM 标记为 superseded，但无具体替代条目引用」。
+        # retrieval 只检查 superseded_by is None，任何非 None 值都会被跳过。
+        sentinel = uuid.UUID("00000000-0000-0000-0000-000000000000")
+        marked = 0
+        with self._lock:
+            for entry in self._snapshot.archive:
+                if entry.superseded_by is not None:
+                    continue
+                if entry.entry_id.hex.startswith(prefix):
+                    entry.superseded_by = sentinel
+                    marked += 1
+            if marked:
+                self._persist_locked()
+            return marked
 
     @guarded_commit
     def drop_impressions(self, topics: set[str]) -> int:

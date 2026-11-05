@@ -233,3 +233,69 @@ def test_concurrent_append_is_thread_safe(tmp_path) -> None:
     reloaded = MemoryStore("companion.alice", root=str(tmp_path))
     reloaded.load()
     assert len(reloaded.snapshot().short_term) == 40
+
+
+def test_mark_superseded_excludes_old_fact(store: MemoryStore) -> None:
+    """玩家改口：旧事实被标记纠正后，检索不再注入，但条目仍留档。"""
+    old = MemoryEntry(content="玩家说在港口小镇认识的", source="player_statement")
+    store.record_fact(old)
+    new = MemoryEntry(content="玩家说从没去过港口小镇", source="player_statement")
+    store.record_fact(new)
+
+    # 纠正前：两条都在档案
+    assert len(store.snapshot().archive) == 2
+
+    marked = store.mark_superseded("玩家说在港口小镇认识的", by_entry_id=new.entry_id)
+    assert marked == 1
+
+    # 旧条目标记了，但没被删
+    snap = store.snapshot()
+    assert len(snap.archive) == 2
+    old_entry = next(e for e in snap.archive if "港口小镇认识" in e.content)
+    assert old_entry.superseded_by == new.entry_id
+
+    # 检索时跳过被纠正的
+    from app.services.memory.retrieval import retrieve
+    retrieved = retrieve(store, budget=10)
+    contents = [e.content for e in retrieved]
+    assert "玩家说从没去过港口小镇" in contents
+    assert not any("港口小镇认识" in c for c in contents)
+
+
+def test_mark_superseded_by_entry_id_matches_short_prefix(store: MemoryStore) -> None:
+    """#101 新路径：LLM 回传 [ID:xxxxxxxx] 短码，按 entry_id 前 8 位 hex 前缀匹配。"""
+    old = MemoryEntry(content="玩家说在港口小镇认识的", source="player_statement")
+    store.record_fact(old)
+    new = MemoryEntry(content="玩家说从没去过港口小镇", source="player_statement")
+    store.record_fact(new)
+
+    short_id = old.entry_id.hex[:8]
+
+    # 纯短码
+    marked = store.mark_superseded_by_entry_id(short_id)
+    assert marked == 1
+    old_entry = next(e for e in store.snapshot().archive if e.content == old.content)
+    # 非 None 即代表被标记（retrieval 只过滤 None）
+    assert old_entry.superseded_by is not None
+
+
+def test_mark_superseded_by_entry_id_tolerates_wrapping_and_case(store: MemoryStore) -> None:
+    """LLM 可能把 [ID:xxxxxxxx] 整个包进来、或大小写不一致——都要容错。"""
+    old = MemoryEntry(content="玩家说在港口小镇认识的", source="player_statement")
+    store.record_fact(old)
+    short_id = old.entry_id.hex[:8].upper()
+
+    # 带 [ID:...] 包裹、大写
+    marked = store.mark_superseded_by_entry_id(f"[ID:{short_id}]")
+    assert marked == 1
+
+
+def test_mark_superseded_by_entry_id_unknown_id_returns_zero(store: MemoryStore) -> None:
+    """LLM 幻觉出一个不存在的 ID——不抛错，只返回 0。"""
+    old = MemoryEntry(content="玩家说在港口小镇认识的", source="player_statement")
+    store.record_fact(old)
+
+    marked = store.mark_superseded_by_entry_id("deadbeef")  # 不存在
+    assert marked == 0
+    old_entry = next(e for e in store.snapshot().archive if e.content == old.content)
+    assert old_entry.superseded_by is None

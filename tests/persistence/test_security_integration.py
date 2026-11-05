@@ -93,6 +93,7 @@ def delayed_generation(monkeypatch):
         def __init__(self, *, profile):
             self.last_topics = ["fishing"]
             self.last_facts = []
+            self.last_corrected_fact_ids = []
             self.last_reply_topics = []
             self.last_relationship_signal = "warm"
             self.last_salient = False
