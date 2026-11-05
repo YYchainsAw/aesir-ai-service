@@ -143,15 +143,15 @@ class _DialoguePayload(BaseModel):
     interruptible: bool = True
     topics: list[str] = Field(default_factory=list, max_length=3)
     facts: list[str] = Field(default_factory=list, max_length=3)
-    # 玩家改口时被纠正的旧事实内容（与 facts 同格式的中文短句）。
-    # 例如玩家先说"在港口小镇认识"后说"没去过港口小镇"，facts 写新事实，
-    # corrected_facts 返回旧事实原文，由 store.mark_superseded 标记旧条目。
-    corrected_facts: list[str] = Field(default_factory=list, max_length=3)
+    # 玩家改口时被纠正的旧事实短 ID 列表（来自 long-term memories 块里的 [ID:xxxxxxxx]）。
+    # #101 实测：让 LLM 照抄旧事实原文再走 dedup_key 匹配失败率高（LLM 会换
+    # 标点/同义词），改成让它直接回传 ID，匹配零措辞依赖。
+    corrected_fact_ids: list[str] = Field(default_factory=list, max_length=3)
     reply_topics: list[str] = Field(default_factory=list, max_length=3)
     relationship_signal: Literal["none", "warm", "deep", "cold", "hurtful"] = "none"
     salient: bool = False
 
-    @field_validator("facts", "corrected_facts")
+    @field_validator("facts", "corrected_fact_ids")
     @classmethod
     def _clean_facts(cls, values: list[str]) -> list[str]:
         """清洗事实条目：去空白、丢空串与超长项。
@@ -182,7 +182,7 @@ class LLMCompanionDialogueService:
         # 最近一次成功生成提取的主题/事实/自述主题/关系信号/显著性（实例按请求创建，见 dialogue_service）。
         self.last_topics: list[str] = []
         self.last_facts: list[str] = []
-        self.last_corrected_facts: list[str] = []
+        self.last_corrected_fact_ids: list[str] = []
         self.last_reply_topics: list[str] | None = None
         self.last_relationship_signal: str = "none"
         self.last_salient: bool = False
@@ -271,7 +271,7 @@ class LLMCompanionDialogueService:
             if not violations:
                 self.last_topics = response_payload.topics
                 self.last_facts = response_payload.facts
-                self.last_corrected_facts = response_payload.corrected_facts
+                self.last_corrected_fact_ids = response_payload.corrected_fact_ids
                 self.last_reply_topics = response_payload.reply_topics
                 self.last_relationship_signal = response_payload.relationship_signal
                 self.last_salient = response_payload.salient
@@ -436,7 +436,7 @@ class LLMCompanionDialogueService:
 
         self.last_topics = response_payload.topics
         self.last_facts = response_payload.facts
-        self.last_corrected_facts = response_payload.corrected_facts
+        self.last_corrected_fact_ids = response_payload.corrected_fact_ids
         self.last_reply_topics = response_payload.reply_topics
         self.last_relationship_signal = response_payload.relationship_signal
         self.last_salient = response_payload.salient
@@ -702,7 +702,7 @@ def _build_system_prompt(
         lines.append(_format_lookup_menu())
 
     lines += [
-        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, corrected_facts, reply_topics, relationship_signal, salient.",
+        "Return only one JSON object with exactly these keys: action, reply_text, emotion_id, gesture_id, facial_expression_id, interruptible, topics, facts, corrected_fact_ids, reply_topics, relationship_signal, salient.",
         'relationship_signal: rate the EMOTIONAL QUALITY of what the PLAYER said in this '
         'message — not your own tone. '
         '"warm" = everyday friendly warmth: genuine care, gratitude, cheerful mood, '
@@ -742,12 +742,14 @@ def _build_system_prompt(
         'Only include what the player stated — NEVER your own words, your guesses, or any '
         'detail you invented; empty list if the player only made small talk. These facts are '
         'stored and reused later, so a wrong one becomes a permanent false memory. '
-        'corrected_facts: if the player this turn CORRECTS or CONTRADICTS something they '
+        'corrected_fact_ids: if the player this turn CORRECTS or CONTRADICTS something they '
         'previously told you (e.g. earlier said "在港口小镇认识的", now says "我从没去过港口小镇"), '
-        'list the OLD fact(s) being overturned here — copy their content close to how they were '
-        'originally stated. Only list facts that were actually said before; empty list if no '
-        'correction this turn. The old facts will be marked as superseded so she never quotes '
-        'both versions at once.',
+        'list the [ID:xxxxxxxx] short code(s) of the OLD fact(s) being overturned — the IDs '
+        'appear in the "Long-term memories about the player" block above. Copy the 8-char hex '
+        'ID exactly as shown (without the [ID:] wrapper is also fine). Only list IDs that '
+        'actually appear in that block; empty list if no correction this turn. The old facts '
+        'will be marked as superseded so she never quotes both versions at once. Do NOT rewrite '
+        'the old fact content — just give the ID.',
         'salient: true only if the player solemnly declares something important about themselves '
         'and clearly wants it remembered (e.g. "记住：...", "有件重要的事情告诉你", promises, '
         'strong likes/dislikes); false for ordinary chat.',

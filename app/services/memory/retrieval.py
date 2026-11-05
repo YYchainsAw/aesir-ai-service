@@ -187,6 +187,10 @@ def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -
     这些是**她确定知道的事实**（对话链路抽取并经接地校验后才落档案），
     所以措辞要给她「可以直说」的许可——否则她会连记得的事也含糊其辞；
     同时明确「不得在此之外加细节」，把发挥空间压在事实边界内。
+
+    每条记忆前面带 ``[ID:xxxxxxxx]`` 短码（entry_id 前 8 位十六进制），
+    供 #101 矛盾纠错时让 LLM 直接回传被纠正旧事实的 ID——比让它照抄原文
+    再用 dedup_key 模糊匹配可靠得多（实测改写法会导致匹配失败）。
     """
     if not entries:
         return ""
@@ -197,5 +201,6 @@ def format_memory_block(entries: list[MemoryEntry], display_name: str = "她") -
     ]
     for entry in entries:
         phrase = _SOURCE_PHRASES.get(entry.source, "you remember")
-        lines.append(f"- ({phrase}) {entry.content}")
+        short_id = entry.entry_id.hex[:8]
+        lines.append(f"- [ID:{short_id}] ({phrase}) {entry.content}")
     return "\n".join(lines)
