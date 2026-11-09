@@ -340,6 +340,12 @@ class ScopedChatResponse(ScopedResponseBase):
     memory_layers: dict[str, int] = Field(default_factory=dict)
 
 
+class ScopedVoiceChatResponse(ScopedChatResponse):
+    """Scoped voice chat response with the server-side ASR text."""
+
+    transcribed_text: str
+
+
 class _ScopedControlState(ScopedModel):
     protocol_version: Literal["0.4"]
     scope: ScopedSaveScope

@@ -1,9 +1,10 @@
 """v0.4 JSON 边界：可信归属→显式绑定→预算/去重→共享业务→最终屏障。"""
+import json
 from dataclasses import dataclass
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 
 from fastapi.responses import JSONResponse
 
@@ -30,8 +31,10 @@ from app.schemas.scoped import (
     BindRunRequest, EndRunRequest, EncounterControlRequest, ScopedAgentRequest,
     ScopedChatRequest, ScopedWorldEventRequest, ScopedExecutionRequest, ScopedResetRequest,
     ScopedContextResponse, ScopedControlResponse, ScopedAgentResponse,
-    ScopedChatResponse, ScopedWorldEventResponse, ScopedExecutionResponse, ScopedResetResponse, ScopedConsoleStateResponse, ScopedMemoryViewResponse,
+    ScopedChatResponse, ScopedVoiceChatResponse, ScopedWorldEventResponse, ScopedExecutionResponse, ScopedResetResponse, ScopedConsoleStateResponse, ScopedMemoryViewResponse,
 )
+from app.services.transcribers.base import TranscriptionError
+from app.services.transcribers.factory import get_transcriber
 
 router = APIRouter(prefix="/v1/scoped", tags=["scoped-v0.4"])
 
@@ -298,6 +301,94 @@ def chat(request: ScopedChatRequest, principal: Principal = Depends(require_perm
         output.pop("companion_id", None)
         return {**output, **_base(scope, request.request_id, request.world_context)}
     return _execute(request, principal, "chat", run)
+
+
+@router.post("/companion/chat/voice", response_model=ScopedVoiceChatResponse)
+def voice_chat(
+    audio: UploadFile = File(..., description="WAV/PCM audio supplied by the game client"),
+    protocol_version: str = Form(default="0.4"),
+    request_id: str | None = Form(default=None),
+    save_id: str = Form(...),
+    service_instance_id: str = Form(...),
+    companion_id: str = Form(...),
+    run_id: str = Form(...),
+    run_binding_id: str = Form(...),
+    memory_epoch: str = Form(...),
+    session_id: str | None = Form(default=None),
+    encounter_id: str | None = Form(default=None),
+    game_state: str = Form(default="exploration"),
+    timing: str = Form(..., description="JSON encoded TimingInput"),
+    world_context_json: str | None = Form(default=None),
+    principal: Principal = Depends(require_permission("npc:use")),
+):
+    """Scoped voice chat: authenticate and validate scope before invoking ASR.
+
+    The first release keeps voice synchronous (v0.4).  UE can move to text
+    v0.5 after ASR returns; the server does not expose an unscoped voice path.
+    """
+    if protocol_version != "0.4":
+        raise ScopeError(422, "INVALID_SCOPE_OR_TIMING", "Scoped voice currently supports protocol_version 0.4")
+
+    request_data = {
+        "protocol_version": protocol_version,
+        "request_id": request_id or str(uuid4()),
+        "save_id": save_id,
+        "service_instance_id": service_instance_id,
+        "companion_id": companion_id,
+        "run_id": run_id,
+        "run_binding_id": run_binding_id,
+        "memory_epoch": memory_epoch,
+        "session_id": session_id,
+        "encounter_id": encounter_id,
+        "timing": _parse_form_json(timing, "timing"),
+        "text": "voice_pending",
+        "game_state": game_state,
+        "world_context": _parse_form_json(world_context_json, "world_context") if world_context_json else None,
+    }
+    try:
+        request = ScopedChatRequest.model_validate(request_data)
+    except Exception as error:
+        raise ScopeError(422, "INVALID_SCOPE_OR_TIMING", "Invalid scoped voice request") from error
+
+    # Resolve ownership and current credential before reading audio into ASR.
+    npc = resolve_npc_scope(principal, request.save_id, request.companion_id)
+    with use_principal(principal):
+        validate_principal(principal, npc)
+
+    try:
+        text = get_transcriber().transcribe(audio.file.read() or b"")
+    except TranscriptionError as error:
+        raise ScopeError(502, "ASR_UNAVAILABLE", "Speech transcription is unavailable") from error
+    if not text.strip():
+        raise ScopeError(422, "ASR_EMPTY", "No speech content was recognized")
+
+    request = request.model_copy(update={"text": text})
+
+    def run(scope):
+        from app.schemas.companion_dialogue import CompanionDialogueRequest
+        from app.services.companion.dialogue_service import create_dialogue_reply
+
+        legacy = CompanionDialogueRequest(
+            companion_id=request.companion_id,
+            text=request.text,
+            game_state=request.game_state,
+            session_id=str(request.session_id),
+            world_context=request.world_context,
+        )
+        output = create_dialogue_reply(legacy).model_dump(mode="json")
+        output.pop("protocol_version", None)
+        output.pop("companion_id", None)
+        return {**output, "transcribed_text": text,
+                **_base(scope, request.request_id, request.world_context)}
+
+    return _execute(request, principal, "chat", run)
+
+
+def _parse_form_json(raw: str, field: str):
+    try:
+        return json.loads(raw)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ScopeError(422, "INVALID_SCOPE_OR_TIMING", f"Invalid {field} JSON") from error
 
 
 def _event_directive(response):

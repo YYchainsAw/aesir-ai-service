@@ -252,9 +252,41 @@ def test_strict_mode_blocks_every_legacy_entry(h, method, path):
     code(h.client.request(method, path), 403, "LEGACY_DISABLED")
 
 
-@pytest.mark.parametrize("path", ["/v1/scoped/companion/chat/stream", "/v1/scoped/companion/chat/voice", "/v1/scoped/voice/command"])
+@pytest.mark.parametrize("path", ["/v1/scoped/companion/chat/stream", "/v1/scoped/voice/command"])
 def test_unsupported_scoped_stream_and_voice_are_explicitly_rejected(h, path):
     code(h.client.post(path), 404, "BUSINESS_REJECTED")
+
+
+def test_scoped_voice_chat_validates_scope_transcribes_and_replies(h, monkeypatch):
+    class StubTranscriber:
+        def transcribe(self, audio: bytes) -> str:
+            assert audio == b"wav"
+            return "你好，艾莉"
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", lambda: StubTranscriber())
+    ctx = h.bind()
+    data = {
+        "protocol_version": "0.4",
+        "request_id": str(uuid4()),
+        "save_id": ctx["scope"]["save_id"],
+        "service_instance_id": ctx["service_instance_id"],
+        "companion_id": ctx["scope"]["companion_id"],
+        "run_id": ctx["run_id"],
+        "run_binding_id": ctx["run_binding_id"],
+        "memory_epoch": ctx["memory_epoch"],
+        "timing": json.dumps(h.timing()),
+        "game_state": "exploration",
+    }
+    response = h.client.post(
+        "/v1/scoped/companion/chat/voice",
+        data=data,
+        files={"audio": ("voice.wav", b"wav", "audio/wav")},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["protocol_version"] == "0.4"
+    assert body["transcribed_text"] == "你好，艾莉"
+    assert body["scope"] == ctx["scope"]
 
 
 def test_legacy_chat_cannot_read_or_reset_scoped_history(h, monkeypatch):
