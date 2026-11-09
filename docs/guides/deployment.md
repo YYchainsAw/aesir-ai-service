@@ -86,4 +86,15 @@ python3.12 -m venv .venv
 
 ## 当前实现差距
 
+### 发布前配置门禁
+
+部署前可执行只读配置检查：
+
+```bash
+python scripts/release_preflight.py --mode staging
+python scripts/release_preflight.py --mode production --json
+```
+
+该检查会阻止开发身份、JSON 存储、内存调度、缺失数据库连接、mock ASR 和缺失 LLM 凭据进入生产配置；它只检查进程配置，不替代 HTTPS、UE 实际运行、外部供应商、备份恢复或容量验收。
+
 v0.4已实现可信开发身份、存档授权、玩家/存档/角色分区、显式绑定、相对时效、持久memory_epoch和有界内存幂等；旧入口默认关闭并保留独立legacy命名空间，详见[scoped交接](scoped-development.md)。第四步服务端已实现独立SQL事务/持久去重、服务端Bearer/存档授权、原子事实确认及历史回执归档，并有实际MySQL/进程重启/空库恢复证据，见[开发指南](persistent-development.md)。当前开发`.env`保留JSON模式，没有自动迁移/切换现有数据或公开服务。UE凭据/缓存/离线队列、正式HTTPS/OS隔离、完整灾备收敛、外部ASR、scoped SSE/语音、模型发布/签名下载与生产容量仍待验；所有后端继续单worker，不支持可靠共享多worker。现有服务端回归不替代本页AT-DEP完整远程验收。实现与跨仓依赖统一追踪[todo](../planning/todo.md)，本页不复制任务勾选或伪造运行记录。
