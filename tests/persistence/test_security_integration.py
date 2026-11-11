@@ -75,6 +75,28 @@ def document_snapshot(database):
     return sorted((row["namespace"], row["key_hash"], json.dumps(row["payload"], sort_keys=True)) for row in rows)
 
 
+def test_voice_failure_is_durably_replayed_without_second_asr_call(security, monkeypatch):
+    from app.services.transcribers.base import TranscriptionError
+
+    calls = []
+
+    class Unavailable:
+        def transcribe(self, audio):
+            calls.append(audio)
+            raise TranscriptionError("private provider detail")
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", lambda: Unavailable())
+    data = payload(security, timing=json.dumps(dict(capture_age_ms=0, request_age_ms=0,
+                   max_snapshot_age_ms=30000, max_request_age_ms=30000)))
+    for _ in range(2):
+        response = security.client.post("/v1/scoped/companion/chat/voice", data=data,
+                                        files={"audio": ("voice.wav", b"audio", "audio/wav")})
+        assert response.status_code == 502, response.text
+        assert response.json()["detail"]["code"] == "ASR_UNAVAILABLE"
+        assert "private provider detail" not in response.text
+    assert calls == [b"audio"]
+
+
 def session_history(service):
     context = service.context
     scope = RequestScope(NpcScope("aesir", service.player.player_id, service.player.save_id, "companion.alice"),

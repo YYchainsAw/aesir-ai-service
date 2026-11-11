@@ -191,6 +191,13 @@ class ScopedChatRequest(_RealtimeRequest):
         return self
 
 
+class ScopedVoiceChatRequest(ScopedChatRequest):
+    """Internal upload identity; the hash participates in logical-request deduplication."""
+
+    protocol_version: Literal["0.4"] = "0.4"
+    audio_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ScopedWorldEvent(WorldEvent):
     event_id: str
     sequence: int = Field(ge=0, strict=True)

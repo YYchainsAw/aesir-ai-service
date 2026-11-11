@@ -56,3 +56,18 @@ def test_staging_allows_mock_asr_as_explicit_warning(tmp_path: Path) -> None:
     settings = _settings(tmp_path, asr_backend="mock")
     checks = _by_key(run_preflight("staging", settings))
     assert checks["asr_backend"].status == "WARN"
+
+
+def test_external_asr_requires_a_readable_nonempty_speech_credential(tmp_path: Path) -> None:
+    key = tmp_path / "speech-key"
+    key.write_text("", encoding="utf-8")
+    settings = _settings(tmp_path, asr_backend="volcengine", asr_volc_api_key="",
+                         asr_volc_api_key_file=str(key))
+    assert _by_key(run_preflight("production", settings))["asr_credentials"].status == "BLOCK"
+    key.write_text("speech-test-key", encoding="utf-8")
+    assert _by_key(run_preflight("production", settings))["asr_credentials"].status == "PASS"
+
+
+def test_unknown_asr_backend_does_not_pass_release_gates(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, asr_backend="misspelled")
+    assert _by_key(run_preflight("staging", settings))["asr_backend"].status == "BLOCK"

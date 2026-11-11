@@ -1,5 +1,7 @@
 # 未决事项与跨仓依赖
 
+2026-11-11 答辩范围补充：文本、指令、真实 ASR 三项全部必交；真实 ASR 允许在已有服务器自部署开源模型并通过 HTTP 提供服务，优先复用 faster-whisper。第三方商业 ASR 不再是本轮必需依赖，原 #98 的第三方供应商要求按本次确认调整；UE 录音、真实识别、文本兜底与服务器部署仍分别验收。见[自部署方案](../guides/asr-self-hosted.md)。本地进展不代改 GitHub Issue 状态。
+
 2026-10-19初始整理，2026-10-23按Python `main@b641b2f`、UE `main@ea43abc`及本轮Issue对齐更新当前余项；逐项学习点与交接步骤见[AIRI学习点与两仓交接基线](airi-learning-alignment-20261023.md)。排期和完成状态由 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues) 维护；本页只记录尚未解决的业务口径、实现差距和跨仓依赖，不重复完成勾选。需求基线见 [SDD v1.1](aesir-agent-sdd-v1.1.md)，已完成事项与历史测试见[验证记录](../logs/verification-records.md)。
 
 | 编号 | 尚需解决的内容 | 处理边界 |

@@ -289,6 +289,82 @@ def test_scoped_voice_chat_validates_scope_transcribes_and_replies(h, monkeypatc
     assert body["scope"] == ctx["scope"]
 
 
+def _voice_upload(harness, context, **changes):
+    body = harness.payload(context, timing=json.dumps(harness.timing()), game_state="exploration")
+    body.update(changes)
+    return body
+
+
+def test_voice_retries_do_not_call_asr_twice_and_changed_audio_conflicts(h, monkeypatch):
+    calls = []
+
+    class Transcriber:
+        def transcribe(self, audio):
+            calls.append(audio)
+            return "你好"
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", lambda: Transcriber())
+    body = _voice_upload(h, h.bind())
+    first = h.client.post("/v1/scoped/companion/chat/voice", data=body,
+                          files={"audio": ("voice.wav", b"first", "audio/wav")})
+    retry = h.client.post("/v1/scoped/companion/chat/voice", data=body,
+                          files={"audio": ("voice.wav", b"first", "audio/wav")})
+    assert first.status_code == retry.status_code == 200, first.text
+    assert first.json() == retry.json()
+    assert calls == [b"first"]
+    changed = h.client.post("/v1/scoped/companion/chat/voice", data=body,
+                            files={"audio": ("voice.wav", b"second", "audio/wav")})
+    code(changed, 409, "REQUEST_ID_CONFLICT")
+    assert calls == [b"first"]
+
+
+def test_stale_voice_binding_is_rejected_before_asr(h, monkeypatch):
+    def never():
+        pytest.fail("ASR was invoked for a stale binding")
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", never)
+    old = h.bind()
+    h.bind()
+    response = h.client.post("/v1/scoped/companion/chat/voice", data=_voice_upload(h, old),
+                             files={"audio": ("voice.wav", b"audio", "audio/wav")})
+    code(response, 409, "RUN_BINDING_STALE")
+
+
+@pytest.mark.parametrize("failure,expected_status,expected_code", [
+    ("empty", 422, "ASR_EMPTY"),
+    ("provider", 502, "ASR_UNAVAILABLE"),
+    ("format", 422, "AUDIO_INVALID_FORMAT"),
+])
+def test_voice_errors_remain_recoverable(h, monkeypatch, failure, expected_status, expected_code):
+    from app.services.transcribers.base import AudioValidationError, TranscriptionError
+
+    class Transcriber:
+        def transcribe(self, audio):
+            if failure == "provider":
+                raise TranscriptionError("provider credential must not leak")
+            if failure == "format":
+                raise AudioValidationError("Use PCM WAV", code="AUDIO_INVALID_FORMAT")
+            return ""
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", lambda: Transcriber())
+    response = h.client.post("/v1/scoped/companion/chat/voice", data=_voice_upload(h, h.bind()),
+                             files={"audio": ("voice.wav", b"audio", "audio/wav")})
+    code(response, expected_status, expected_code)
+    assert "provider credential" not in response.text
+
+
+def test_voice_upload_size_limit_precedes_transcription(h, monkeypatch):
+    monkeypatch.setenv("AESIR_ASR_MAX_AUDIO_BYTES", "44")
+
+    def never():
+        pytest.fail("Oversized audio reached ASR")
+
+    monkeypatch.setattr("app.api.v1.scoped.get_transcriber", never)
+    response = h.client.post("/v1/scoped/companion/chat/voice", data=_voice_upload(h, h.bind()),
+                             files={"audio": ("voice.wav", b"x" * 45, "audio/wav")})
+    code(response, 413, "AUDIO_TOO_LARGE")
+
+
 def test_legacy_chat_cannot_read_or_reset_scoped_history(h, monkeypatch):
     ctx = h.bind()
     assert h.client.post("/v1/scoped/companion/chat", json=h.chat(ctx)).status_code == 200

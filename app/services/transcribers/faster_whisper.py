@@ -1,8 +1,8 @@
 """基于 faster-whisper 的本地语音转写后端。
 
 把 UE 上传的 WAV（默认 16kHz / 单声道 / 16bit）转成文本，再送入解析层。
-faster-whisper 用 ctranslate2 加速 Whisper：模型默认 ``small``（8GB 显存足够、
-中文够用、一句话约 0.5s，远低于 UE 3s 预算），首次使用按需下载。
+faster-whisper 用 ctranslate2 加速 Whisper，模型默认 ``small``。
+延迟取决于设备与录音长度，必须实测；首次使用按需下载，也可指定本地模型目录。
 
 模型实例做进程级懒加载缓存（``_load_model``），避免每次请求重新读权重。
 faster-whisper 为延迟导入，核心服务（mock 后端）不依赖 ML 栈。
@@ -13,7 +13,7 @@ import logging
 from functools import lru_cache
 
 from app.config import get_settings
-from app.services.transcribers.base import ASRBackend, TranscriptionError
+from app.services.transcribers.base import ASRBackend, TranscriptionError, validate_pcm_wav
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,10 @@ class FasterWhisperTranscriber(ASRBackend):
         if not audio:
             return ""
 
+        settings = get_settings()
+        validate_pcm_wav(audio, max_bytes=settings.asr_max_audio_bytes,
+                         max_seconds=settings.asr_max_audio_seconds)
+
         try:
             segments, _info = _load_model().transcribe(
                 io.BytesIO(audio),
@@ -57,5 +61,5 @@ class FasterWhisperTranscriber(ASRBackend):
             raise
         except Exception as exc:
             # 透传给上层：模型下载失败、推理异常、解码失败等都归为转写错误 → 502
-            logger.exception("faster-whisper 转写失败")
-            raise TranscriptionError(f"ASR transcription failed: {exc}") from exc
+            logger.warning("faster-whisper transcription failed (%s)", type(exc).__name__)
+            raise TranscriptionError("Local ASR is unavailable or could not decode the recording.") from None

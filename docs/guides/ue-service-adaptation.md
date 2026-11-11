@@ -101,7 +101,7 @@ GET /v1/scoped/requests/{request_id}
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `audio` | file | WAV/PCM 音频；大小和时长按部署配置限制 |
+| `audio` | file | 16 kHz、单声道、16-bit PCM WAV；默认最多 2 MiB、30 秒 |
 | `protocol_version` | string | 当前为 `0.4` |
 | `request_id` | UUID | 可省略；省略由服务端生成 |
 | `save_id`、`service_instance_id`、`companion_id` | string | 当前作用域 |
@@ -120,7 +120,7 @@ GET /v1/scoped/requests/{request_id}
 | 409 | 作用域/时效/绑定错误 | 重新获取 context；不要重放旧音频 |
 | 413/422 | 音频格式或大小问题 | 本地提示并重新录音 |
 
-当前服务端已提供 mock 和 faster-whisper 适配；生产使用哪家外部 ASR、音频外发范围和保留期必须在部署配置中明确，不能用 mock 验收代替真实供应商验收。
+2026-11-11 本轮答辩确认允许自部署开源 ASR：优先采用 faster-whisper，通过服务端 HTTP 向 UE 提供真实转写，无需第三方语音 API Key。配置和验证见[自部署语音识别](asr-self-hosted.md)。服务端另保留 mock 与豆包商业接口适配；模型部署、音频范围和保留期需记录，mock 不能代替真实模型验收。
 
 ## 6. Directive 与执行回执
 

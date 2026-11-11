@@ -108,12 +108,24 @@ def run_preflight(mode: str, settings: Settings | None = None) -> list[Check]:
 
     add(
         "asr_backend",
-        settings.asr_backend != "mock",
-        "A non-mock ASR backend is selected."
-        if settings.asr_backend != "mock"
-        else "mock ASR is enabled; voice acceptance cannot use this configuration.",
-        warn=not production,
+        settings.asr_backend in {"faster_whisper", "volcengine"},
+        "A supported non-mock ASR backend is selected."
+        if settings.asr_backend in {"faster_whisper", "volcengine"}
+        else "ASR is mock or unknown; voice acceptance cannot use this configuration.",
+        warn=not production and settings.asr_backend == "mock",
     )
+    if settings.asr_backend == "volcengine":
+        from app.services.transcribers.base import TranscriptionError
+        from app.services.transcribers.volcengine import load_api_key
+
+        try:
+            load_api_key(settings)
+            key_ready = True
+        except TranscriptionError:
+            key_ready = False
+        add("asr_credentials", key_ready,
+            "An external ASR credential is configured; provider access is not verified."
+            if key_ready else "Configure a Doubao speech API Key or readable private key file.")
     add(
         "https_boundary",
         False,
