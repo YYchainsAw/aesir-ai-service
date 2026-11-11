@@ -18,3 +18,11 @@ class ScopeError(RuntimeError):
         if self.request_id is not None:
             detail["request_id"] = str(self.request_id)
         return detail
+
+
+class PreGenerationError(ScopeError):
+    """Known failure before any dialogue/command state change.
+
+    Provider attempts may have been billed. Cache and replay the failure instead
+    of calling the provider again; this does not authorize an automatic retry.
+    """

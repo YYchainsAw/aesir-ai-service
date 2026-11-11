@@ -1,12 +1,16 @@
 """v0.5 异步契约真实端到端自证（打运行中的 server，不 mock）。
 
-用法（server 必须以 development identity 启动）：
+开发联调用法（server 以 development identity 启动）：
     set AESIR_SCOPE_IDENTITY_BACKEND=development
     set AESIR_SCOPE_DEV_PLAYER_ID=11111111-1111-1111-1111-111111111111
     set AESIR_SCOPE_DEV_SAVE_IDS=22222222-2222-2222-2222-222222222222
     .venv/Scripts/python.exe scripts/run_server.py
     :: 另开终端：
     .venv/Scripts/python.exe scripts/v05_async_e2e.py
+
+Bearer staging：设置 ``AESIR_SCOPE_IDENTITY_BACKEND=bearer``、
+``AESIR_BEARER_TOKEN``、``AESIR_SCOPE_SAVE_ID`` 和可选的
+``AESIR_COMPANION_ID``；脚本会为每个请求发送 Authorization 头。
 
 验证项：
   1. v0.4 同步 chat 200（baseline）
@@ -31,6 +35,9 @@ def http(method: str, url: str, body: dict | None = None, timeout: float = 10.0)
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Content-Type", "application/json; charset=utf-8")
     req.add_header("Accept", "application/json")
+    bearer_token = os.environ.get("AESIR_BEARER_TOKEN", "").strip()
+    if bearer_token:
+        req.add_header("Authorization", f"Bearer {bearer_token}")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read().decode("utf-8"))
@@ -46,8 +53,13 @@ def main() -> int:
     base = os.environ.get("AESIR_BASE_URL", "http://127.0.0.1:8011").rstrip("/")
     player_id = os.environ.get("AESIR_SCOPE_DEV_PLAYER_ID")
     save_ids_raw = os.environ.get("AESIR_SCOPE_DEV_SAVE_IDS", "")
-    if not player_id or not save_ids_raw:
-        print("[FAIL] 需要环境变量 AESIR_SCOPE_DEV_PLAYER_ID / AESIR_SCOPE_DEV_SAVE_IDS", file=sys.stderr)
+    identity_backend = os.environ.get("AESIR_SCOPE_IDENTITY_BACKEND", "development").strip().lower()
+    bearer_token = os.environ.get("AESIR_BEARER_TOKEN", "").strip()
+    if identity_backend == "bearer" and not bearer_token:
+        print("[FAIL] bearer 模式需要 AESIR_BEARER_TOKEN；脚本不会用开发身份冒充生产凭据", file=sys.stderr)
+        return 2
+    if identity_backend != "bearer" and (not player_id or not save_ids_raw):
+        print("[FAIL] 开发身份需要 AESIR_SCOPE_DEV_PLAYER_ID / AESIR_SCOPE_DEV_SAVE_IDS", file=sys.stderr)
         return 2
     # pydantic-settings 接受 JSON list 或逗号分隔；这里两种都容错
     save_ids = []
@@ -55,11 +67,14 @@ def main() -> int:
         part = part.strip().strip('"').strip("'")
         if part:
             save_ids.append(part)
-    if not save_ids:
-        print("[FAIL] AESIR_SCOPE_DEV_SAVE_IDS 解析为空", file=sys.stderr)
+    save_id = os.environ.get("AESIR_SCOPE_SAVE_ID", "").strip()
+    if not save_id and save_ids:
+        save_id = save_ids[0]
+    if not save_id:
+        name = "AESIR_SCOPE_SAVE_ID" if identity_backend == "bearer" else "AESIR_SCOPE_DEV_SAVE_IDS"
+        print(f"[FAIL] {name} 解析为空", file=sys.stderr)
         return 2
-    save_id = save_ids[0]
-    companion_id = "companion.alice"
+    companion_id = os.environ.get("AESIR_COMPANION_ID", "companion.alice")
 
     print(f"[setup] base={base} player={player_id} save={save_id} npc={companion_id}")
 
@@ -135,7 +150,8 @@ def main() -> int:
         f"&service_instance_id={ctx['service_instance_id']}&memory_epoch={ctx['memory_epoch']}"
         f"&operation=chat"
     )
-    deadline = time.monotonic() + 15.0
+    poll_timeout = float(os.environ.get("AESIR_V05_POLL_TIMEOUT_SECONDS", "15"))
+    deadline = time.monotonic() + poll_timeout
     status_body = None
     while time.monotonic() < deadline:
         code, status_body = http("GET", f"{base}/v1/scoped/requests/{p05['request_id']}?{status_query}")
@@ -143,7 +159,9 @@ def main() -> int:
         if status_body.get("state") == "completed":
             break
         time.sleep(0.1)
-    assert status_body and status_body.get("state") == "completed", f"未在 15s 内 completed: {status_body}"
+    assert status_body and status_body.get("state") == "completed", (
+        f"未在 {poll_timeout:g}s 内 completed: {status_body}"
+    )
     result = status_body.get("result") or {}
     async_fields = set(result.keys())
     print(f"[5/5] 轮询 completed ({(time.monotonic()-t0)*1000:.0f}ms 总) reply={result.get('reply_text', '')[:30]!r}")
@@ -158,6 +176,9 @@ def main() -> int:
         print(f"  ⚠ 异步多出字段: {sorted(extra)}")
     if not missing and not extra:
         print("  ✅ 字段集合完全一致")
+    else:
+        print("  [FAIL] v0.5 result 与 v0.4 同步响应字段不一致", file=sys.stderr)
+        return 1
 
     # 6. 并发两个 v0.5（不串台检查）
     print("\n[concurrent] 并发发两个 v0.5 chat ...")

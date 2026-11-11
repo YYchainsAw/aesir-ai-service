@@ -11,7 +11,7 @@ import threading
 import time
 from typing import Any, Hashable
 
-from app.scoped.errors import ScopeError
+from app.scoped.errors import PreGenerationError, ScopeError
 from app.scoped.timing import TimingBudget, use_budget
 
 
@@ -111,7 +111,7 @@ class IdempotencyStore:
             if entry is None or entry.state != "running":
                 return
             entry.expires_at = self.clock() + self.retention_seconds
-            if isinstance(error, ScopeError) and error.status_code < 500:
+            if isinstance(error, ScopeError) and (error.status_code < 500 or isinstance(error, PreGenerationError)):
                 entry.state = "failed"
                 entry.error = error
             else:
@@ -194,7 +194,7 @@ class IdempotencyStore:
                     entry.state, entry.error = "failed", error
                     if self._entries.get(key) is entry:
                         del self._entries[key]
-                elif isinstance(error, ScopeError) and error.status_code < 500:
+                elif isinstance(error, ScopeError) and (error.status_code < 500 or isinstance(error, PreGenerationError)):
                     entry.state = "failed"
                     entry.error = error
                 else:

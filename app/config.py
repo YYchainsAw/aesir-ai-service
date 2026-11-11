@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # -- 后端选择 -----------------------------------------------------------
     parser_backend: str = "rule"                # rule | llm
     companion_backend: str = "mock"             # mock | llm
-    asr_backend: str = "mock"                   # mock | faster_whisper
+    asr_backend: str = "mock"                   # mock | faster_whisper | volcengine
     tactical_policy: str = "rule"               # rule | rl（rl 仅占位，见总策划书 Phase 4）
     intent_backend: str = "rule"                # rule | llm（/v1/tactical/command 的意图解析后端）
     dialogue_history_turns: int = 10            # 会话记忆滚动窗口（session_id 维度，0 = 关闭记忆）
@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     asr_device: str = "auto"                     # auto：有 CUDA 用 GPU，否则 CPU
     asr_compute_type: str = "int8_float16"       # CUDA 加速；CPU 自动退化 int8
     asr_language: str = "zh"                     # 跳过语言检测省开销
+    asr_volc_api_key: SecretStr = SecretStr("")
+    asr_volc_api_key_file: str = ""              # 私有纯文本密钥文件，优先于直接配置
+    asr_volc_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    asr_max_audio_bytes: int = Field(default=2 * 1024 * 1024, ge=44, le=20 * 1024 * 1024)
+    asr_max_audio_seconds: float = Field(default=30.0, gt=0, le=120)
 
     # -- 回执与 LLM Provider -------------------------------------------------
     receipts_dir: str = "data/runtime/command_service/executions"

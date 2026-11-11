@@ -18,6 +18,8 @@
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/llm-integration.md) |
 | 指令在源码中怎样处理 | [命令处理导读](guides/command-execution.md) |
 | UE该调用哪个端点、怎样检查结果 | [两端接入对齐](protocols/integration-alignment-v0.3.md) |
+| UE新版文本/语音/指令如何接入、怎样导出离线交接包 | [UE服务适配](guides/ue-service-adaptation.md) · [请求样例](examples/ue-scoped.http) |
+| 发布时使用哪些进程守护、HTTPS和环境模板 | [发布准备](../deploy/README.md) |
 | 当前范围、45FR、7UC、规则和验收 | [NPC需求主文](planning/aesir-agent-sdd-v1.1.md) |
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/todo.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/npc-interaction-evolution.md)，含20项UC/FR/DEP映射和AT-EVO验收 |

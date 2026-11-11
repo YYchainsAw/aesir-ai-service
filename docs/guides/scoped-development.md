@@ -4,6 +4,8 @@
 
 ## 1. 配置与入口
 
+面向 UE 的最小适配步骤、语音表单字段和错误处理见[UE 服务适配说明](ue-service-adaptation.md)。本文继续作为服务端 v0.4/v0.5 的详细实现交接页。
+
 继续使用项目 `.venv` 与单个 Uvicorn worker。第二、三步的JSON开发方式不依赖数据库、Redis、Torch或真实ASR；第四步SQL/Bearer的新增依赖、独立配置与恢复方式见[持久化开发指南](persistent-development.md)。
 
 | 配置 | 默认与开发用法 |

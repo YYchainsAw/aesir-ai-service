@@ -1,5 +1,7 @@
 # 远程部署、隔离与同步
 
+可审查的发布文件见[deploy/README.md](../../deploy/README.md)，包含 systemd、Nginx 和无真实凭据的环境模板；本轮仅准备文件，目标服务器安装及运行验收另行执行。2026-11-11 答辩范围允许复用已有服务器上的 faster-whisper 开源 ASR，见[自部署方案](asr-self-hosted.md)。下文外部供应商转接仍保留为可选路径。
+
 > 2026-10-21用户采纳的目标方案，2026-10-22提交时按`main@4e2badc`对齐已合并v0.4子集。本页定义完整开发/发布要求；本次未执行部署、迁移、真实ASR或并发验收。新版字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)为准，旧[v0.3](../protocols/npc-contract-v0.3.md)及其引用的v0.1/v0.2仅用于显式legacy开发兼容，不将完整DEP目标当已实现API。
 
 已采纳的轮次取消、语音播放、事件治理、记忆来源和请求幂等等增量见[交互演进计划](../planning/npc-interaction-evolution.md)。该计划引用本页DEP规则，新增AT-EVO与现有AT-DEP按场景互相补充；TTS/VAD/流式转写与打断后置实施，不改变本页首期按键录音和外部ASR分工。字段/供应商/预算启用前另行对齐，原模型分发与训练隔离目标保持。
@@ -85,5 +87,16 @@ python3.12 -m venv .venv
 时延分开报告网络往返、服务排队/处理、外部ASR、LLM首字/完整回复和UE首次实际表现。原NFR-02/SC-011本机样例保留原范围，远程测试按已记录预算及失败样本验收，不自动放宽或宣称达标。UE检查入口见其`DEP-UE-*`；每次真实运行记录提交、配置、并发和原始证据，再更新验证记录。
 
 ## 当前实现差距
+
+### 发布前配置门禁
+
+部署前可执行只读配置检查：
+
+```bash
+python scripts/release_preflight.py --mode staging
+python scripts/release_preflight.py --mode production --json
+```
+
+该检查会阻止开发身份、JSON 存储、内存调度、缺失数据库连接、mock ASR 和缺失 LLM 凭据进入生产配置；它只检查进程配置，不替代 HTTPS、UE 实际运行、外部供应商、备份恢复或容量验收。
 
 v0.4已实现可信开发身份、存档授权、玩家/存档/角色分区、显式绑定、相对时效、持久memory_epoch和有界内存幂等；旧入口默认关闭并保留独立legacy命名空间，详见[scoped交接](scoped-development.md)。第四步服务端已实现独立SQL事务/持久去重、服务端Bearer/存档授权、原子事实确认及历史回执归档，并有实际MySQL/进程重启/空库恢复证据，见[开发指南](persistent-development.md)。当前开发`.env`保留JSON模式，没有自动迁移/切换现有数据或公开服务。UE凭据/缓存/离线队列、正式HTTPS/OS隔离、完整灾备收敛、外部ASR、scoped SSE/语音、模型发布/签名下载与生产容量仍待验；所有后端继续单worker，不支持可靠共享多worker。现有服务端回归不替代本页AT-DEP完整远程验收。实现与跨仓依赖统一追踪[todo](../planning/todo.md)，本页不复制任务勾选或伪造运行记录。

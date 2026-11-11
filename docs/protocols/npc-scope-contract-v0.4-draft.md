@@ -216,7 +216,7 @@ scoped业务响应携带实际解析的game/player/save/companion、run/绑定/e
 
 legacy开发兼容模式把旧v0.1/v0.2/v0.3请求映射到显式固定、独立的legacy归属，不能访问scoped数据。严格模式关闭所有未接入作用域的旧业务入口，包括commands/parse、parse-command、tactical/command/resolve、combat/events、旧回执、console和其UI；不是只在agent/step门口检查一次。/health及必要只读服务发现单独列白名单。
 
-语音multipart与SSE尚未实现scoped关联时在严格模式拒绝，不静默丢失作用域后落入旧chat。后续可在兼容章节增加其正式字段与流完成写入规则；当前不扩展ASR依赖或宣称语音/流式已通过。历史兼容路径继续遵守其已有字段和行为，不在新协议中重写旧验收记录。
+scoped语音入口 `POST /v1/scoped/companion/chat/voice` 已提供 v0.4 multipart 适配：先校验可信作用域，再执行ASR，最后复用scoped chat链路并返回 `transcribed_text`。当前语音入口保持同步；v0.5异步只对JSON chat/agent-step开放。SSE仍未实现scoped关联，严格模式拒绝，不静默落入旧chat。外部ASR供应商、音频门禁和真实语音验收仍需单独配置与取证。历史兼容路径继续遵守其已有字段和行为，不在新协议中重写旧验收记录。
 
 ## 8. 错误与处理顺序
 

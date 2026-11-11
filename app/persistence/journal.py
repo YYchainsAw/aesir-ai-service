@@ -21,7 +21,7 @@ from app.persistence.database import get_database, parts_hash, read_document, wr
 from app.persistence.schema import metadata
 from app.persistence.uow import current_uow
 from app.scoped.context import current_scope
-from app.scoped.errors import ScopeError
+from app.scoped.errors import PreGenerationError, ScopeError
 from app.scoped.idempotency import NotStartedError, fingerprint
 from app.scoped.runtime import get_runtime
 from app.scoped.timing import use_budget
@@ -264,7 +264,8 @@ class DurableIdempotencyStore:
                     raise _unknown(request_id) from database_error
                 self._notify()
                 raise error
-            if not frame.committed and not frame.staged and isinstance(error, ScopeError) and error.status_code < 500:
+            if (not frame.committed and not frame.staged and isinstance(error, ScopeError)
+                    and (error.status_code < 500 or isinstance(error, PreGenerationError))):
                 self._set_terminal(frame, "failed", {"status_code": error.status_code, "code": error.code, "message": error.message})
                 raise error
             self._set_terminal(frame, "unknown")

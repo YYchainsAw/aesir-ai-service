@@ -10,6 +10,8 @@ htmlcov/
 .env
 .env.*
 !.env.example
+/deploy/*.env
+/deploy/*.url
 
 # Model artifacts and training outputs
 models/

@@ -191,6 +191,13 @@ class ScopedChatRequest(_RealtimeRequest):
         return self
 
 
+class ScopedVoiceChatRequest(ScopedChatRequest):
+    """Internal upload identity; the hash participates in logical-request deduplication."""
+
+    protocol_version: Literal["0.4"] = "0.4"
+    audio_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ScopedWorldEvent(WorldEvent):
     event_id: str
     sequence: int = Field(ge=0, strict=True)
@@ -338,6 +345,12 @@ class ScopedChatResponse(ScopedResponseBase):
     relationship_delta: int = 0
     persona_revision: str = ""
     memory_layers: dict[str, int] = Field(default_factory=dict)
+
+
+class ScopedVoiceChatResponse(ScopedChatResponse):
+    """Scoped voice chat response with the server-side ASR text."""
+
+    transcribed_text: str
 
 
 class _ScopedControlState(ScopedModel):
