@@ -1,0 +1,176 @@
+# Scoped UE integration examples. These IDs are placeholders, not a live session.
+# Replace context values after discovery/bind and generate new IDs for new work.
+# Keep real Bearer credentials in your HTTP client's private environment.
+@baseUrl = http://127.0.0.1:8011
+@playerToken = REPLACE_IN_PRIVATE_CLIENT_ENVIRONMENT
+@saveId = 22222222-2222-4222-8222-222222222222
+@companionId = companion.alice
+@serviceInstanceId = 44444444-4444-4444-8444-444444444444
+@runId = 33333333-3333-4333-8333-333333333333
+@runBindingId = 55555555-5555-4555-8555-555555555555
+@memoryEpoch = 66666666-6666-4666-8666-666666666666
+@controlRevision = 0
+# JSON null when no run is bound; otherwise a quoted UUID from context.
+@expectedRunId = null
+@chatRequestId = 90000000-0000-4000-8000-000000000002
+@agentRequestId = 90000000-0000-4000-8000-000000000003
+@directiveId = 77777777-7777-4777-8777-777777777777
+
+### 1. Health (no player credential required)
+GET {{baseUrl}}/health
+
+### 2. Discover context
+GET {{baseUrl}}/v1/scoped/context?save_id={{saveId}}&companion_id={{companionId}}
+Authorization: Bearer {{playerToken}}
+
+### 3. Explicitly bind a NEW run, then refresh context with request 2
+POST {{baseUrl}}/v1/scoped/runs/bind
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.4",
+  "request_id": "90000000-0000-4000-8000-000000000001",
+  "save_id": "{{saveId}}",
+  "service_instance_id": "{{serviceInstanceId}}",
+  "expected_control_revision": {{controlRevision}},
+  "expected_run_id": {{expectedRunId}},
+  "run_id": "{{runId}}"
+}
+
+### 4. Async text: 202 means queued/running; a completed replay can be 200
+POST {{baseUrl}}/v1/scoped/companion/chat
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.5",
+  "request_id": "{{chatRequestId}}",
+  "save_id": "{{saveId}}", "companion_id": "{{companionId}}",
+  "service_instance_id": "{{serviceInstanceId}}", "run_id": "{{runId}}",
+  "run_binding_id": "{{runBindingId}}", "memory_epoch": "{{memoryEpoch}}",
+  "text": "你好，今天我们一起出发吧。",
+  "timing": {"capture_age_ms": 20, "request_age_ms": 0, "max_snapshot_age_ms": 30000, "max_request_age_ms": 120000}
+}
+
+### 5. Poll CHAT; include the original session/encounter if explicitly supplied
+GET {{baseUrl}}/v1/scoped/requests/{{chatRequestId}}?save_id={{saveId}}&companion_id={{companionId}}&service_instance_id={{serviceInstanceId}}&run_id={{runId}}&run_binding_id={{runBindingId}}&memory_epoch={{memoryEpoch}}&operation=chat
+Authorization: Bearer {{playerToken}}
+
+### 6. Async non-combat command. Capture a NEW snapshot and compute ages in UE.
+POST {{baseUrl}}/v1/scoped/agent/step
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.5",
+  "request_id": "{{agentRequestId}}",
+  "save_id": "{{saveId}}", "companion_id": "{{companionId}}",
+  "service_instance_id": "{{serviceInstanceId}}", "run_id": "{{runId}}",
+  "run_binding_id": "{{runBindingId}}", "memory_epoch": "{{memoryEpoch}}",
+  "text": "艾莉，原地等我",
+  "timing": {"capture_age_ms": 20, "request_age_ms": 0, "max_snapshot_age_ms": 30000, "max_request_age_ms": 30000},
+  "world_context": {
+    "snapshot_id": "88888888-8888-4888-8888-888888888888",
+    "captured_at": "2026-11-11T00:00:00Z",
+    "scene": "exploration",
+    "world_time": {"game_clock": "12:00", "time_of_day": "noon", "weather": "clear"},
+    "player": {"id": "party.player", "hp_percent": 100, "is_downed": false},
+    "companion": {"id": "companion.alice", "hp_percent": 83, "mp_percent": 72, "current_behavior": "follow", "is_casting": false}
+  }
+}
+
+### 7. Poll AGENT-STEP, copy directive.directive_id to directiveId after completion
+GET {{baseUrl}}/v1/scoped/requests/{{agentRequestId}}?save_id={{saveId}}&companion_id={{companionId}}&service_instance_id={{serviceInstanceId}}&run_id={{runId}}&run_binding_id={{runBindingId}}&memory_epoch={{memoryEpoch}}&operation=agent-step
+Authorization: Bearer {{playerToken}}
+
+### 8. Accepted receipt: new outer request ID; original IDs inside receipt
+POST {{baseUrl}}/v1/scoped/tactical/executions
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.4", "request_id": "90000000-0000-4000-8000-000000000004",
+  "save_id": "{{saveId}}", "companion_id": "{{companionId}}",
+  "service_instance_id": "{{serviceInstanceId}}", "run_id": "{{runId}}",
+  "run_binding_id": "{{runBindingId}}", "memory_epoch": "{{memoryEpoch}}",
+  "receipt": {"protocol_version": "0.4", "order_id": "{{directiveId}}", "request_id": "{{agentRequestId}}", "agent_id": "{{companionId}}", "result": "accepted", "sequence": 0}
+}
+
+### 9. Send ONLY after actual UE execution; never manufacture executed from HTTP 202
+POST {{baseUrl}}/v1/scoped/tactical/executions
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.4", "request_id": "90000000-0000-4000-8000-000000000005",
+  "save_id": "{{saveId}}", "companion_id": "{{companionId}}",
+  "service_instance_id": "{{serviceInstanceId}}", "run_id": "{{runId}}",
+  "run_binding_id": "{{runBindingId}}", "memory_epoch": "{{memoryEpoch}}",
+  "receipt": {"protocol_version": "0.4", "order_id": "{{directiveId}}", "request_id": "{{agentRequestId}}", "agent_id": "{{companionId}}", "result": "executed", "sequence": 1}
+}
+
+### 10. Read the ledger; this response is not an executable directive
+GET {{baseUrl}}/v1/scoped/directives/{{directiveId}}?save_id={{saveId}}&companion_id={{companionId}}&service_instance_id={{serviceInstanceId}}&run_id={{runId}}&run_binding_id={{runBindingId}}&memory_epoch={{memoryEpoch}}
+Authorization: Bearer {{playerToken}}
+
+### 11. Cancel an old CHAT request; invalidate its UE callback even if cancellation loses
+POST {{baseUrl}}/v1/scoped/requests/cancel
+Authorization: Bearer {{playerToken}}
+Content-Type: application/json
+
+{
+  "protocol_version": "0.4", "request_id": "90000000-0000-4000-8000-000000000006",
+  "save_id": "{{saveId}}", "companion_id": "{{companionId}}",
+  "service_instance_id": "{{serviceInstanceId}}", "run_id": "{{runId}}",
+  "run_binding_id": "{{runBindingId}}", "memory_epoch": "{{memoryEpoch}}",
+  "target_request_id": "{{chatRequestId}}", "operation": "chat", "reason_code": "SUPERSEDED"
+}
+
+### 12. Voice remains synchronous v0.4. Select your own local PCM WAV below.
+POST {{baseUrl}}/v1/scoped/companion/chat/voice
+Authorization: Bearer {{playerToken}}
+Content-Type: multipart/form-data; boundary=AesirVoiceBoundary
+
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="protocol_version"
+
+0.4
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="request_id"
+
+90000000-0000-4000-8000-000000000007
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="save_id"
+
+{{saveId}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="service_instance_id"
+
+{{serviceInstanceId}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="companion_id"
+
+{{companionId}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="run_id"
+
+{{runId}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="run_binding_id"
+
+{{runBindingId}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="memory_epoch"
+
+{{memoryEpoch}}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="timing"
+
+{"capture_age_ms":0,"request_age_ms":0,"max_snapshot_age_ms":120000,"max_request_age_ms":120000}
+--AesirVoiceBoundary
+Content-Disposition: form-data; name="audio"; filename="voice.wav"
+Content-Type: audio/wav
+
+< ./voice.wav
+--AesirVoiceBoundary--

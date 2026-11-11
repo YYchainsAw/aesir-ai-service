@@ -1,5 +1,7 @@
 # 远程部署、隔离与同步
 
+可审查的发布文件见[deploy/README.md](../../deploy/README.md)，包含 systemd、Nginx 和无真实凭据的环境模板；本轮仅准备文件，目标服务器安装及运行验收另行执行。2026-11-11 答辩范围允许复用已有服务器上的 faster-whisper 开源 ASR，见[自部署方案](asr-self-hosted.md)。下文外部供应商转接仍保留为可选路径。
+
 > 2026-10-21用户采纳的目标方案，2026-10-22提交时按`main@4e2badc`对齐已合并v0.4子集。本页定义完整开发/发布要求；本次未执行部署、迁移、真实ASR或并发验收。新版字段以[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)为准，旧[v0.3](../protocols/npc-contract-v0.3.md)及其引用的v0.1/v0.2仅用于显式legacy开发兼容，不将完整DEP目标当已实现API。
 
 已采纳的轮次取消、语音播放、事件治理、记忆来源和请求幂等等增量见[交互演进计划](../planning/npc-interaction-evolution.md)。该计划引用本页DEP规则，新增AT-EVO与现有AT-DEP按场景互相补充；TTS/VAD/流式转写与打断后置实施，不改变本页首期按键录音和外部ASR分工。字段/供应商/预算启用前另行对齐，原模型分发与训练隔离目标保持。

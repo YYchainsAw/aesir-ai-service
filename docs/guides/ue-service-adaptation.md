@@ -2,6 +2,16 @@
 
 本文把游戏端工作限定为 HTTP 适配。UE 不需要把 NPC 记忆、关系、LLM、ASR 或 Boss 策略逻辑搬进游戏本体；UE 只负责采集状态、发送请求、校验响应、执行合法动作并回传事实。
 
+可复制的请求模板见[ue-scoped.http](../examples/ue-scoped.http)。这些 UUID 和快照仅为占位，必须由当前 context/bind 和 UE 实际快照替换。实际 Bearer token 放在 HTTP 客户端的私有环境，不填写回仓库示例。
+
+离线生成交接包（不访问模型、数据库或运行中的服务）：
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.export_ue_handoff
+```
+
+产物为 `data/runtime/ue-handoff/ue-service-handoff.zip`，包含本说明、请求样例、OpenAPI、相关契约、发布模板与文件哈希清单；不包含 `.env`、模型、音频、真实记忆或运行日志。它是源码交接材料，不是运行验收证据。
+
 ## 1. 服务职责边界
 
 | 能力 | 服务端负责 | UE 负责 |
@@ -77,6 +87,8 @@ UE 必须：
 
 请求体将 `protocol_version` 改为 `0.5`，POST 返回 `202` 和 `state=queued/running`，不包含业务回复。随后轮询：
 
+同 ID 重试时，已完成请求可能直接返回 `200` 的业务结果；UE 必须处理 `200` 和 `202` 两种成功分支。v0.5 只是提交方式，轮询信封与业务 result 当前仍使用 v0.4 形状，不能把所有响应都强制要求为 `protocol_version=0.5`。
+
 ```text
 GET /v1/scoped/requests/{request_id}
   ?save_id=...
@@ -141,6 +153,20 @@ GET /v1/scoped/requests/{request_id}
 
 回执必须使用原 `directive_id` 和原 `request_id`。服务端回执已记录不代表 UE 世界状态已经改变。
 
+线上字段分为两层，不能把它们写成同一个 ID：
+
+| 字段 | 值与生命周期 |
+| --- | --- |
+| 外层 `request_id` | 本次回执提交的新逻辑 ID；网络重试复用它，accepted 与 executed 两次提交使用不同 ID |
+| `receipt.request_id` | 产生原 directive 的 agent-step/world-event 请求 ID |
+| `receipt.order_id` | 原 `directive.directive_id` |
+| `receipt.agent_id` | 当前 companion_id |
+| `receipt.sequence` | 同一指令的递增反馈序号，例如 accepted=0、executed=1；同一条回执重试不递增 |
+
+原提交 ID 重放会回放原响应，因此响应中 `stored=1` 不代表又写了一条；使用新外层 ID 重报同一回执时，去重响应可为 `stored=0`。只读 directive 状态查询可核对账本，但不能拿查询结果重新执行动作。
+
+最小 UE 动作先使用已有控制器处理的 exploration / player_command / wait，再接 follow。wait 无需 ability_id，不能虚构技能来满足字段；有能力动作时才核对 payload.ability_id 与 UE 实际能力目录。
+
 ## 7. 错误、断网和重启
 
 - 401：暂停云端写入，重新获取凭据；不要退回匿名作用域。
@@ -155,3 +181,16 @@ GET /v1/scoped/requests/{request_id}
 服务端可单独验收：schema、认证、作用域隔离、记忆/关系、LLM/ASR错误、v0.5轮询、回执去重、SQL/Redis、备份恢复和配置门禁。
 
 UE 仍需适配并提供证据：实际录音上传、文本/语音 UI、directive 执行、技能命中/完成、Boss 观测与 fallback、断网恢复和真实 Windows 包运行。服务端测试不能替代这些游戏内证据。
+
+## 9. UE 代码实施顺序
+
+当前 `CompanionChatSubsystem.cpp` 仍发送 legacy v0.3；以下是待实施的接口分工，不表示 UE 已完成修改。
+
+1. **会话上下文**：保存服务实例、save、run、binding、epoch、revision。进入新局或重连时由 context/bind 更新；不要用响应中旧值反向覆盖当前上下文。
+2. **请求记录**：每个逻辑请求保存 ID、operation、原始语义、快照和首次发送单调时间。重试只增加 age，不增加原预算、不刷新原快照。
+3. **异步分发**：POST 200 直接进入结果校验；202 创建轮询。chat 与 agent-step 的查询 operation 不同，session/encounter 要保持原值。HTTP 线程只交回结果，游戏线程更新 UI/角色。
+4. **旧代失效**：换局、读档、切角色和服务重启使本地回调代次失效并停止轮询。取消请求使用新控制 ID；即便服务端取消返回 false，也不能让旧回调作用于新局。
+5. **动作与回执**：只执行当前仍有效且本地可执行的 directive；本地已处理 directive_id 不能再次触发动作。按实际结果报告，不因模型回复或服务 HTTP 成功报告 executed。
+6. **录音界面**：按键录音导出完整 PCM WAV，上传时保存本地输入状态；等待期间游戏继续。失败显示未听清、重录或文本入口，不能自动上传上一局的录音。
+
+UE 待填的运行证据分开记录：文本首次回复、wait 实际生效、follow 恢复、重复响应不重复动作、换局旧响应丢弃、录音上传、ASR 故障切文本、断网仍能结算。最终代码提交、地图/资产快照、录屏及日志与这些项目一一关联。
