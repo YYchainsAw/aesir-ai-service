@@ -38,21 +38,7 @@ CANDIDATE_EXTENSION_TERMS = (
 )
 
 
-def _iter_records(root: Path):
-    for path in sorted(root.glob("*/*.jsonl")):
-        try:
-            with path.open(encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        yield path, json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-        except OSError:
-            continue
-
+from scripts.support.jsonl import iter_records as _iter_records
 
 def build_report(root: Path) -> dict:
     policy = get_style_policy()

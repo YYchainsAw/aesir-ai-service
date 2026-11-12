@@ -23,38 +23,15 @@ from rl.boss.policy import RuleBossPolicy
 from scripts.rl.boss.inventory import EXPECTED_SHA256, MODEL_NAME, ROOT, digest
 
 
-class FrozenBossPolicy:
-    def __init__(self, model):
-        if tuple(model.observation_space.shape) != (OBSERVATION_DIM,):
-            raise ValueError("frozen model observation space does not match schema 4")
-        if model.action_space.n != ACTION_COUNT:
-            raise ValueError("frozen model action space does not match schema 4")
-        self.model = model
-
-    def select_action(self, observation, state) -> BossAction:
-        del state
-        import numpy as np
-
-        mask = np.asarray(make_action_mask(observation), dtype=np.bool_)
-        action, _ = self.model.predict(
-            np.asarray(observation, dtype=np.float32),
-            deterministic=True, action_masks=mask,
-        )
-        result = BossAction(int(action))
-        if not mask[result]:
-            raise ValueError("frozen model selected a masked action")
-        return result
-
+from rl.boss.policy_adapter import PPOBossPolicy as FrozenBossPolicy
+from rl.boss.model_loader import FrozenModelLoader
 
 def load_frozen_policy(model_path: Path) -> FrozenBossPolicy:
-    if digest(model_path) != EXPECTED_SHA256:
-        raise ValueError("model SHA-256 does not match the recorded frozen candidate")
-    try:
-        from sb3_contrib import MaskablePPO
-    except ImportError as exc:
-        raise ValueError("missing Boss inference dependencies; see requirements-boss-inference.txt") from exc
-    return FrozenBossPolicy(MaskablePPO.load(str(model_path), device="cpu"))
-
+    loader = FrozenModelLoader(model_path)
+    loader.load()
+    policy = FrozenBossPolicy(loader._model)
+    policy.validation = loader.validation
+    return policy
 
 def validate_seeds(episodes: int, seed: int) -> None:
     if episodes <= 0 or seed < 0:
@@ -104,7 +81,8 @@ def run_evaluation(*, model_path: Path, output: Path, episodes: int, seed: int) 
         "source_sha256": {str(p.relative_to(ROOT)): digest(p) for p in sorted(sources)},
         "python_version": platform.python_version(), "platform": platform.platform(),
         "software": software,
-        "model_path": str(model_path.resolve()), "model_sha256": EXPECTED_SHA256,
+        "model_path": str(model_path.resolve()), "model_sha256": policy.validation["actual"]["sha256"],
+        "model_validation": policy.validation,
         "deterministic": True, "device": "cpu", "training_performed": False,
         "seed_plan": {"base_seed": seed, "episodes_per_profile": episodes,
                       "strategy": "same_seed_plus_index_for_each_profile_and_policy",
@@ -133,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         summary = run_evaluation(model_path=args.model, output=args.output,
                                  episodes=args.episodes, seed=args.seed)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RuntimeError) as exc:
         parser.exit(1, f"Frozen evaluation failed: {exc}\n")
     print(json.dumps({"summary": str(args.output / "summary.json"),
                       "state": summary["state"], "model_sha256": summary["model_sha256"]}))

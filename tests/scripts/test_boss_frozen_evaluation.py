@@ -34,7 +34,7 @@ def test_untrusted_zip_rejected_before_sb3_import(tmp_path, monkeypatch):
     monkeypatch.setattr(builtins, "__import__", guard)
     model = tmp_path / "wrong.zip"
     model.write_bytes(b"not the frozen model")
-    with pytest.raises(ValueError, match="SHA-256"):
+    with pytest.raises(RuntimeError, match="MODEL_SHA256_MISMATCH"):
         eval_frozen.load_frozen_policy(model)
 
 
@@ -74,7 +74,7 @@ def test_frozen_adapter_uses_deterministic_masked_cpu_input(selected, legal):
 
 def test_missing_model_leaves_no_evidence_directory(tmp_path):
     output = tmp_path / "evidence"
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(RuntimeError, match="MODEL_NOT_FOUND"):
         eval_frozen.run_evaluation(model_path=tmp_path / "absent.zip", output=output,
                                    episodes=1, seed=200000)
     assert not output.exists()
@@ -104,7 +104,9 @@ def test_episode_sink_and_summary_describe_same_run():
 
 def test_comparison_evidence_pairing_hashes_and_reproduction(tmp_path, monkeypatch):
     # Exercises evidence generation only; never describes this stand-in as PPO performance.
-    monkeypatch.setattr(eval_frozen, "load_frozen_policy", lambda path: RuleBossPolicy())
+    policy = RuleBossPolicy()
+    policy.validation = {"actual": {"sha256": eval_frozen.EXPECTED_SHA256}}
+    monkeypatch.setattr(eval_frozen, "load_frozen_policy", lambda path: policy)
     output = tmp_path / "run"
     summary = eval_frozen.run_evaluation(model_path=tmp_path / "fixture.zip", output=output,
                                         episodes=2, seed=200000)
@@ -159,3 +161,23 @@ def test_inventory_bounds_json_size(tmp_path):
     with ZipFile(path, "w") as archive:
         archive.writestr("data", b" " * (1024 * 1024 + 1))
     assert zip_metadata(path) == {"metadata_state": "over_size_limit"}
+
+
+def test_bad_zip_does_not_abort_other_model_inventory(tmp_path):
+    from zipfile import ZipFile
+    from scripts.rl.boss.inventory import inventory
+    bad = tmp_path / "bad.zip"
+    with ZipFile(bad, "w") as archive:
+        archive.writestr("data", "{}")
+    data = bytearray(bad.read_bytes())
+    for signature, offset in ((b"PK\x03\x04", 8), (b"PK\x01\x02", 10)):
+        position = data.index(signature) + offset
+        data[position:position+2] = (99).to_bytes(2, "little")
+    bad.write_bytes(data)
+    with ZipFile(tmp_path / "good.zip", "w") as archive:
+        archive.writestr("data", json.dumps({"observation_space": {"_shape": [26]},
+                                            "action_space": {"n": 9}}))
+    models = inventory(tmp_path)["local_model_metadata"]
+    assert len(models) == 2
+    assert models[0]["metadata_state"] == "unreadable_or_no_json_data"
+    assert models[1]["declared_dimensions_match"] is True

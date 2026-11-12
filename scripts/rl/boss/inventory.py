@@ -51,7 +51,7 @@ def zip_metadata(path: Path) -> dict:
         return {"metadata_state": "json_read_only", "declared_observation_shape": shape,
                 "declared_action_count": count,
                 "declared_dimensions_match": shape == [len(FEATURE_NAMES)] and count == ACTION_COUNT}
-    except (OSError, BadZipFile, KeyError, ValueError):
+    except (OSError, BadZipFile, KeyError, ValueError, RuntimeError, NotImplementedError, EOFError, RecursionError):
         return {"metadata_state": "unreadable_or_no_json_data"}
 
 

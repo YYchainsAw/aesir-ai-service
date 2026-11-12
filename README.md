@@ -2,7 +2,7 @@
 
 AesirWarden 的 Python 配套服务。NPC 服务负责对话、记忆、关系、语音转写、行为建议和回执采集；Boss RL 在独立进程中训练和推理。UE 始终负责世界状态、技能合法性、实际执行和结果结算。
 
-2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、外部ASR转接和模型版本发布。当前仍是单worker开发实现；2026-10-22第四步已新增SQL事务/Bearer授权、持久确认及真实事实/历史回执归档，并有受控MySQL与恢复证据。UE接入、正式数据/网络发布、完整离线队列与外部ASR仍待验。新增部署要求和验收见[部署指南](docs/guides/deployment.md)，不表示现代码可直接公网开放。
+2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、ASR和模型版本发布。当前按单worker受控交付理解；SQL事务/Bearer授权、持久确认及事实/历史回执归档已有受控MySQL与恢复证据；ASR已有自部署与商业备选适配和本机真实样例验证。UE接入、目标服务器语音部署、正式数据/网络发布及完整离线队列仍待验。见[部署指南](docs/guides/deployment.md)与[自部署ASR](docs/guides/asr-self-hosted.md)，不表示现代码可直接公网开放。
 
 ## 开发环境启动 NPC 服务
 
@@ -25,6 +25,7 @@ python -m venv .venv
 
 | 我现在要做什么 | 入口 |
 | --- | --- |
+| 刚接手项目，先了解结构、接口、功能和待办 | [接手导览：无需先读源码](docs/guides/project-onboarding-2026-11.md) |
 | 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
 | 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
 | 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |

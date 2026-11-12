@@ -123,7 +123,7 @@ def test_relationship_is_isolated_between_companions() -> None:
 
 def test_agent_step_accepts_second_companion() -> None:
     """/v1/agent/step 主入口无需改动即可处理第二角色。"""
-    from app.api.v1 import agent as agent_module
+    from app.services.agency import agent_service as agent_module
 
     agent_module._reset_heartbeat_tracker()
     response = client.post(

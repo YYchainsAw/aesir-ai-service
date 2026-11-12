@@ -13,8 +13,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.api.v1 import agent as agent_module
-from app.api.v1.agent import _reset_heartbeat_tracker
+from app.services.agency import agent_service as agent_module
+from app.services.agency.agent_service import _reset_heartbeat_tracker
 from app.services.agency.throttle import reset_throttle
 
 client = TestClient(app)

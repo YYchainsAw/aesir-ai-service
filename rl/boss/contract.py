@@ -5,6 +5,7 @@ retraining every model. The integer action values mirror
 ``EAesirBossAction`` in Unreal.
 """
 
+import math
 from enum import IntEnum
 from typing import Iterable
 
@@ -68,7 +69,7 @@ def make_observation(values: Iterable[float]) -> tuple[float, ...]:
             f"received {len(observation)}"
         )
     if any(
-        value < low or value > high
+        not math.isfinite(value) or value < low or value > high
         for value, low, high in zip(observation, OBSERVATION_LOW, OBSERVATION_HIGH)
     ):
         raise ValueError("observation contains values outside the schema-v4 bounds")

@@ -31,3 +31,17 @@ jobs:
           python -m pytest tests/api tests/services tests/schemas
           tests/scripts tests/rl/boss/test_contract.py tests/scoped
           tests/persistence -q
+
+  boss-inference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test and space-validation dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt -c requirements-sql-linux-py312.lock
+          python -m pip install numpy==2.5.2 gymnasium==1.2.3
+      - name: Frozen loader, inference and environment contracts (no real policy)
+        run: python -m pytest tests/rl/boss tests/scripts/test_boss_frozen_evaluation.py -q

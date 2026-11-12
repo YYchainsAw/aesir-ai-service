@@ -12,7 +12,7 @@ from gymnasium import spaces
 from fastapi.testclient import TestClient
 
 from rl.boss.contract import BossAction, FEATURE_NAMES, OBSERVATION_DIM
-from rl.boss import inference
+from rl.boss import model_loader as inference
 from rl.boss.inference import BossPolicyRuntime, ModelValidationError
 from rl.boss.inference_app import create_app
 
@@ -284,3 +284,35 @@ def test_runtime_contract_drift_is_rejected(tmp_path, monkeypatch):
     with pytest.raises(ModelValidationError, match="RUNTIME_CONTRACT_MISMATCH"):
         runtime.load()
     loader.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
+def test_nonfinite_observation_is_rejected_at_http_boundary(tmp_path, monkeypatch, value):
+    client = TestClient(create_app(make_runtime(tmp_path, monkeypatch)))
+    response = client.post("/v1/boss/policy/decide", json={
+        "request_id": "nonfinite", "sequence": 0, "observation": [value] + [0.0] * 25,
+    })
+    assert response.status_code == 422
+
+
+def test_offline_evaluation_uses_same_verified_snapshot_and_manifest(tmp_path, monkeypatch):
+    from scripts.rl.boss.eval_frozen import load_frozen_policy
+    runtime, loader = prepare_runtime(tmp_path, monkeypatch)
+    original = runtime.model_path.read_bytes()
+    def load(snapshot, device):
+        assert snapshot.read() == original
+        runtime.model_path.write_bytes(b"replacement after verification")
+        return FakeMaskableModel()
+    loader.side_effect = load
+    policy = load_frozen_policy(runtime.model_path)
+    assert policy.validation["state"] == "passed"
+    assert policy.validation["actual"]["sha256"] == sha256(original).hexdigest()
+    assert policy.validation["actual"]["sha256"] != sha256(runtime.model_path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("invalid", [1.5, float("nan"), [1, 2]])
+def test_policy_adapter_rejects_noninteger_or_multiple_actions(invalid):
+    from rl.boss.policy_adapter import predict_action
+    model = SimpleNamespace(predict=lambda *args, **kwargs: (invalid, None))
+    with pytest.raises(ValueError):
+        predict_action(model, [1.0] * 26)

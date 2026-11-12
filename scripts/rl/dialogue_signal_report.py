@@ -25,21 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 _DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "data" / "runtime" / "dialogue_signals"
 
 
-def _iter_records(root: Path):
-    for path in sorted(root.glob("*/*.jsonl")):
-        try:
-            with path.open(encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        yield path, json.loads(line)
-                    except json.JSONDecodeError:
-                        continue  # 坏行跳过，不阻塞报告
-        except OSError:
-            continue
-
+from scripts.support.jsonl import iter_records as _iter_records
 
 def _percent(part: int, total: int) -> float:
     return round(100.0 * part / total, 1) if total else 0.0

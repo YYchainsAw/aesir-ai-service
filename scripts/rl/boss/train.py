@@ -9,7 +9,6 @@ from pathlib import Path
 import platform
 import sys
 
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
@@ -17,7 +16,6 @@ from rl.boss.contract import (
     BossAction,
     FEATURE_NAMES,
     SCHEMA_VERSION,
-    make_action_mask,
 )
 from rl.boss.evaluation import evaluate_policy
 from rl.boss.policy import RuleBossPolicy
@@ -69,20 +67,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-class PPOBossPolicy:
-    def __init__(self, model) -> None:
-        self._model = model
-
-    def select_action(self, observation, state) -> BossAction:
-        del state
-        action_mask = np.asarray(make_action_mask(observation), dtype=np.bool_)
-        action, _ = self._model.predict(
-            observation,
-            deterministic=True,
-            action_masks=action_mask,
-        )
-        return BossAction(int(action))
-
+from rl.boss.policy_adapter import PPOBossPolicy
 
 def main() -> None:
     args = parse_args()
