@@ -1,6 +1,10 @@
 """Frozen MaskablePPO adapter for the standalone Boss inference service."""
 
 from dataclasses import dataclass
+from copy import deepcopy
+from hashlib import sha256
+from io import BytesIO
+import json
 import os
 from pathlib import Path
 from threading import Lock
@@ -9,13 +13,25 @@ from time import perf_counter
 import numpy as np
 
 from rl.boss.contract import (
+    ACTION_COUNT,
     BossAction,
+    FEATURE_NAMES,
     OBSERVATION_DIM,
     SCHEMA_VERSION,
     make_action_mask,
     make_observation,
 )
+from rl.boss.artifact import (
+    EXPECTED_ACTION_COUNT,
+    EXPECTED_OBSERVATION_DIM,
+    EXPECTED_REWARD_REVISION,
+    EXPECTED_SCHEMA_VERSION,
+    EXPECTED_SHA256,
+    EXPECTED_SIMULATION_REVISION,
+    MODEL_NAME,
+)
 from rl.boss.sim import SIMULATION_REVISION
+from rl.boss.rewards import REWARD_REVISION
 
 
 DEFAULT_MODEL_PATH = (
@@ -24,7 +40,7 @@ DEFAULT_MODEL_PATH = (
     / "rl"
     / "boss"
     / "deployment"
-    / "boss_policy_schema_v4_sim005.zip"
+    / f"{MODEL_NAME}.zip"
 )
 
 UNREAL_ACTION_NAMES = {
@@ -48,16 +64,47 @@ class BossPolicyDecision:
     inference_milliseconds: float
 
 
+class ModelValidationError(RuntimeError):
+    """A stable failure code, without leaking model loader exception details."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(f"Boss policy validation failed: {code}")
+
+
 class BossPolicyRuntime:
     """Loads one frozen policy and serializes prediction calls."""
 
-    def __init__(self, model_path: Path | None = None) -> None:
+    def __init__(self, model_path: Path | None = None, *, manifest_path: Path | None = None) -> None:
         configured_path = os.getenv("AESIR_BOSS_POLICY_MODEL")
-        self.model_path = Path(configured_path) if configured_path else (
-            model_path or DEFAULT_MODEL_PATH
-        )
+        self.model_path = Path(model_path or configured_path or DEFAULT_MODEL_PATH)
+        self.manifest_path = manifest_path or self.model_path.with_suffix(".training.manifest.json")
         self._model = None
         self._lock = Lock()
+        self._validation = self._new_validation()
+
+    @staticmethod
+    def _new_validation() -> dict:
+        return {
+            "state": "not_checked", "error_code": None,
+            "expected": {"model_id": MODEL_NAME, "sha256": EXPECTED_SHA256,
+                         "schema_version": EXPECTED_SCHEMA_VERSION,
+                         "observation_dimension": EXPECTED_OBSERVATION_DIM,
+                         "action_count": EXPECTED_ACTION_COUNT,
+                         "simulation_revision": EXPECTED_SIMULATION_REVISION,
+                         "reward_revision": EXPECTED_REWARD_REVISION},
+            "actual": {"sha256": None, "manifest_sha256": None, "schema_version": None,
+                       "observation_shape": None, "action_count": None,
+                       "simulation_revision": None, "reward_revision": None},
+        }
+
+    @property
+    def validation(self) -> dict:
+        return deepcopy(self._validation)
+
+    @property
+    def is_ready(self) -> bool:
+        return self.is_loaded and self._validation["state"] == "passed"
 
     @property
     def is_loaded(self) -> bool:
@@ -65,20 +112,106 @@ class BossPolicyRuntime:
 
     @property
     def model_id(self) -> str:
-        return self.model_path.stem
+        return MODEL_NAME
 
     def load(self) -> None:
-        if self.is_loaded:
-            return
-        if not self.model_path.is_file():
-            raise FileNotFoundError(f"Boss policy model not found: {self.model_path}")
+        with self._lock:
+            if self.is_ready:
+                return
+            self._model = None
+            self._validation = self._new_validation()
+            self._validation["state"] = "checking"
+            try:
+                self._load_validated()
+            except ModelValidationError as exc:
+                self._validation.update(state="failed", error_code=exc.code)
+                raise
+            except Exception as exc:
+                self._validation.update(state="failed", error_code="MODEL_LOAD_FAILED")
+                raise ModelValidationError("MODEL_LOAD_FAILED") from exc
 
-        from sb3_contrib import MaskablePPO
+    def _load_validated(self) -> None:
+        if (SCHEMA_VERSION, OBSERVATION_DIM, ACTION_COUNT, SIMULATION_REVISION, REWARD_REVISION) != (
+            EXPECTED_SCHEMA_VERSION, EXPECTED_OBSERVATION_DIM, EXPECTED_ACTION_COUNT,
+            EXPECTED_SIMULATION_REVISION, EXPECTED_REWARD_REVISION,
+        ):
+            raise ModelValidationError("RUNTIME_CONTRACT_MISMATCH")
+        try:
+            # Hash and deserialize the same immutable snapshot, never reopen the path.
+            model_bytes = self.model_path.read_bytes()
+        except FileNotFoundError as exc:
+            raise ModelValidationError("MODEL_NOT_FOUND") from exc
+        except OSError as exc:
+            raise ModelValidationError("MODEL_UNREADABLE") from exc
+        actual = self._validation["actual"]
+        actual["sha256"] = sha256(model_bytes).hexdigest()
+        if actual["sha256"] != EXPECTED_SHA256:
+            raise ModelValidationError("MODEL_SHA256_MISMATCH")
+        self._validate_manifest()
+        try:
+            from sb3_contrib import MaskablePPO
+            from gymnasium import spaces
+        except ImportError as exc:
+            raise ModelValidationError("INFERENCE_DEPENDENCIES_MISSING") from exc
+        with BytesIO(model_bytes) as snapshot:
+            model = MaskablePPO.load(snapshot, device="cpu")
+        observation_space = getattr(model, "observation_space", None)
+        action_space = getattr(model, "action_space", None)
+        shape = getattr(observation_space, "shape", None)
+        actual["observation_shape"] = list(shape) if shape is not None else None
+        count = getattr(action_space, "n", None)
+        actual["action_count"] = int(count) if isinstance(count, (int, np.integer)) else None
+        if not isinstance(observation_space, spaces.Box) or shape != (OBSERVATION_DIM,):
+            raise ModelValidationError("MODEL_OBSERVATION_SPACE_MISMATCH")
+        if (observation_space.dtype != np.float32
+                or not np.all(observation_space.low == 0.0)
+                or not np.all(observation_space.high == 1.0)):
+            raise ModelValidationError("MODEL_OBSERVATION_BOUNDS_MISMATCH")
+        if (not isinstance(action_space, spaces.Discrete) or count != ACTION_COUNT
+                or action_space.start != 0):
+            raise ModelValidationError("MODEL_ACTION_SPACE_MISMATCH")
+        # Publish only after every check succeeds.
+        self._model = model
+        self._validation["state"] = "passed"
 
-        self._model = MaskablePPO.load(str(self.model_path), device="cpu")
+    def _validate_manifest(self) -> None:
+        try:
+            with self.manifest_path.open("rb") as stream:
+                data = stream.read(1024 * 1024 + 1)
+        except FileNotFoundError as exc:
+            raise ModelValidationError("MANIFEST_NOT_FOUND") from exc
+        except OSError as exc:
+            raise ModelValidationError("MANIFEST_UNREADABLE") from exc
+        if len(data) > 1024 * 1024:
+            raise ModelValidationError("MANIFEST_INVALID")
+        self._validation["actual"]["manifest_sha256"] = sha256(data).hexdigest()
+        try:
+            manifest = json.loads(data)
+        except (ValueError, UnicodeError) as exc:
+            raise ModelValidationError("MANIFEST_INVALID") from exc
+        if not isinstance(manifest, dict):
+            raise ModelValidationError("MANIFEST_INVALID")
+        actual = self._validation["actual"]
+        for key in ("schema_version", "simulation_revision", "reward_revision"):
+            value = manifest.get(key)
+            # Only scalar values belong in health diagnostics, even for malformed input.
+            actual[key] = value if type(value) in (str, int) else None
+        if type(manifest.get("schema_version")) is not int or manifest["schema_version"] != SCHEMA_VERSION:
+            raise ModelValidationError("MANIFEST_SCHEMA_MISMATCH")
+        if manifest.get("feature_names") != list(FEATURE_NAMES):
+            raise ModelValidationError("MANIFEST_FEATURES_MISMATCH")
+        actions = manifest.get("actions")
+        if (not isinstance(actions, dict) or any(type(v) is not int for v in actions.values())
+                or actions != {action.name: int(action) for action in BossAction}):
+            raise ModelValidationError("MANIFEST_ACTIONS_MISMATCH")
+        if (manifest.get("simulation_revision") != SIMULATION_REVISION
+                or manifest.get("reward_revision") != REWARD_REVISION):
+            raise ModelValidationError("MANIFEST_REVISION_MISMATCH")
 
     def decide(self, values: list[float]) -> BossPolicyDecision:
         observation = make_observation(values)
+        if not self.is_ready:
+            self.load()
         raw_availability = tuple(value >= 0.5 for value in observation[-len(BossAction):])
         if not any(raw_availability):
             return BossPolicyDecision(
@@ -87,9 +220,6 @@ class BossPolicyRuntime:
                 reason="state_locked",
                 inference_milliseconds=0.0,
             )
-
-        if not self.is_loaded:
-            self.load()
 
         action_mask = np.asarray(make_action_mask(observation), dtype=np.bool_)
         started = perf_counter()
@@ -101,6 +231,8 @@ class BossPolicyRuntime:
             )
         elapsed_ms = (perf_counter() - started) * 1000.0
         action = BossAction(int(action_value))
+        if not action_mask[action]:
+            raise ValueError("Boss policy selected an unavailable action")
         return BossPolicyDecision(
             actionable=True,
             action=action,
@@ -116,5 +248,9 @@ def runtime_metadata(runtime: BossPolicyRuntime) -> dict[str, object]:
         "simulation_revision": SIMULATION_REVISION,
         "model_id": runtime.model_id,
         "model_path": str(runtime.model_path),
+        "manifest_path": str(runtime.manifest_path),
         "loaded": runtime.is_loaded,
+        "ready": runtime.is_ready,
+        "action_count": ACTION_COUNT,
+        "model_validation": runtime.validation,
     }

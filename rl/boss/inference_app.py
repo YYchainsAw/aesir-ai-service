@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
 from rl.boss.contract import OBSERVATION_DIM, SCHEMA_VERSION
@@ -64,9 +64,11 @@ def create_app(runtime: BossPolicyRuntime | None = None) -> FastAPI:
     )
 
     @app.get("/health", tags=["system"])
-    def health() -> dict[str, object]:
+    def health(response: Response) -> dict[str, object]:
+        if not policy_runtime.is_ready:
+            response.status_code = 503
         return {
-            "status": "ok" if policy_runtime.is_loaded else "not_loaded",
+            "status": "ok" if policy_runtime.is_ready else "not_ready",
             "service": "aesir-boss-policy-service",
             "protocol_version": PROTOCOL_VERSION,
             **runtime_metadata(policy_runtime),
