@@ -1,6 +1,6 @@
 # 本机启动与检查
 
-> 2026-10-19按`a2dd426`校对；当前默认NPC端口8011。本页集中启动、依赖与常见操作，现行scoped JSON字段见[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)，旧示例字段见[legacy v0.3及其引用的兼容契约](../protocols/npc-contract-v0.3.md)，需求见[SDD v1.1](../planning/aesir-agent-sdd-v1.1.md)。
+> 2026-10-19 初版，2026-11-12 清理过时启动及 ASR 描述。新人优先阅读[接手导览](project-onboarding-2026-11.md)；本页保留本机操作和 legacy 示例背景。现行 scoped JSON 字段见[v0.4契约](../protocols/npc-scope-contract-v0.4-draft.md)，旧示例见[legacy v0.3](../protocols/npc-contract-v0.3.md)。
 
 正式目标为远程NPC与本地Boss；本页保留Windows开发操作。下文旧业务示例须显式启用legacy兼容；默认新版入口、身份与绑定顺序见[v0.4交接](scoped-development.md)。生产环境的Linux运行环境、认证、存储、外部ASR和发布门禁见[部署指南](deployment.md)，当前本机文件后端不能直接作为多人公网服务。
 
@@ -27,6 +27,7 @@ python -m venv .venv
 ## 启动与检查地址
 
 ```powershell
+$env:AESIR_COORDINATION_BACKEND = 'memory' # 本机 JSON 开发模式显式配置
 .\.venv\Scripts\python -m scripts.run_server --reload
 curl.exe http://127.0.0.1:8011/health
 ```
@@ -78,11 +79,11 @@ Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8011/v1/companion/chat' -C
 
 ## 语音和外部后端
 
-部署目标见[AI-DEP-12/13分工对照](../planning/ai-capability-placement.md)及[部署指南](deployment.md)：采集/PTT、已采纳后置的VAD与播放在UE本地；初期文本优先，正式语音已采纳NPC服务转接外部ASR。下面仍说明当前已支持的`mock`／`faster_whisper`，外部ASR尚无适配，不新增未实现的配置值，真人音频与时延另验收。
+当前已支持 `mock`、`faster_whisper` 与 `volcengine` 三种 ASR 后端。2026-11-11 已确认允许服务器自部署开源模型，配置与本机验证边界见[自部署 ASR](asr-self-hosted.md)，scoped 上传流程见[UE 服务适配](ue-service-adaptation.md)。UE 录音、目标服务器部署与真实端到端时延仍需分别验收；VAD/TTS/播放打断仍属后置范围。
 
 ASR默认mock；真实识别用AESIR_ASR_BACKEND=faster_whisper，另按本机能力配置AESIR_ASR_MODEL/DEVICE/COMPUTE_TYPE/LANGUAGE。首次下载模型可能联网，运行需已有模型和依赖，不能把mock通过当真实语音已验收。
 
-传输约定16kHz/单声道/16-bit PCM WAV。命令上传字段为file、context_json；闲聊与纯转写字段为audio。当前没有统一大小/时长/WAV头门禁，失败按实际响应处理，保留文本入口。不要在教程或测试记录中放密钥、私人对话和未脱敏音频。
+传输约定 16kHz/单声道/16-bit PCM WAV。旧命令上传字段为 file、context_json；scoped 语音聊天使用 audio 及绑定表单字段。当前真实识别后端已有 WAV 内容、大小与时长校验，默认 2 MiB、30 秒；不能只凭扩展名判断格式。失败时保留文本入口，不在教程中放密钥、私人对话和未脱敏音频。
 
 ## 检查与结果记录
 

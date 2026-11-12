@@ -37,15 +37,7 @@ from app.schemas.ids import (
 from app.services.parsers.base import CommandParser
 
 
-def _normalize(text: str) -> str:
-    return (
-        text.strip()
-        .lower()
-        .replace("，", ",")
-        .replace("。", "")
-        .replace(" ", "")
-    )
-
+from app.services.parsers.text import normalize as _normalize
 
 def _has_any(text: str, *keywords: str) -> bool:
     return any(keyword in text for keyword in keywords)

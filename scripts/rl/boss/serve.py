@@ -1,7 +1,6 @@
 """Run the standalone frozen Boss policy service."""
 
 import argparse
-import os
 from pathlib import Path
 import sys
 
@@ -13,20 +12,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8012)
     parser.add_argument("--model", type=Path, default=None)
+    parser.add_argument("--manifest", type=Path, default=None,
+                        help="training manifest (default: <model>.training.manifest.json)")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if args.model is not None:
-        if not args.model.is_file():
-            raise SystemExit(f"model does not exist: {args.model}")
-        os.environ["AESIR_BOSS_POLICY_MODEL"] = str(args.model.resolve())
-
     import uvicorn
+    from rl.boss.inference import BossPolicyRuntime
+    from rl.boss.inference_app import create_app
 
     uvicorn.run(
-        "rl.boss.inference_app:app",
+        create_app(BossPolicyRuntime(args.model, manifest_path=args.manifest)),
         host=args.host,
         port=args.port,
         reload=False,

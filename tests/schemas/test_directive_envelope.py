@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.api.v1.agent import _build_directive
+from app.services.agency.agent_service import _build_directive
 from app.schemas.directives.common import (
     KNOWN_ACTION_TYPES,
     DirectiveActionType,

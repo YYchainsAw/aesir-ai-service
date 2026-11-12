@@ -1,0 +1,11 @@
+# Standalone Boss HTTP inference only; no NPC/ASR/SQL/Redis or training tools.
+# Pins match the existing core and RL requirement files.
+# Select a target-platform CPU build of torch when preparing the Windows runtime.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+numpy==2.5.2
+gymnasium==1.2.3
+stable-baselines3==2.7.1
+sb3-contrib==2.7.1
+torch==2.7.1

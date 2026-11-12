@@ -7,8 +7,8 @@
 | 编号 | 尚需解决的内容 | 处理边界 |
 | --- | --- | --- |
 | EXT-01 | 真实玩家输入→解析→UE 接收→实际启动/命中/完成→回执闭环；Alice/Bruno 技能声明与 UE 可执行能力逐项对照 | 服务端返回 200、接收回执或临时心跳通道均不代表技能已完成；按实际能力拒绝越界，不擅自冻结技能数量 |
-| EXT-02 | Boss 冻结候选部署身份校验、无重训独立 PPO 评估入口、逐局输出、UE 同条件 BT 对照与故障回退复测 | 当前候选为 schema4/sim005/reward003 seed1；900 局属于选模；旧队友“2/3达标”不能作 Boss 上线依据，见 [RL 说明](../../rl/README.md) |
-| EXT-03 / OUT-05 | 对话RL导演层是否立项（#54 / T39） | 仍待批准；现有信号可分析，不能据此启用在线学习或自演化人格 |
+| EXT-02 | Boss 冻结候选真实启动校验、真实冻结 PPO 评估与训练数据独立性核定、UE 同条件 BT 对照与故障回退复测 | 2026-11-12已补无需重训的评估入口和逐局输出，以及 HTTP 启动 SHA/manifest Schema/加载后空间门禁和健康状态，合成材料测试通过；冻结 ZIP/配套材料及 sb3-contrib 缺失，真实启动和评估待验。用户明确暂不训练新候选。当前候选为 schema4/sim005/reward003 seed1；900 局属于选模；旧队友“2/3达标”不能作 Boss 上线依据，见 [RL 说明](../../rl/README.md) |
+| EXT-03 / OUT-05 | 对话RL导演层离线评估、数据量与收益门槛（#54 / T39） | 已有立项评估批准记录；信号可分析，在线学习和自演化人格仍未启用，见[评估](dialogue-director-rl-eval.md) |
 | EXT-07 | 已采纳外部ASR转接；首期供应商/scoped音频/文本兜底由[#98](https://github.com/YYchainsAw/aesir-ai-service/issues/98)交付，VAD/TTS/播放打断由[#56](https://github.com/YYchainsAw/aesir-ai-service/issues/56)后置 | 见BR-DEP-05、V1～V4及AT-EVO-03/04；mock/本机Whisper不代替正式外部ASR，真实语音总预算不套300ms文本口径，供应商/声音/保留与播出门槛启用前记录 |
 | EXT-08 | 读档、快进、跨存档的时间/衰减业务（[#57](https://github.com/YYchainsAw/aesir-ai-service/issues/57) / T42），以及UE缓存/持久队列/恢复接入 | DEP2绑定/epoch及DEP4 SQL持久确认、真实事实/历史回执归档和只读恢复均已合入main；复用[持久化契约](../protocols/npc-persistence-contract-v0.4.md)，不重排为待开发数据库。服务重启须重新context/bind；UE端到端恢复、任意分支合并及#57完整时间/衰减范围未由服务端通过代替 |
 | FIX-02 | UE 敌人血条 MaxHealth=0 防护 | 跨仓检查与 PIE 验证；不以 Python 文档判已修复 |

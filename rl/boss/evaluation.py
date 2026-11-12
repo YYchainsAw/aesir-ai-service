@@ -3,6 +3,7 @@
 from collections import Counter
 from dataclasses import dataclass, field
 import statistics
+from typing import Callable
 
 from rl.boss.contract import BossAction
 from rl.boss.policy import BossPolicy
@@ -124,15 +125,18 @@ def evaluate_policy(
     policy_name: str,
     episodes_per_profile: int = 20,
     base_seed: int = 0,
+    on_episode: Callable[[EpisodeMetrics], None] | None = None,
 ) -> EvaluationReport:
     if episodes_per_profile <= 0:
         raise ValueError("episodes_per_profile must be positive")
 
-    episodes = [
-        run_episode(policy, seed=base_seed + index, player_profile=profile)
-        for profile in PLAYER_PROFILES
-        for index in range(episodes_per_profile)
-    ]
+    episodes = []
+    for profile in PLAYER_PROFILES:
+        for index in range(episodes_per_profile):
+            episode = run_episode(policy, seed=base_seed + index, player_profile=profile)
+            episodes.append(episode)
+            if on_episode is not None:
+                on_episode(episode)
     results_by_profile: dict[str, dict[str, int]] = {}
     for episode in episodes:
         profile_results = results_by_profile.setdefault(episode.player_profile, {})

@@ -13,3 +13,6 @@ include = ["app*", "rl*", "scripts*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+"app.api.v1" = ["*.html"]

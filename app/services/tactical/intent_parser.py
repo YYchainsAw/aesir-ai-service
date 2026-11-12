@@ -21,15 +21,7 @@ _BURST_WORDS = ("爆裂", "大招", "爆发", "开大", "explosion", "burst")
 _STUN_WORDS = ("眩晕", "晕了", "出破绽", "破绽", "stun")
 
 
-def _normalize(text: str) -> str:
-    return (
-        text.strip()
-        .lower()
-        .replace("，", ",")
-        .replace("。", "")
-        .replace(" ", "")
-    )
-
+from app.services.parsers.text import normalize as _normalize
 
 def _has_any(text: str, *keywords: str) -> bool:
     return any(keyword in text for keyword in keywords)

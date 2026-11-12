@@ -1,6 +1,6 @@
-# NPC 异步请求契约 v0.5（设计草案 · 待 UE 对齐）
+# NPC 异步请求契约 v0.5（服务端已实现 · 待 UE 对齐）
 
-> 2026-10-27 起草。本页是 [50k 人架构改造阶段 2](../planning/stage0-cde-followup.md#阶段-2异步化ue-契约变更) 的 UE 契约设计稿。
+> 2026-10-27 起草。本页定义异步请求增量；服务端已实现、UE 联调仍待验。当前接入步骤见 [UE 服务适配](../guides/ue-service-adaptation.md)，部署与推进边界见[六步方案](../planning/local-boss-cloud-companion-roadmap.md)。旧阶段待办草案已于 2026-11-12 清理，本文保留契约及历史证据。
 > 基线：develop-dyh@`9c25895`，阶段 0（Redis 外置调度）+ 阶段 1（status journal fallback）已闭环。
 > **2026-10-27 进展**：§4 的 result 回放已实现（`ScopedRequestStatusResponse` 加 `result` 字段；内存 `_record()` 与 journal `read_status()` 在 completed 时回放业务结果，其余状态为 None）。同步模式下 UE 也可拿 POST 结果回查。
 > **§3 的 202 提交已落地服务端（develop-dyh@`d0b6ffe`，受控 1566 绿）并通过 2026-10-28 真实端到端自证（commit `3e83ec5`）**：`chat`/`agent-step` 发 `protocol_version="0.5"` opt-in——提交线程只做校验/配额/容量准入即返回 §3.2 信封（202，不含业务结果），业务闭包投递进程内守护池（`app/scoped/async_pool.py`，contextvars 捕获 scope/principal/budget）执行；`coordinator.submit()`/`run_submitted()` 把登记入队与执行段拆开；幂等 `begin/settle/settle_failure` 不等待，同 request_id 网络重试在 `running` 时**不重复投递后台**（否则两 worker 把同一 action 跑两遍）。其余入口不放开 0.5（422）；v0.4 同步 200 永久保留。
@@ -110,7 +110,7 @@ HTTP **202**，响应体是当前 `_base(scope, request_id)` 信封加状态，*
 
 1. 轮询节奏与保留期匹配：默认终态保留 300s 是否够 UE 最坏轮询路径，还是延长到 600s？（实测单次完成约 3s，300s 保留期非常宽裕；建议联调时观测长尾再定，不预先放宽。）
 2. ~~result 回放字段是否附 `completed_at`~~ **已落地可配置（commit `c8357fb`），待 UE 拍板是否开启**：response model 永远预留 `completed_at: str | None = None`（老 UE 看到 null 忽略，向后兼容）；config `AESIR_SCOPE_ASYNC_COMPLETED_AT`（默认 False）控制 completed 时是否填 UTC ISO 墙钟值。开了即开箱即用，不开零行为变化。UE 拍板"要"就开 env，"不要"保持默认。
-3. ~~单请求预算上限默认值~~ **已澄清，无需拍板**：预算不是服务端写死的——`valid_for_ms` 直接取自 UE 请求自带的 `timing.max_request_age_ms`（[timing.py:38](../app/scoped/timing.py#L38)），服务端硬上限 `max_budget_ms=120_000`（120s，[timing.py:25](../app/scoped/timing.py#L25)）。异步化后排队**确实计入同一预算**，但实测排队 ~0ms + LLM 约 3s ≪ UE 自带的 30s，远未触顶。UE 侧只需在请求里给 `max_request_age_ms` 留足排队余量即可，服务端无默认值可调。
+3. ~~单请求预算上限默认值~~ **已澄清，无需拍板**：预算不是服务端写死的——`valid_for_ms` 直接取自 UE 请求自带的 `timing.max_request_age_ms`（[timing.py:38](../../app/scoped/timing.py#L38)），服务端硬上限 `max_budget_ms=120_000`（120s，[timing.py:25](../../app/scoped/timing.py#L25)）。异步化后排队**确实计入同一预算**，但实测排队 ~0ms + LLM 约 3s ≪ UE 自带的 30s，远未触顶。UE 侧只需在请求里给 `max_request_age_ms` 留足排队余量即可，服务端无默认值可调。
 
 ---
 

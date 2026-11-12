@@ -1,5 +1,46 @@
 # 历史验证与决策记录
 
+<a id="boss-runtime-gate-20261112"></a>
+## 2026-11-12 Boss HTTP 启动模型校验与健康状态
+
+用户明确暂不训练或更换冻结候选，本轮仅实现启动校验。`rl/boss/artifact.py` 集中登记原候选名称、SHA、Schema 4、26 维观测、9 动作及 sim005/reward003；清点脚本复用名称和 SHA，既有离线评估入口的导入保持兼容。
+
+`BossPolicyRuntime.load()` 在独占锁内校验，使用同一份内存快照完成 SHA 核对与 CPU 加载。SHA 不符时不反序列化；训练 manifest 缺失、超过 1 MiB、格式异常、Schema/观测字段顺序/动作映射/模拟器或奖励修订不符均拒绝。加载后核对 Box(26,) 的 float32/[0,1] 及从 0 开始的 Discrete(9)，全部通过才发布模型。失败保留稳定错误码且不发布 `_model`；暂时无动作也不能绕过校验。manifest 的格式来自既有训练入口，不要求未知格式的 selection 评分字段，也不使用文件名推断身份。
+
+`/health` 只有 ready 才 HTTP 200，其他状态 HTTP 503；新增 `model_validation.state/error_code/expected/actual`，实测 SHA 与 manifest SHA 来自读取字节，Schema/修订来自核对的 manifest，空间来自加载后的模型。未执行的检查保持 null，顶层原有维度/版本继续表示服务契约；启动校验失败会直接退出，因此失败诊断查看启动日志而非期待该失败进程提供 HTTP。`serve.py` 新增 `--manifest`，显式模型路径优先于环境变量；候选身份不随文件重命名变化。
+
+验证命令：
+
+```powershell
+.\.venv\Scripts\python.exe -B -m pytest tests/scripts tests/rl/boss -q --tb=short -p no:cacheprovider --basetemp=data/runtime/boss-delivery/runtime-gate-pytest-tmp --junitxml=data/runtime/boss-delivery/runtime-gate-tests.xml
+.\.venv\Scripts\python.exe -B scripts/rl/boss/serve.py --port 18982
+```
+
+相关回归 **137 passed，1 warning，10.20 秒**，warning 为既有 Starlette/httpx 弃用提示。测试包含真实 FastAPI lifespan 的成功/失败路径；错误 SHA、缺文件/manifest、Schema/映射/修订错误均在加载前拒绝；实际空间/范围/类型不符、加载器异常、缺依赖、运行时代码契约漂移拒绝且模型未发布；另核对健康状态、暂时无动作无法绕过校验、失败重试和内存快照不受路径替换影响。成功测试仅使用合成材料，并临时替换预期 SHA 和 SB3 加载器，不调用真实 PPO。JUnit 保存在上述忽略目录。
+
+实际独立服务进程 PID 14660 启动失败，错误码 `MODEL_NOT_FOUND`，退出码 1，未进入服务就绪状态。本机没有冻结 ZIP/manifest 和 sb3-contrib，真实模型成功加载与推理仍待验。本轮未训练、未换模型/登记 SHA、未安装依赖或改动 UE/NPC 服务、生产环境及 GitHub Issue 状态；selection 评分、发行签名、Windows 包和 UE 故障回退验收均未由该门禁代替。
+
+<a id="boss-frozen-eval-20261112"></a>
+## 2026-11-12 Boss 交付清点续接与冻结评估入口
+
+从工作区上次未提交的 Boss 清点脚本、独立推理依赖清单及 RL 说明继续。重新执行 `python -m scripts.rl.boss.inventory`：冻结 ZIP、selection、training manifest 仍缺失，`sb3-contrib` 未安装，材料状态为 `blocked`。用户本轮确认没有这些模型材料；没有重训或用旧 ZIP 替代。
+
+新增 `scripts.rl.boss.eval_frozen`：先检查记录中的冻结 SHA，再用 CPU 加载 MaskablePPO，核对 26 维观测/9 动作，确定性预测携带动作掩码；不导入训练入口。规则基线与冻结 PPO 使用相同画像和种子，拒绝与已记录选模种子 `[50000, 50300)` 重叠。该限制不证明避开全部训练和历史调参数据，正式测试集独立性继续待训练材料核定。
+
+`evaluate_policy` 增加可选逐局回调，原默认调用及聚合方式保持兼容。新入口输出两策略的 `episodes.jsonl`，完成后写 `summary.json`，记录分画像指标、模型/源码/逐局数据 SHA、依赖及复评参数。已有输出目录拒绝覆盖；预检失败不创建输出，中途失败不发布完成汇总。
+
+验证命令（Windows，本地项目 venv）：
+
+```powershell
+.\.venv\Scripts\python.exe -B -m pytest tests/scripts tests/rl/boss -q --tb=short -p no:cacheprovider --basetemp=data/runtime/boss-delivery/pytest-all-tmp --junitxml=data/runtime/boss-delivery/scripts-boss-tests.xml
+.\.venv\Scripts\python.exe -B -m scripts.rl.boss.inventory
+.\.venv\Scripts\python.exe -B -m scripts.rl.boss.eval_frozen --output data/runtime/boss-delivery/frozen-200000
+```
+
+测试 **109 passed，1 warning，4.24 秒**；warning 为既有 Starlette/httpx 弃用提示。覆盖错误 SHA 在 SB3 导入前拒绝、维度不符、动作掩码/非法动作、选模种子区间边界、原始输出与汇总一致性、证据覆盖保护、失败不生成完成汇总，以及清点仅读取有大小限制的 ZIP JSON。自动化证据生成使用规则替身，不是 PPO 性能数据。实际评估 CLI 因缺模型退出码 1，没有生成输出目录或 PPO 汇总；清点报告位于忽略目录 `data/runtime/boss-delivery/inventory.json`。
+
+本轮只完成离线评估工具和相应验证。冻结模型真实推理/正式独立评估、HTTP 运行时部署身份校验、Windows 发行、UE BT 对照与连续错误回退复测继续待验；没有安装依赖或修改 UE、生产环境及 GitHub Issue 状态。
+
 <a id="shadow-0c-20261026"></a>
 ## 2026-10-26 阶段 0c 影子模式双写比对
 

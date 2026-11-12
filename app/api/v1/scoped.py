@@ -273,7 +273,7 @@ def control_encounter(request: EncounterControlRequest, principal: Principal = D
 
 @router.post("/agent/step", response_model=ScopedAgentResponse)
 def agent_step(request: ScopedAgentRequest, principal: Principal = Depends(require_permission("npc:use"))):
-    from app.api.v1.agent import agent_step as legacy_step
+    from app.services.agency.agent_service import agent_step as legacy_step
     from app.schemas.agent_step import AgentStepRequest
 
     def run(scope):
@@ -399,11 +399,11 @@ def _parse_form_json(raw: str, field: str):
 
 def _event_directive(response):
     from app.schemas.directives.common import DirectiveEnvelope
-    from app.api.v1.agent import _COMBAT_ACTION_TYPE
+    from app.services.agency.agent_service import COMBAT_ACTION_TYPE
     action = response.companion_action
     if action is None or action.type not in ("cast_ability", "follow", "retreat"):
         return None
-    kind = action.type if action.type in ("follow", "retreat") else _COMBAT_ACTION_TYPE.get((action.ability_id or "").rsplit(".", 1)[-1], "")
+    kind = action.type if action.type in ("follow", "retreat") else COMBAT_ACTION_TYPE.get((action.ability_id or "").rsplit(".", 1)[-1], "")
     # 未有同义映射的旧建议仅保留reaction，绝不编造新动作。
     if not kind:
         return None
@@ -420,7 +420,7 @@ def _event_directive(response):
 @router.post("/combat/events", response_model=ScopedWorldEventResponse)
 @router.post("/world/events", response_model=ScopedWorldEventResponse)
 def world_event(request: ScopedWorldEventRequest, principal: Principal = Depends(require_permission("npc:use"))):
-    from app.api.v1.world import report_world_event
+    from app.services.tactical.world_service import report_world_event
     from app.schemas.world_event import WorldEventRequest
 
     def run(scope):
@@ -496,7 +496,7 @@ def console_view(
     memory_epoch_value: UUID = Query(alias="memory_epoch"), session_id: UUID | None = None,
     encounter_id: UUID | None = None, principal: Principal = Depends(require_permission("console:read")),
 ):
-    from app.api.v1.console import console_state, view_memory
+    from app.services.console.query_service import console_state, view_memory
     scope = _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
                          memory_epoch_value, session_id, encounter_id, principal)
     with use_principal(principal), use_scope(scope), commit_guard(scope):

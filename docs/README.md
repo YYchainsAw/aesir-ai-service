@@ -6,6 +6,9 @@
 
 | 现在要解决的问题 | 阅读入口 |
 | --- | --- |
+| 刚接手项目，从全貌、功能与接口认识当前进度 | [面向新人的项目接手导览](guides/project-onboarding-2026-11.md) |
+| 为什么结构复杂、哪些重复可收敛、清理了哪些旧文档 | [代码冗余与文档清理报告](planning/redundancy-review-2026-11-12.md) |
+| 本轮实际改了什么、还存在哪些缺陷、接下来做什么 | [结构整改与后续行动](planning/structure-followup-2026-11-12.md) |
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/getting-started.md) |
 | 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
 | 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |

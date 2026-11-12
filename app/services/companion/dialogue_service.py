@@ -27,13 +27,8 @@ from app.services.memory.retrieval import retrieve, retrieve_impressions
 from app.services.memory.topics import extract_topics, looks_salient
 
 
-def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
-    """按 YAML 人设选择 LLM；不可用时回退到 YAML 分类候选回复。
-
-    记忆接入（SDD T028）：检索长期记忆注入 LLM prompt；回复后把该轮写入短期
-    记忆。记忆体系任何故障都降级为「无记忆继续对话」（FR-011 / T030），
-    绝不因记忆问题中断玩家流程。
-    """
+def _prepare_dialogue(request):
+    """One source for profile/history/recall/stage across sync and SSE."""
     # 按 companion_id 路由到已登记角色；未登记抛 UnknownCompanionError → 404（FR-044）。
     profile = get_registered_profile(request.companion_id)
     game_id = profile.game_name.lower()
@@ -44,6 +39,37 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
     memories = _recall(request.companion_id, game_id=game_id)
     impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
     stage = _relationship_stage(request.companion_id, game_id=game_id)
+
+    return profile, game_id, history, memories, impressions, stage
+
+
+def _complete_reply(request, response, *, profile, stage, memories, impressions, game_id, service=None):
+    """Commit only a complete reply; incomplete SSE never calls this helper."""
+    response.relationship_stage = stage
+    response.relationship_stage_display = _relationship_stage_display(stage)
+    _annotate_observability(response, profile,
+                            memories=memories, impressions=impressions)
+    fields = {name: getattr(service, 'last_' + name, None) if response.source == 'llm' else None for name in (
+        'topics', 'facts', 'corrected_fact_ids', 'salient', 'reply_topics', 'relationship_signal',
+        'style_violations')}
+    fields['style_violations'] = getattr(service, 'last_style_violations', None)
+    response.relationship_delta = _record_turn(
+        request, response, **fields, injected_topics=[item.topic for item in impressions],
+        relationship_stage=stage, memory_cited=bool(memories),
+        lore_lookup=_lookup_signal(getattr(service, 'last_lookup', None)), game_id=game_id,
+    )
+    return response
+
+
+def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogueResponse:
+    """按 YAML 人设选择 LLM；不可用时回退到 YAML 分类候选回复。
+
+    记忆接入（SDD T028）：检索长期记忆注入 LLM prompt；回复后把该轮写入短期
+    记忆。记忆体系任何故障都降级为「无记忆继续对话」（FR-011 / T030），
+    绝不因记忆问题中断玩家流程。
+    """
+    profile, game_id, history, memories, impressions, stage = _prepare_dialogue(request)
+    service = None
 
     if get_settings().companion_backend == "llm":
         service = LLMCompanionDialogueService(profile=profile)
@@ -56,48 +82,13 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 relationship_stage=stage,
                 world_context=request.world_context,
             )
-            topics = service.last_topics
-            facts = service.last_facts
-            corrected_fact_ids = service.last_corrected_fact_ids
-            salient = service.last_salient
-            reply_topics = service.last_reply_topics
-            relationship_signal = service.last_relationship_signal
         except LLMClientError:
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
-            topics = None
-            facts = None
-            corrected_fact_ids = None
-            salient = None
-            reply_topics = None
-            relationship_signal = None
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
-        topics = None
-        facts = None
-        corrected_fact_ids = None
-        salient = None
-        reply_topics = None
-        relationship_signal = None
-    response.relationship_stage = stage
-    response.relationship_stage_display = _relationship_stage_display(stage)
-    _annotate_observability(response, profile, memories=memories, impressions=impressions)
-    response.relationship_delta = _record_turn(
-        request,
-        response,
-        topics=topics,
-        facts=facts,
-        corrected_fact_ids=corrected_fact_ids,
-        salient=salient,
-        reply_topics=reply_topics,
-        relationship_signal=relationship_signal,
-        injected_topics=[i.topic for i in impressions],
-        style_violations=getattr(service, "last_style_violations", None) if get_settings().companion_backend == "llm" else None,
-        lore_lookup=_lookup_signal(getattr(service, "last_lookup", None)) if get_settings().companion_backend == "llm" else None,
-        relationship_stage=stage,
-        memory_cited=bool(memories),
-        game_id=game_id,
-    )
-    return response
+    return _complete_reply(request, response, profile=profile, stage=stage, memories=memories,
+                           impressions=impressions, game_id=game_id, service=service)
+
 
 
 def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamEvent]:
@@ -110,15 +101,7 @@ def stream_dialogue_reply(request: CompanionDialogueRequest) -> Iterator[StreamE
     注意：本函数是普通函数（不是生成器），人设校验在调用时立即执行，
     未知名伴的 404 得以在 SSE 响应头发出之前抛出。
     """
-    profile = get_registered_profile(request.companion_id)
-    game_id = profile.game_name.lower()
-
-    memory = get_session_memory(get_settings().dialogue_history_turns)
-    history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
-
-    memories = _recall(request.companion_id, game_id=game_id)
-    impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
-    stage = _relationship_stage(request.companion_id, game_id=game_id)
+    profile, game_id, history, memories, impressions, stage = _prepare_dialogue(request)
 
     if get_settings().companion_backend != "llm":
         return _stream_mock_reply(
@@ -164,24 +147,9 @@ def _stream_llm_reply(
                 delta_parts.append(event.text)
                 yield event
                 continue
-            event.response.relationship_delta = _record_turn(
-                request,
-                event.response,
-                topics=service.last_topics,
-                facts=service.last_facts,
-                corrected_fact_ids=service.last_corrected_fact_ids,
-                salient=service.last_salient,
-                reply_topics=service.last_reply_topics,
-                relationship_signal=service.last_relationship_signal,
-                injected_topics=[i.topic for i in impressions],
-                style_violations=service.last_style_violations,
-                lore_lookup=_lookup_signal(getattr(service, "last_lookup", None)),
-                game_id=game_id,
-            )
-            _annotate_observability(
-                event.response, profile, memories=memories, impressions=impressions
-            )
-            yield _with_stage(event, stage)
+            _complete_reply(request, event.response, profile=profile, stage=stage, memories=memories,
+                            impressions=impressions, game_id=game_id, service=service)
+            yield event
             return
     except LLMClientError:
         if emitted_delta:
@@ -225,18 +193,14 @@ def _stream_mock_reply(
 ) -> Iterator[StreamEvent]:
     """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
     response = _create_mock_dialogue_reply(request, profile=profile, source=source)
-    _record_turn(request, response, game_id=game_id)
-    _annotate_observability(response, profile, memories=memories, impressions=impressions)
+    _complete_reply(request, response, profile=profile, stage=stage, memories=memories,
+                    impressions=impressions, game_id=game_id)
     if response.reply_text:
         yield StreamEvent(kind="delta", text=response.reply_text)
-    yield _with_stage(StreamEvent(kind="meta", response=response), stage)
+    yield StreamEvent(kind="meta", response=response)
 
 
-def _with_stage(event: StreamEvent, stage: str) -> StreamEvent:
-    if event.response is not None:
-        event.response.relationship_stage = stage
-        event.response.relationship_stage_display = _relationship_stage_display(stage)
-    return event
+
 
 
 def _relationship_stage_display(stage: str) -> str:

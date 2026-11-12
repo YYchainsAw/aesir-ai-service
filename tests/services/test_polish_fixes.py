@@ -105,7 +105,7 @@ def test_primary_companion_falls_back_to_registry() -> None:
 
 def test_degraded_flag_reflects_open_circuit(monkeypatch: pytest.MonkeyPatch) -> None:
     """熔断器处于 OPEN 时 degraded 应为 true（此前生产路径恒 False）。"""
-    from app.api.v1.agent import _degraded_flag
+    from app.services.agency.agent_service import _degraded_flag
 
     class _OpenBreaker:
         state = "open"
@@ -119,7 +119,7 @@ def test_degraded_flag_reflects_open_circuit(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_degraded_flag_false_when_closed() -> None:
     """熔断器 CLOSED 且无降级原因码时 degraded 为 false（正常路径语义不变）。"""
-    from app.api.v1.agent import _degraded_flag
+    from app.services.agency.agent_service import _degraded_flag
 
     assert _degraded_flag([]) is False
     assert _degraded_flag(["NO_AUTONOMOUS_CANDIDATE"]) is False
@@ -127,7 +127,7 @@ def test_degraded_flag_false_when_closed() -> None:
 
 def test_degraded_flag_true_on_degrade_reason_code() -> None:
     """命中已知降级原因码（关系存储故障等）时 degraded 为 true。"""
-    from app.api.v1.agent import _degraded_flag
+    from app.services.agency.agent_service import _degraded_flag
 
     assert _degraded_flag(["RELATIONSHIP_UNAVAILABLE"]) is True
     assert _degraded_flag(["COMBAT_CONTEXT_MISSING"]) is True

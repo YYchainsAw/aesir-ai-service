@@ -14,7 +14,7 @@ from app.scoped.identity import Principal, get_principal
 from app.scoped.runtime import reset_runtime
 from app.scoped.idempotency import reset_idempotency_stores
 from app.scoped.directives import registry
-from app.api.v1.agent import _reset_heartbeat_tracker
+from app.services.agency.agent_service import _reset_heartbeat_tracker
 from app.scoped.context import NpcScope, RequestScope, use_scope
 from app.services.companion.session_memory import get_session_memory, SessionMemoryStore
 
