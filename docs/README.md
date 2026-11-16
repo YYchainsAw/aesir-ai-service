@@ -1,49 +1,52 @@
 # 开发与课程文档
 
-服务需求以[NPC需求主文](planning/aesir-agent-sdd-v1.1.md)为当前入口。UE整组Word、关卡和Boss模型在UE仓维护；本仓解释NPC服务和独立Boss RL，不再维护旧游戏全套模型。
+文件命名、临时材料清理及协议归档规则见[文档维护规范](_01_documentation_guide.md)。
+
+服务需求以[NPC需求主文](planning/_11_npc_requirements.md)为当前入口。UE整组Word、关卡和Boss模型在UE仓维护；本仓解释NPC服务和独立Boss RL，不再维护旧游戏全套模型。
 
 ## 按问题找资料
 
 | 现在要解决的问题 | 阅读入口 |
 | --- | --- |
-| 刚接手项目，从全貌、功能与接口认识当前进度 | [面向新人的项目接手导览](guides/project-onboarding-2026-11.md) |
-| 为什么结构复杂、哪些重复可收敛、清理了哪些旧文档 | [代码冗余与文档清理报告](planning/redundancy-review-2026-11-12.md) |
-| 本轮实际改了什么、还存在哪些缺陷、接下来做什么 | [结构整改与后续行动](planning/structure-followup-2026-11-12.md) |
-| 怎样安装、启动、配置端口和实例 | [启动指南](guides/getting-started.md) |
-| 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/ai-capability-placement.md) |
-| 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](guides/remote-development.md) |
-| 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/step-02-identity-scope-plan.md) · [v0.4契约草案](protocols/npc-scope-contract-v0.4-draft.md)（已合入main，服务端回归通过，UE待验） |
-| 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/step-03-execution-loop-plan.md) · [闭环增量契约](protocols/npc-loop-contract-v0.4.md)（服务端回归通过，UE待验） |
-| 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/scoped-development.md) |
-| 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/step-04-persistence-access-plan.md) · [持久化开发指南](guides/persistent-development.md) · [增量契约](protocols/npc-persistence-contract-v0.4.md)（服务端验证通过，UE/正式发布待验） |
-| 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/deployment.md)，含外部ASR、模型发布及AT-DEP验收 |
-| 当前运行版本和后端怎样核对 | [联调复现](guides/repro.md) |
-| LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/llm-integration.md) |
-| 指令在源码中怎样处理 | [命令处理导读](guides/command-execution.md) |
-| UE该调用哪个端点、怎样检查结果 | [两端接入对齐](protocols/integration-alignment-v0.3.md) |
-| UE新版文本/语音/指令如何接入、怎样导出离线交接包 | [UE服务适配](guides/ue-service-adaptation.md) · [请求样例](examples/ue-scoped.http) |
+| 刚接手项目，从全貌、功能与接口认识当前进度 | [面向新人的项目接手导览](guides/_01_project_overview_guide.md) |
+| 为什么结构复杂、哪些重复可收敛、清理了哪些旧文档 | [代码冗余与文档清理报告](design/_01_architecture_review.md) |
+| 本轮实际改了什么、还存在哪些缺陷、接下来做什么 | [结构整改与后续行动](planning/_14_quality_plan.md) |
+| 怎样安装、启动、配置端口和实例 | [启动指南](guides/_02_local_setup_guide.md) |
+| 哪些 AI 能力在本地或服务器、原计划是否覆盖 | [15 项部署分工对照](planning/_07_capability_placement_plan.md) |
+| 服务器远程开发与本地 Boss/云端队友怎样推进 | [六步开发方案](planning/_02_delivery_plan.md) · [远程开发指南](guides/_08_remote_development_guide.md) |
+| 第二步怎样定义玩家/存档归属、游玩身份和有效期 | [第二步实施计划](planning/_03_identity_scope_plan.md) · [v0.4契约草案](protocols/_01_npc_contract.md#scope)（已合入main，服务端回归通过，UE待验） |
+| 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/_04_execution_loop_plan.md) · [闭环增量契约](protocols/_01_npc_contract.md#loop)（服务端回归通过，UE待验） |
+| 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/_04_scoped_development_guide.md) |
+| 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/_05_persistence_plan.md) · [持久化开发指南](guides/_06_persistence_guide.md) · [增量契约](protocols/_01_npc_contract.md#persistence)（服务端验证通过，UE/正式发布待验） |
+| 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/_07_deployment_guide.md)，含外部ASR、模型发布及AT-DEP验收 |
+| 当前运行版本和后端怎样核对 | [联调复现](guides/_10_verification_guide.md) |
+| LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/_03_llm_integration_guide.md) |
+| 指令在源码中怎样处理 | [命令处理导读](guides/_09_command_execution_guide.md) |
+| UE该调用哪个端点、怎样检查结果 | [两端接入对齐](guides/_12_legacy_integration_guide.md) |
+| UE新版文本/语音/指令如何接入、怎样导出离线交接包 | [UE服务适配](guides/_05_client_integration_guide.md) · [请求样例](examples/ue-scoped.http) |
 | 发布时使用哪些进程守护、HTTPS和环境模板 | [发布准备](../deploy/README.md) |
-| 当前范围、45FR、7UC、规则和验收 | [NPC需求主文](planning/aesir-agent-sdd-v1.1.md) |
-| 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/todo.md) |
-| 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/npc-interaction-evolution.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
-| AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/airi-learning-alignment-20261023.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
-| 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/course-requirements-index.md) |
+| 当前范围、45FR、7UC、规则和验收 | [NPC需求主文](planning/_11_npc_requirements.md) |
+| 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/_01_known_issues.md) |
+| 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/_06_interaction_evolution_plan.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
+| AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/_08_integration_alignment_plan.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
+| 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/_10_course_requirements_guide.md) |
 | 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
 | Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
-| 真实测试/联调发生过什么 | [验证记录](logs/verification-records.md) · [里程碑](../CHANGELOG.md) |
+| 真实测试/联调发生过什么 | [验证记录](records/_01_verification_records.md) · [里程碑](../CHANGELOG.md) |
 
 ## 字段定义看契约
 
 | 契约 | 当前用途 |
 | --- | --- |
-| [v0.1订单与对话](protocols/ue-protocol-contract-v0.1.md) | 显式legacy开发兼容的文本/语音订单解析、陪伴对话与流式响应 |
-| [v0.2战术决策](protocols/combat-tactical-protocol-v0.2.md) | 显式legacy开发兼容的战斗快照、上下文决策、战斗事件与执行回执 |
-| [v0.3代理入口](protocols/npc-contract-v0.3.md) | 显式legacy开发兼容的心跳/文本、世界事件与回执边界 |
-| [v0.4作用域契约](protocols/npc-scope-contract-v0.4-draft.md) | 现行scoped JSON的身份、生命周期、时效与兼容边界；已合入main，服务端回归及UE待验范围见验证记录 |
-| [v0.4闭环增量契约](protocols/npc-loop-contract-v0.4.md) | 请求取消/状态查询、执行反馈账本与新增golden；保留原回执枚举和UE验收边界 |
-| [v0.4持久化与恢复增量](protocols/npc-persistence-contract-v0.4.md) | SQL权威状态、Bearer与权限、持久确认、真实事实/历史回执归档；单worker及生产/跨端验收分开 |
-| [人格包与游戏档案schema](protocols/persona-pack-schema-v0.2.md) | 数据资产格式；它的版本不等于API协议版本 |
+| [v0.1订单与对话](protocols/_01_npc_contract.md#legacy-dialogue) | 显式legacy开发兼容的文本/语音订单解析、陪伴对话与流式响应 |
+| [v0.2战术决策](protocols/_01_npc_contract.md#legacy-tactical) | 显式legacy开发兼容的战斗快照、上下文决策、战斗事件与执行回执 |
+| [v0.3代理入口](protocols/_01_npc_contract.md#legacy-agent) | 显式legacy开发兼容的心跳/文本、世界事件与回执边界 |
+| [v0.4作用域契约](protocols/_01_npc_contract.md#scope) | 现行scoped JSON的身份、生命周期、时效与兼容边界；已合入main，服务端回归及UE待验范围见验证记录 |
+| [v0.4闭环增量契约](protocols/_01_npc_contract.md#loop) | 请求取消/状态查询、执行反馈账本与新增golden；保留原回执枚举和UE验收边界 |
+| [v0.4持久化与恢复增量](protocols/_01_npc_contract.md#persistence) | SQL权威状态、Bearer与权限、持久确认、真实事实/历史回执归档；单worker及生产/跨端验收分开 |
+| [人格包与游戏档案schema](protocols/_02_persona_pack_schema.md) | 数据资产格式；它的版本不等于API协议版本 |
+| [NPC 协议上一版](protocols/_01_npc_contract_previous.md) | v0.4 归档参考；当前接入仍看整合协议及其兼容章节 |
 
 这些契约按职责并存，不能仅因编号较旧删除仍使用的协议。指南只维护步骤与说明，字段表链接上述契约；当前接口的交互文档由运行实例的`/docs`提供。
 

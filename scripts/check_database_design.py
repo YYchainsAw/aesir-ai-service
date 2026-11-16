@@ -57,7 +57,7 @@ def check_artifacts(design_root: Path | None = None) -> list[str]:
         errors.append("initial_sql: missing")
     elif initial_sql.read_text(encoding="utf-8") != render_initial_sql():
         errors.append("initial_sql: differs from current MySQL metadata rendering")
-    dictionary = design_root / "03-data-dictionary.md"
+    dictionary = design_root / "_03_data_dictionary.md"
     content = dictionary.read_text(encoding="utf-8") if dictionary.is_file() else ""
     for table in metadata.sorted_tables:
         section = re.search(

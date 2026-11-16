@@ -14,7 +14,7 @@ from scripts.check_database_design import (
 def design(tmp_path):
     target = tmp_path / "database"
     for relative in (
-        "sql/001-initial-schema.sql", "03-data-dictionary.md",
+        "sql/001-initial-schema.sql", "_03_data_dictionary.md",
         "src/02-npc-persistence-pdm.drawio",
     ):
         destination = target / relative
@@ -64,7 +64,7 @@ def test_pdm_rejects_extra_tables_and_columns(design):
 
 @pytest.mark.parametrize("change", ["missing", "type", "nullable", "fake_fk"])
 def test_dictionary_rejects_column_or_constraint_drift(design, change):
-    path = design / "03-data-dictionary.md"
+    path = design / "_03_data_dictionary.md"
     content = path.read_text(encoding="utf-8")
     row = next(line for line in content.splitlines() if line.startswith("| `expires_at` |"))
     changed = {"missing": "", "type": row.replace("DOUBLE", "FLOAT"),

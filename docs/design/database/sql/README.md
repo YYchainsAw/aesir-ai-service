@@ -1,6 +1,6 @@
 # NPC持久化SQL与迁移规范
 
-> 2026-10-22，`database-design-v1`，当前 `schema_version=1`。本目录保留可审查、可复核的MySQL初始DDL和有实际依据的修复SQL。物理规范见[物理模型](../02-physical-model.md)，字段与JSON命名空间见[数据字典](../03-data-dictionary.md)。现有初始化、JSON导入和逻辑备份恢复工具见[持久化开发指南](../../../guides/persistent-development.md)。
+> 2026-10-22，`database-design-v1`，当前 `schema_version=1`。本目录保留可审查、可复核的MySQL初始DDL和有实际依据的修复SQL。物理规范见[物理模型](../_02_physical_model.md)，字段与JSON命名空间见[数据字典](../_03_data_dictionary.md)。现有初始化、JSON导入和逻辑备份恢复工具见[持久化开发指南](../../../guides/_06_persistence_guide.md)。
 
 ## 1. 文件与版本
 
@@ -34,7 +34,7 @@ MySQL DDL不是一个可以整体回滚的普通业务事务。若脚本中途�
 
 `metadata.create_all()` 只创建缺失表，不修改已存在列、默认值、主外键或索引。当前应用 `check_schema()` 与离线MySQL审计复用metadata结构检查，发现声明不一致时拒绝继续；检查本身不建表、不迁移也不修复。已有库必须先只读比较实际元数据与v1规范，再决定是否需要修复；禁止把初始DDL当升级脚本。
 
-首次设计审查发现dev验证库 `access_credentials.expires_at` 为 `DOUBLE NULL`，而源码及初始SQL为 `DOUBLE NOT NULL`。后续推进已先备份dev库，确认版本、DOUBLE列型及NULL=0，再执行 `repairs/001-v1-credential-expiry-not-null.sql` 并复核。dev/test/restore现均通过只读结构审计；test/restore原已符合规范，没有重复ALTER，schema版本均保留1。备份、SQL哈希与核对证据见[本轮验证记录](../../../logs/verification-records.md#schema-gate-20261022)；这不构成其他实例跳过维护窗口或前置检查的理由。
+首次设计审查发现dev验证库 `access_credentials.expires_at` 为 `DOUBLE NULL`，而源码及初始SQL为 `DOUBLE NOT NULL`。后续推进已先备份dev库，确认版本、DOUBLE列型及NULL=0，再执行 `repairs/001-v1-credential-expiry-not-null.sql` 并复核。dev/test/restore现均通过只读结构审计；test/restore原已符合规范，没有重复ALTER，schema版本均保留1。备份、SQL哈希与核对证据见[本轮验证记录](../../../records/_01_verification_records.md#schema-gate-20261022)；这不构成其他实例跳过维护窗口或前置检查的理由。
 
 修复脚本使用带明确名称的临时辅助存储过程，以 `SQL SECURITY INVOKER` 按执行者权限运行；版本、DOUBLE列型或NULL计数不符合前置条件时由SIGNAL阻止ALTER，成功后删除辅助过程。执行账号除目标ALTER外还需本脚本相应的例程权限；业务运行账号不执行。用支持DELIMITER的MySQL客户端执行整份脚本，不使用 `--force` 忽略错误；失败后核对辅助过程是否残留并按脚本说明处置，不能误把客户端继续执行当成功。
 
@@ -73,4 +73,4 @@ cd /www/wwwroot/aesir-ai-service
   --database-url-file /etc/aesir-ai/dev/mysql84-dev-runtime.url
 ```
 
-凭据文件必须受限，报告只保留结构差异，不输出连接串或token。发现差异应使审计失败，并分别记录目标与差异；不能因另一个空库初始化成功而覆盖既有库失败结果。执行初始DDL的验证只在新建隔离空库进行，需另记目标库名、脚本SHA-256、8表/外键/列定义核对及实际结果；本页命令本身不表示验证已通过，真实证据见[验证记录](../../../logs/verification-records.md)。
+凭据文件必须受限，报告只保留结构差异，不输出连接串或token。发现差异应使审计失败，并分别记录目标与差异；不能因另一个空库初始化成功而覆盖既有库失败结果。执行初始DDL的验证只在新建隔离空库进行，需另记目标库名、脚本SHA-256、8表/外键/列定义核对及实际结果；本页命令本身不表示验证已通过，真实证据见[验证记录](../../../records/_01_verification_records.md)。

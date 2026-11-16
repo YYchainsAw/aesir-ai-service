@@ -1,28 +1,28 @@
 # Changelog
 
-记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/todo.md)，真实抓样与测试范围集中在[历史验证记录](docs/logs/verification-records.md)。本页不再复制逐文件流水账。
+记录里程碑；排期与完成状态见 [GitHub Issues](https://github.com/YYchainsAw/aesir-ai-service/issues)，当前差距见[未决清单](docs/planning/_01_known_issues.md)，真实抓样与测试范围集中在[历史验证记录](docs/records/_01_verification_records.md)。本页不再复制逐文件流水账。
 
 历史完整环境锚点为 **2026-10-21，848 passed + 2 skipped**（T49/#66 SC-009 历史/本次拆分后）。此前末次全量记录为 2026-10-20 的 843 passed + 2 skipped、2026-10-15 的 769 passed + 2 skipped——它们是当时结果，不能冒充本次文档整合在 `a2dd426` 上新跑的完整测试。早期分支/合并与计数差异按原记录保留。
 
 ## 2026-10-22 — DEP4结构门禁与开发库整改
 
-已合入的第四步后续补齐SQL启动/首次接入结构检查，运行时与离线审计共享metadata规则；只有空库能初始化DDL，已有错误库只读拒绝，损坏凭据到期数据拒绝认证。dev的expires_at可空偏差在私有备份后受检修复，8表业务数据不变，三个项目库结构审计通过。适用核心1463 passed、1 skipped（含5项真实MySQL），独立实际进程验证错误结构拒绝启动及恢复后健康/认证门禁；PDM源与预览同步。范围及后续UE/生产边界见[计划](docs/planning/step-04-persistence-access-plan.md)与[证据](docs/logs/verification-records.md#schema-gate-20261022)。
+已合入的第四步后续补齐SQL启动/首次接入结构检查，运行时与离线审计共享metadata规则；只有空库能初始化DDL，已有错误库只读拒绝，损坏凭据到期数据拒绝认证。dev的expires_at可空偏差在私有备份后受检修复，8表业务数据不变，三个项目库结构审计通过。适用核心1463 passed、1 skipped（含5项真实MySQL），独立实际进程验证错误结构拒绝启动及恢复后健康/认证门禁；PDM源与预览同步。范围及后续UE/生产边界见[计划](docs/planning/_05_persistence_plan.md)与[证据](docs/records/_01_verification_records.md#schema-gate-20261022)。
 
 ## 2026-10-22 — DEP4数据库设计与SQL审计补齐
 
-新增需求映射、两页ER/单页PDM、8表44列字典、保留初始DDL及带阻断检查的v1漂移修复SQL；2份draw.io源由本地MCP保存，Desktop导出3张含XML的PNG并上传。新增结构/工件审计及15项回归，脚本组50 passed；真实隔离MySQL验证初始DDL和修复正反场景。test/restore结构一致，dev到期列可空偏差如实保留待修，未改既有库或业务schema。本次为实现后补齐设计，详见[数据库索引](docs/design/database/README.md)与[证据](docs/logs/verification-records.md#database-design-20261022)。
+新增需求映射、两页ER/单页PDM、8表44列字典、保留初始DDL及带阻断检查的v1漂移修复SQL；2份draw.io源由本地MCP保存，Desktop导出3张含XML的PNG并上传。新增结构/工件审计及15项回归，脚本组50 passed；真实隔离MySQL验证初始DDL和修复正反场景。test/restore结构一致，dev到期列可空偏差如实保留待修，未改既有库或业务schema。本次为实现后补齐设计，详见[数据库索引](docs/design/database/README.md)与[证据](docs/records/_01_verification_records.md#database-design-20261022)。
 
 ## 2026-10-22 — DEP4 SQL持久化、访问控制与恢复（服务端分支实现）
 
-`feature/npc-persistence-access`新增独立MySQL事务与确认版本、正式Bearer/存档授权和管理分权、持久请求/事件去重、SQL执行反馈、只读历史确认及离线真实事实/历史回执归档；记忆重置按分项确认，恢复默认停用所有旧凭据。提供默认dry-run的归属JSON迁移、私有备份与空目标恢复工具。新增132项测试、10个完整golden；适用核心1404 passed、1 skipped，含5项真实MySQL专项，另完成8.4.13真实HTTP进程重启与备份恢复。未升级旧5.7、未改开发.env、未切正式数据、未修改/连接UE或调用真实模型；生产/跨端余项保留。见[计划](docs/planning/step-04-persistence-access-plan.md)、[开发指南](docs/guides/persistent-development.md)与[实测记录](docs/logs/verification-records.md#persist-20261022)。
+`feature/npc-persistence-access`新增独立MySQL事务与确认版本、正式Bearer/存档授权和管理分权、持久请求/事件去重、SQL执行反馈、只读历史确认及离线真实事实/历史回执归档；记忆重置按分项确认，恢复默认停用所有旧凭据。提供默认dry-run的归属JSON迁移、私有备份与空目标恢复工具。新增132项测试、10个完整golden；适用核心1404 passed、1 skipped，含5项真实MySQL专项，另完成8.4.13真实HTTP进程重启与备份恢复。未升级旧5.7、未改开发.env、未切正式数据、未修改/连接UE或调用真实模型；生产/跨端余项保留。见[计划](docs/planning/_05_persistence_plan.md)、[开发指南](docs/guides/_06_persistence_guide.md)与[实测记录](docs/records/_01_verification_records.md#persist-20261022)。
 
 ## 2026-10-22 — DEP3 队友请求与执行反馈（服务端分支实现）
 
-`feature/npc-execution-loop`新增同会话文本FIFO、请求取消/状态查询、有限生成并发与上游剩余预算、元数据追踪，以及有界执行反馈账本和只读查询。提交后失败保留UNKNOWN；回执不确定追加封锁对应NPC/run，避免污染损坏尾部。修复跟随目标和战术能力关联，未支持条件明确无动作。新增243项scoped测试、10个完整golden，适用核心回归1272 passed、1 skipped；无新增依赖。未修改/连接UE、未调用真实LLM/ASR或安装RL依赖，第三步整体与生产目标仍待验。见[计划](docs/planning/step-03-execution-loop-plan.md)、[契约](docs/protocols/npc-loop-contract-v0.4.md)与[实测记录](docs/logs/verification-records.md#loop-20261022)。
+`feature/npc-execution-loop`新增同会话文本FIFO、请求取消/状态查询、有限生成并发与上游剩余预算、元数据追踪，以及有界执行反馈账本和只读查询。提交后失败保留UNKNOWN；回执不确定追加封锁对应NPC/run，避免污染损坏尾部。修复跟随目标和战术能力关联，未支持条件明确无动作。新增243项scoped测试、10个完整golden，适用核心回归1272 passed、1 skipped；无新增依赖。未修改/连接UE、未调用真实LLM/ASR或安装RL依赖，第三步整体与生产目标仍待验。见[计划](docs/planning/_04_execution_loop_plan.md)、[契约](docs/protocols/_01_npc_contract.md#loop)与[实测记录](docs/records/_01_verification_records.md#loop-20261022)。
 
 ## 2026-10-21 — DEP2 NPC归属、生命周期与有效期（分支实现）
 
-按已批准的第二步计划，在 `feature/npc-scope-v04` 新增v0.4同版JSON边界、可信开发身份、玩家/存档/NPC状态分区、显式run/encounter CAS、记忆epoch重置屏障、单调预算、有限窗口single-flight与回执关联；旧协议须显式开启开发兼容模式。新增190项scoped测试和21个完整golden，适用核心回归1029 passed+1 skipped。未安装可选ML/RL、未调用真实LLM、未修改或连接UE。命令、证据与未验范围见[验证记录](docs/logs/verification-records.md#scope-20261021)，配置与接入见[开发指南](docs/guides/scoped-development.md)。
+按已批准的第二步计划，在 `feature/npc-scope-v04` 新增v0.4同版JSON边界、可信开发身份、玩家/存档/NPC状态分区、显式run/encounter CAS、记忆epoch重置屏障、单调预算、有限窗口single-flight与回执关联；旧协议须显式开启开发兼容模式。新增190项scoped测试和21个完整golden，适用核心回归1029 passed+1 skipped。未安装可选ML/RL、未调用真实LLM、未修改或连接UE。命令、证据与未验范围见[验证记录](docs/records/_01_verification_records.md#scope-20261021)，配置与接入见[开发指南](docs/guides/_04_scoped_development_guide.md)。
 
 ## 2026-10-21 — T49 SC-009 历史/本次拆分（#66）
 
@@ -64,7 +64,7 @@ SC-004/005/006/007/008/013 六项 N/A 升为脚本可判定，纯观测层埋点
 
 ## 2026-10-19 — FIX-10 端口对齐与临时UE心跳
 
-`46feea3` 将NPC默认端口由8000改8011；Boss服务继续8012。历史记录health_commands 12 passed及health200。`1ac8751` 整理E盘临时UE工程心跳记录（agent/step200×28），只支持当时心跳连通；玩家UI、技能执行和D盘正式工程验收另行核对，见[原环境与结论边界](docs/logs/verification-records.md#ue-20261019)。
+`46feea3` 将NPC默认端口由8000改8011；Boss服务继续8012。历史记录health_commands 12 passed及health200。`1ac8751` 整理E盘临时UE工程心跳记录（agent/step200×28），只支持当时心跳连通；玩家UI、技能执行和D盘正式工程验收另行核对，见[原环境与结论边界](docs/records/_01_verification_records.md#ue-20261019)。
 
 ## 2026-10-15 — 指标、联调复现和表达修正
 
@@ -73,7 +73,7 @@ SC-004/005/006/007/008/013 六项 N/A 升为脚本可判定，纯观测层埋点
 - T35/#44、T36/#45：登记默认参数、补style-policy-002样例；未宣称PIE调优完成。
 - T37 / `b30f4cc`：Bruno展示文案、缺省角色路由、degraded观测及可选埋点修正。全量历史762→769 passed，2 skipped沿用原锚点；生产调用未传latency_ms，不把字段存在写成正式SC-011采集完成。
 
-样例、命令范围与代理限制见[验证记录](docs/logs/verification-records.md#metrics-boundary)。
+样例、命令范围与代理限制见[验证记录](docs/records/_01_verification_records.md#metrics-boundary)。
 
 ## 2026-10-12～13 — 指标漏采、状态边界与Bruno
 
@@ -89,7 +89,7 @@ T18/#31集中v0.3契约、跨仓版本/端口和能力对照；记录服务HTTP�
 
 批量回执、调试台UI、关系阶段中文名落地；CODE-01～05/07修复白名单校验、不可信输入封装、指令有效期、映射兜底及显式异常。S0/S1完成游戏命名空间、人格路由与lore/信号/回执隔离，`15cfc55`提交S1。FIX-01建立读取Settings的可配置启动入口，当时默认8000。
 
-不同检查快照原记678+2、711+2、709、712、714+2、726+2；详细范围见[历史检查表](docs/logs/verification-records.md#regression)。09-30的一进程一游戏、能力子集校验、S5后置和Bruno迁移裁决继续保留在[决策记录](docs/logs/verification-records.md#decisions)。
+不同检查快照原记678+2、711+2、709、712、714+2、726+2；详细范围见[历史检查表](docs/records/_01_verification_records.md#regression)。09-30的一进程一游戏、能力子集校验、S5后置和Bruno迁移裁决继续保留在[决策记录](docs/records/_01_verification_records.md#decisions)。
 
 ## 2026-09-14～24 — NPC人格与行为代理
 
@@ -105,7 +105,7 @@ T18/#31集中v0.3契约、跨仓版本/端口和能力对照；记录服务HTTP�
 
 ## 2026-09-10 — 初期LLM与旧队友RL实验
 
-战术LLM意图解析、人格few-shot/多样回退、短期session记忆相继落地，历史236→242→250 passed、3 skipped。旧队友实验记3种子×100万步、2/3达标，优化眩晕窗口爆裂；这是17维/7队友动作的旧模拟实验，不能引用为当前schema4/26维/9动作Boss候选的上线结论，见[RL历史](docs/logs/verification-records.md#rl-history)。
+战术LLM意图解析、人格few-shot/多样回退、短期session记忆相继落地，历史236→242→250 passed、3 skipped。旧队友实验记3种子×100万步、2/3达标，优化眩晕窗口爆裂；这是17维/7队友动作的旧模拟实验，不能引用为当前schema4/26维/9动作Boss候选的上线结论，见[RL历史](docs/records/_01_verification_records.md#rl-history)。
 
 ## 2026-09-02～09 — 服务基础与战术闭环脚手架
 

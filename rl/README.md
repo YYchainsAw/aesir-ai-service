@@ -2,7 +2,7 @@
 
 `rl/boss/` 训练、评估和部署 Boss 高层动作策略，使用 MaskablePPO；NPC 服务 `app/` 不导入它。模拟器规则基线 `RuleBossPolicy` 与 UE 的 `BT_AesirBoss` 是不同实现，模拟器成绩不能直接代表 UE 实战。
 
-部署目标见[15 项能力分工](../docs/planning/ai-capability-placement.md)（`placement-v1`，AI-DEP-01/02/14/15）及[六步方案第五步](../docs/planning/local-boss-cloud-companion-roadmap.md)：源码可在服务器开发，冻结推理发行到玩家电脑；训练/正式评估与在线 NPC 服务隔离。本页既有模型身份/接口说明不表示 Windows 包、自动模型更新、独立 PPO 评估或 UE 验收已经完成。
+部署目标见[15 项能力分工](../docs/planning/_07_capability_placement_plan.md)（`placement-v1`，AI-DEP-01/02/14/15）及[六步方案第五步](../docs/planning/_02_delivery_plan.md)：源码可在服务器开发，冻结推理发行到玩家电脑；训练/正式评估与在线 NPC 服务隔离。本页既有模型身份/接口说明不表示 Windows 包、自动模型更新、独立 PPO 评估或 UE 验收已经完成。
 
 ## 先清点交付材料
 
@@ -41,7 +41,7 @@
 
 输出目录必须是新目录，以免覆盖证据。`episodes.jsonl` 保留两策略的逐局种子、画像、结果、奖励、伤害和动作统计；两策略全部完成后才生成 `summary.json`，包含分画像汇总、模型及源码/原始输出 SHA、依赖版本和可复评参数 `reproduce_argv`。若中途失败，可能保留部分逐局数据，但没有完成汇总。模拟器结果不能当作 UE 的 BT 对照成绩。
 
-2026-11-12：入口及失败保护已通过自动化测试；本机冻结模型和 `sb3-contrib` 仍缺失，真实 PPO 评估未运行，详见[验证记录](../docs/logs/verification-records.md#boss-frozen-eval-20261112)。
+2026-11-12：入口及失败保护已通过自动化测试；本机冻结模型和 `sb3-contrib` 仍缺失，真实 PPO 评估未运行，详见[验证记录](../docs/records/_01_verification_records.md#boss-frozen-eval-20261112)。
 
 训练冒烟命令与正式训练示例如下；它们会写入 `models/rl/boss/`，本轮文档整理没有执行训练。
 
@@ -72,7 +72,7 @@
 | 选模记录 | `models/rl/boss/deployment/boss_policy_schema_v4_sim005.selection.json` |
 | ZIP SHA-256 | `dd79ceca0e0f079634364754d1959212b0cdb357439ab9ef8e36d3ba4ed64add` |
 
-`selection_evaluation` 使用 `base_seed=50000`，aggressive、defensive、evasive 各 300 局，共 900 局；Boss 胜率为 0.8433，分画像 0.553 / 0.977 / 1.0。**这是选模汇总，不能再次充当独立测试集或 UE 成绩。** 未找到对应 900 局逐局原始输出；训练曲线、原选模复现材料和真实独立测试数据仍需整理。2026-09-10 的“3 种子、2/3 达标、眩晕窗口施爆裂”属于旧队友实验，不能作为此 Boss 模型的上线依据，详见[验证记录](../docs/logs/verification-records.md)。
+`selection_evaluation` 使用 `base_seed=50000`，aggressive、defensive、evasive 各 300 局，共 900 局；Boss 胜率为 0.8433，分画像 0.553 / 0.977 / 1.0。**这是选模汇总，不能再次充当独立测试集或 UE 成绩。** 未找到对应 900 局逐局原始输出；训练曲线、原选模复现材料和真实独立测试数据仍需整理。2026-09-10 的“3 种子、2/3 达标、眩晕窗口施爆裂”属于旧队友实验，不能作为此 Boss 模型的上线依据，详见[验证记录](../docs/records/_01_verification_records.md)。
 
 `models/` 被 Git 忽略，新克隆没有默认 ZIP。当前没有仓库内可核验的公开下载入口；交付者需提供以上 ZIP、selection、训练 manifest 及依赖记录，并记录实际保管或获取位置。不要用同名空文件或新训练结果替代原候选。获取后在仓库根核对：
 
@@ -82,7 +82,7 @@ Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005
 
 ## 本地交付与版本发布
 
-2026-10-21用户采纳Boss冻结推理在玩家本机运行：初始程序、依赖、模型和材料随游戏交付，服务器提供可信版本清单和可选更新，训练与在线NPC服务分开调度。首期复用下述独立HTTP服务；ONNX/NNE为后续候选，当前无自动打包/下载/进程管理实现。清单需包含SHA、Schema/动作和游戏/推理运行时兼容性；签名验证、菜单阶段切换、失败回滚及断网行为只在[UE部署说明](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/02_Design_Doc/TDD/06_Deployment.md)维护，服务端要求见[部署指南](../docs/guides/deployment.md)。正式研究固定模型并关闭自动更新。
+2026-10-21用户采纳Boss冻结推理在玩家本机运行：初始程序、依赖、模型和材料随游戏交付，服务器提供可信版本清单和可选更新，训练与在线NPC服务分开调度。首期复用下述独立HTTP服务；ONNX/NNE为后续候选，当前无自动打包/下载/进程管理实现。清单需包含SHA、Schema/动作和游戏/推理运行时兼容性；签名验证、菜单阶段切换、失败回滚及断网行为只在[UE部署说明](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/02_Design_Doc/TDD/06_Deployment.md)维护，服务端要求见[部署指南](../docs/guides/_07_deployment_guide.md)。正式研究固定模型并关闭自动更新。
 
 ## 冻结策略 HTTP 服务
 
@@ -102,8 +102,8 @@ Get-FileHash -LiteralPath models/rl/boss/deployment/boss_policy_schema_v4_sim005
 
 `model_id` 使用登记的候选身份，不随文件改名。健康接口只有已加载且校验通过才返回 HTTP 200 / `status=ok`；未就绪返回 HTTP 503。新增 `ready` 和 `model_validation`：后者包含 `state`（`not_checked/checking/passed/failed`）、稳定 `error_code`、预期值 `expected` 及实测值 `actual`。`actual.sha256` 是加载快照的 SHA，Schema/模拟器/奖励版本来自已核对的 manifest，观测形状和动作数量来自加载后的模型；未检查的值保留 null。顶层 Schema、观测维度和模拟器版本仍表示服务契约。启动失败时进程已经退出，须查看启动错误码，不能再通过该进程的 HTTP 健康接口查询。
 
-该门禁不读取 selection 的评分，也未实现发行清单签名；manifest SHA 作为本次读取证据报告。当前真实冻结 ZIP/manifest 仍缺失，成功路径仅用合成文件和模型加载替身验证，不代表真实模型启动或 UE 已验收。详见[验证记录](../docs/logs/verification-records.md#boss-runtime-gate-20261112)。
+该门禁不读取 selection 的评分，也未实现发行清单签名；manifest SHA 作为本次读取证据报告。当前真实冻结 ZIP/manifest 仍缺失，成功路径仅用合成文件和模型加载替身验证，不代表真实模型启动或 UE 已验收。详见[验证记录](../docs/records/_01_verification_records.md#boss-runtime-gate-20261112)。
 
 UE 已确认目标为连续 3 次通信、协议或非法动作错误后切 BT，保持到本场遭遇结束；仅完整合法响应清零，合法暂时无动作不算故障。2026-11-09 UE 提交 `06f2415` 已修复动作字段校验前清零的源码顺序；连续非法动作注入、BT 接管及结算仍待运行验证。模型身份完整核验、终局取消与同遭遇策略段关联也需联调，参见 [UE RL 契约](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/08_RL_Research/BossRL_Contract.md)、[已知问题](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/06_Test_Doc/KnownIssues.md)。这些 UE 目标不表示 Python 或两端已验收。
 
-NPC LLM 使用独立的默认 **5 次失败 / 60 秒恢复窗口**熔断机制，不采用 Boss 的“本场保持 BT”规则。正式对照、故障与时延统计见 [UE 评估方案](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/08_RL_Research/03_EvaluationProtocol.md)；本仓实施缺口见[未决清单](../docs/planning/todo.md)，模型视图见 [UML 入口](../docs/design/uml/README.md)。
+NPC LLM 使用独立的默认 **5 次失败 / 60 秒恢复窗口**熔断机制，不采用 Boss 的“本场保持 BT”规则。正式对照、故障与时延统计见 [UE 评估方案](https://github.com/YYchainsAw/AesirWarden/blob/main/Docs/08_RL_Research/03_EvaluationProtocol.md)；本仓实施缺口见[未决清单](../docs/planning/_01_known_issues.md)，模型视图见 [UML 入口](../docs/design/uml/README.md)。

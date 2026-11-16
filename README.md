@@ -2,7 +2,7 @@
 
 AesirWarden 的 Python 配套服务。NPC 服务负责对话、记忆、关系、语音转写、行为建议和回执采集；Boss RL 在独立进程中训练和推理。UE 始终负责世界状态、技能合法性、实际执行和结果结算。
 
-2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、ASR和模型版本发布。当前按单worker受控交付理解；SQL事务/Bearer授权、持久确认及事实/历史回执归档已有受控MySQL与恢复证据；ASR已有自部署与商业备选适配和本机真实样例验证。UE接入、目标服务器语音部署、正式数据/网络发布及完整离线队列仍待验。见[部署指南](docs/guides/deployment.md)与[自部署ASR](docs/guides/asr-self-hosted.md)，不表示现代码可直接公网开放。
+2026-10-21已采纳正式目标：Boss冻结推理随游戏在本地运行，NPC通过远程HTTPS服务提供能力，补玩家/存档隔离、权威存储与缓存同步、ASR和模型版本发布。当前按单worker受控交付理解；SQL事务/Bearer授权、持久确认及事实/历史回执归档已有受控MySQL与恢复证据；ASR已有自部署与商业备选适配和本机真实样例验证。UE接入、目标服务器语音部署、正式数据/网络发布及完整离线队列仍待验。见[部署指南](docs/guides/_07_deployment_guide.md)与[自部署ASR](docs/guides/_11_asr_guide.md)，不表示现代码可直接公网开放。
 
 ## 开发环境启动 NPC 服务
 
@@ -17,7 +17,7 @@ python -m venv .venv
 
 默认地址为 `http://127.0.0.1:8011`。打开 `/health` 检查运行提交，打开 `/docs` 查询当前接口。`scripts.run_server` 读取 `AESIR_SERVICE_HOST` / `AESIR_SERVICE_PORT`；直接运行未指定端口的 Uvicorn 会使用其自己的默认端口。修改 `.env` 或策略后重启服务。
 
-新版JSON入口默认要求可信身份，旧协议默认关闭。单机/环回开发的固定身份、旧协议兼容开关及调用顺序见[v0.4开发与交接](docs/guides/scoped-development.md)；不以客户端自报player_id代替身份。
+新版JSON入口默认要求可信身份，旧协议默认关闭。单机/环回开发的固定身份、旧协议兼容开关及调用顺序见[v0.4开发与交接](docs/guides/_04_scoped_development_guide.md)；不以客户端自报player_id代替身份。
 
 规则和 mock 模式不需要云端模型；启用 LLM 时会向配置后端发送文本及生成所需上下文。真实 ASR 需要可选依赖。安装、后端配置、数据流和复现步骤见下面的指南，不能由“服务在本机运行”推断没有外部调用。
 
@@ -25,24 +25,24 @@ python -m venv .venv
 
 | 我现在要做什么 | 入口 |
 | --- | --- |
-| 刚接手项目，先了解结构、接口、功能和待办 | [接手导览：无需先读源码](docs/guides/project-onboarding-2026-11.md) |
-| 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/getting-started.md) |
-| 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/ai-capability-placement.md) |
-| 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/local-boss-cloud-companion-roadmap.md) · [远程开发指南](docs/guides/remote-development.md) |
-| 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/step-02-identity-scope-plan.md) · [v0.4契约草案](docs/protocols/npc-scope-contract-v0.4-draft.md)（分支实现及服务端回归通过，UE待验） |
-| SQL、正式凭据、持久确认与事实/回执恢复 | [第四步计划](docs/planning/step-04-persistence-access-plan.md) · [持久化开发指南](docs/guides/persistent-development.md) |
-| 正式部署、玩家隔离、缓存同步、ASR及模型分发 | [部署指南](docs/guides/deployment.md) |
-| 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/repro.md) |
-| 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/llm-integration.md) |
-| 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/protocols/integration-alignment-v0.3.md) |
+| 刚接手项目，先了解结构、接口、功能和待办 | [接手导览：无需先读源码](docs/guides/_01_project_overview_guide.md) |
+| 安装、启动、切换游戏实例或排查配置 | [启动指南](docs/guides/_02_local_setup_guide.md) |
+| 判断每项 AI 能力在本地还是服务器、核对原计划 | [15 项部署分工对照](docs/planning/_07_capability_placement_plan.md) |
+| 远程开发、Boss 本地与队友云端的推进顺序 | [六步开发方案](docs/planning/_02_delivery_plan.md) · [远程开发指南](docs/guides/_08_remote_development_guide.md) |
+| 审查第二步身份、作用域与有效期设计 | [第二步实施计划](docs/planning/_03_identity_scope_plan.md) · [v0.4契约草案](docs/protocols/_01_npc_contract.md#scope)（分支实现及服务端回归通过，UE待验） |
+| SQL、正式凭据、持久确认与事实/回执恢复 | [第四步计划](docs/planning/_05_persistence_plan.md) · [持久化开发指南](docs/guides/_06_persistence_guide.md) |
+| 正式部署、玩家隔离、缓存同步、ASR及模型分发 | [部署指南](docs/guides/_07_deployment_guide.md) |
+| 查运行版本、mock／LLM／fallback及样例 | [联调复现](docs/guides/_10_verification_guide.md) |
+| 配置LLM、了解数据外发和保留范围 | [LLM与数据流](docs/guides/_03_llm_integration_guide.md) |
+| 从UE选择正确端点、对齐ID和验收 | [两端接入对齐](docs/guides/_12_legacy_integration_guide.md) |
 | 查接口和人格包字段 | [文档索引](docs/README.md)的契约入口 |
-| 查当前需求、规则、异常和对象职责 | [NPC需求主文](docs/planning/aesir-agent-sdd-v1.1.md) |
+| 查当前需求、规则、异常和对象职责 | [NPC需求主文](docs/planning/_11_npc_requirements.md) |
 | 审查数据库ER/PDM、数据字典及建表/迁移SQL | [数据库设计索引](docs/design/database/README.md) |
-| 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/course-requirements-index.md) |
-| 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/todo.md) |
-| 实施已采纳的对话/语音/Agent/记忆/云端演进 | [交互演进计划](docs/planning/npc-interaction-evolution.md)，含UC映射、批次与新增验收 |
+| 查看课程模型与draw.io图源 | [UML索引](docs/design/uml/README.md) · [课程索引](docs/planning/_10_course_requirements_guide.md) |
+| 继续开发或核对已知实现差距 | [未决事项与跨仓依赖](docs/planning/_01_known_issues.md) |
+| 实施已采纳的对话/语音/Agent/记忆/云端演进 | [交互演进计划](docs/planning/_06_interaction_evolution_plan.md)，含UC映射、批次与新增验收 |
 | 训练或运行Boss PPO | [Boss RL说明](rl/README.md) |
-| 查真实联调和历史里程碑 | [验证记录](docs/logs/verification-records.md) · [CHANGELOG](CHANGELOG.md) |
+| 查真实联调和历史里程碑 | [验证记录](docs/records/_01_verification_records.md) · [CHANGELOG](CHANGELOG.md) |
 
 ## 服务边界与端口
 
@@ -62,6 +62,6 @@ python -m venv .venv
 .\.venv\Scripts\python -m pytest tests/api tests/services tests/schemas tests/scripts tests/rl/boss/test_contract.py tests/scoped tests/persistence -q
 ```
 
-上述为无需 ML/RL 依赖的核心回归，包含 `tests/scoped` 的新版身份、生命周期、隔离、时效与幂等测试；`tests/persistence`含隔离SQLite与显式启用的5项MySQL测试；无专用MySQL连接文件时该5项明确跳过，真实库运行见持久化指南。完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/remote-development.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
+上述为无需 ML/RL 依赖的核心回归，包含 `tests/scoped` 的新版身份、生命周期、隔离、时效与幂等测试；`tests/persistence`含隔离SQLite与显式启用的5项MySQL测试；无专用MySQL连接文件时该5项明确跳过，真实库运行见持久化指南。完整 RL 环境/推理测试需要另装对应可选依赖，Linux 命令与跳过边界见[远程开发指南](docs/guides/_08_remote_development_guide.md)。测试数应标注实际提交和环境；历史结果见验证记录。本次文档和模型整理不代表重新运行了服务、UE、ASR、LLM或研究实验。指标脚本的采集/覆盖结果也不能替代正式需求验收。
 
 日常任务只维护一个状态来源，文档保留规则、依赖与验收定义。修改接口字段时同步schema、契约与golden样例；修改业务规则时同步需求、图和追踪，未决定的技能数量或跨端阶段协议继续列为未决。
