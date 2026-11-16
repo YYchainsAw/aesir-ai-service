@@ -21,6 +21,8 @@ def create_llm_client() -> LLMClient:
             model=settings.llm_model,
             base_url=settings.llm_base_url,
             timeout_seconds=settings.llm_timeout_seconds,
+            thinking_mode=settings.llm_thinking_mode,
+            max_tokens=settings.llm_max_tokens,
         )
     )
     _LLm_CIRCUIT_BREAKER._failure_threshold = settings.llm_circuit_failure_threshold

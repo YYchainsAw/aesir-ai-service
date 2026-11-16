@@ -17,16 +17,22 @@
 .env仅放本机配置，不提交真实密钥。复制.env.example后填写实际使用的后端。支持OpenAI兼容接口，但默认Settings的LLM地址/模型/密钥为空，需要显式配置，不把DeepSeek示例说成代码内置后端。
 
 ```ini
-AESIR_PARSER_BACKEND=llm
-AESIR_INTENT_BACKEND=llm
+AESIR_PARSER_BACKEND=rule
+AESIR_INTENT_BACKEND=rule
 AESIR_COMPANION_BACKEND=llm
-LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_MODEL=deepseek-chat
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-flash
 LLM_API_KEY=<仅在本机填写，不提交>
-LLM_TIMEOUT_SECONDS=15
+LLM_TIMEOUT_SECONDS=30
+LLM_THINKING_MODE=disabled
+LLM_MAX_TOKENS=1024
 ```
 
-以上DeepSeek仅为兼容后端配置示例，不代表本轮已联网验证。替换后端仍需核对URL、模型、凭据、结构化输出和超时。改.env后重启`python -m scripts.run_server`；get_settings不缓存进程环境不等于.env文件即时重载。
+这是 2026-11-16 按 [DeepSeek 官方价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/) 与[思考模式协议](https://api-docs.deepseek.com/guides/thinking_mode/)整理的经济配置：Flash 用于对话，规则处理指令；如需大模型理解自由表达的指令，可分别把 parser/intent 改为 llm，会增加调用量。当前 Flash 默认启用思考，本项目通过显式 `thinking.type=disabled` 关闭，减少额外生成。`LLM_MAX_TOKENS` 是每次生成的输出上限，不是每天费用上限；复杂 JSON 超过上限仍可能被截断并回退。
+
+两个可选字段在不设置时不会发给提供方，兼容原有后端。`LLM_THINKING_MODE` 仅接受 enabled/disabled；其他平台不支持该参数时应删除此项。替换后端仍需核对 URL、模型、凭据、结构化输出和超时。改 .env 后重启 `python -m scripts.run_server`；get_settings 不缓存进程环境不等于 .env 文件即时重载。已有终端/IDE 的同名环境变量优先于 .env。
+
+2026-11-16 有效 Key 恢复后，真实文本、LLM 的 wait/follow/burst 与拒绝样例、faster-whisper→LLM 语音链路均通过；同请求重放没有新增上游调用。缺失 ASR 模型时仍能提交真实文本。结果限本机 development/JSON/memory；目标服务器、Bearer、UE 及回复事实质量另验，见 [P0 记录](../records/_03_p0_delivery_verification.md)。
 
 ## 失败与可判定结果
 

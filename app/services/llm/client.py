@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import httpx
 
@@ -49,6 +49,8 @@ class OpenAICompatibleSettings:
     model: str
     base_url: str
     timeout_seconds: float = 15.0
+    thinking_mode: Literal["enabled", "disabled"] | None = None
+    max_tokens: int | None = None
 
 
 class OpenAICompatibleLLMClient:
@@ -69,6 +71,15 @@ class OpenAICompatibleLLMClient:
         except (ImportError, ValueError) as error:
             raise LLMClientError("Unable to initialize the configured LLM HTTP client.") from error
 
+    def _generation_options(self) -> dict[str, Any]:
+        """Only send provider-specific options when explicitly configured."""
+        options: dict[str, Any] = {}
+        if self._settings.thinking_mode is not None:
+            options["thinking"] = {"type": self._settings.thinking_mode}
+        if self._settings.max_tokens is not None:
+            options["max_tokens"] = self._settings.max_tokens
+        return options
+
     @scoped_upstream
     def generate_json(
         self,
@@ -85,6 +96,7 @@ class OpenAICompatibleLLMClient:
             ],
             "temperature": temperature,
             "response_format": {"type": "json_object"},
+            **self._generation_options(),
         }
 
         timeout = ({"timeout": timeout_for_upstream(self._settings.timeout_seconds)}
@@ -135,6 +147,7 @@ class OpenAICompatibleLLMClient:
             "temperature": temperature,
             "response_format": {"type": "json_object"},
             "stream": True,
+            **self._generation_options(),
         }
 
         try:
