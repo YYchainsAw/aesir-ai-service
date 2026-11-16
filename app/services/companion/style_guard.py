@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -45,6 +46,8 @@ class StylePolicy:
     forbidden_expressions: frozenset[str]
     fabrication_signals: frozenset[str]
     require_memory_for_fabrication_signals: bool
+    observation_claim_patterns: tuple[str, ...] = ()
+    self_status_claim_patterns: tuple[str, ...] = ()
 
     @classmethod
     def load(cls, path: Path = _POLICY_PATH) -> "StylePolicy":
@@ -67,6 +70,8 @@ class StylePolicy:
             require_memory_for_fabrication_signals=bool(
                 raw.get("checks", {}).get("require_memory_for_fabrication_signals", True)
             ),
+            observation_claim_patterns=tuple(sorted(_term_set(raw, "observation_claim_patterns"))),
+            self_status_claim_patterns=tuple(sorted(_term_set(raw, "self_status_claim_patterns"))),
         )
 
 
@@ -97,6 +102,9 @@ def check_reply(
     injected_memories: list[Any] | None = None,
     injected_impressions: list[Any] | None = None,
     policy: StylePolicy | None = None,
+    observation_evidence: list[str] | None = None,
+    speaker_names: tuple[str, ...] = (),
+    self_status_available: bool = False,
 ) -> list[StyleViolation]:
     """检查单条回复文本是否违反表达一致性规则。
 
@@ -149,7 +157,40 @@ def check_reply(
                         )
                     )
 
+    # A current snapshot or an unrelated memory cannot prove a past personal action.
+    actors = "(?:" + "|".join(re.escape(name) for name in ("我", *speaker_names) if name) + ")"
+    patterns = [re.compile(template.replace("{actor}", actors), re.IGNORECASE)
+                for template in policy.observation_claim_patterns]
+    supported = any(_affirmed_observations(evidence, patterns) for evidence in observation_evidence or ())
+    if not supported:
+        for claim in _affirmed_observations(text, patterns):
+            violations.append(StyleViolation(
+                category="unsupported_observation", matched_term=claim,
+                message="回复声称已观察或检查，但没有对应行动记录或查证依据",
+            ))
+    if not self_status_available:
+        status_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in policy.self_status_claim_patterns]
+        for claim in _affirmed_observations(text, status_patterns):
+            violations.append(StyleViolation(
+                category="unsupported_self_status", matched_term=claim,
+                message="回复声称当前生命/魔力状态，但没有当前快照或状态查证",
+            ))
+
     return violations
+
+
+def _affirmed_observations(text: str, patterns: list[re.Pattern]) -> list[str]:
+    claims = []
+    for clause in re.findall(r"[^。！？!?\n]+[。！？!?]?", text):
+        if clause.endswith(("？", "?")) or re.search(r"如果|假如|要是|等我|先让我|不能说|不能断言|并不是说", clause):
+            continue
+        if "再" in clause and "已经" not in clause and "早就" not in clause:
+            continue
+        for pattern in patterns:
+            match = pattern.search(clause)
+            if match is not None:
+                claims.append(match.group(0))
+    return claims
 
 
 def _term_set(raw: dict[str, Any], key: str) -> frozenset[str]:

@@ -1,0 +1,291 @@
+{
+  "recorded_at": "2026-11-16T11:07:53.499607+08:00",
+  "issues": [
+    128,
+    129
+  ],
+  "base_commit": "13f97d1f627f0982acdb4cf6af9acc572bc4771f",
+  "source_sha256": {
+    "app/services/companion/prompt_builder.py": "edaaac6795200fff0c04550509d3a4430e3f70ecf6bbd24d2bdf7a3ba618bdb0",
+    "app/services/companion/llm_dialogue_service.py": "e848686cb4585e41b3c19364133a9f7173481edeb6260e9e36bcfe753fbffe92",
+    "app/services/companion/style_guard.py": "664261488fa646eeec025c5f91421290ede9a7c77632df714195f18b1149208f",
+    "data/policy/style_policy.yaml": "9df162393785c801362f5e7ccc23e9fbdf1f4c9e2789b5ff3c229d26fe11c190",
+    "tests/services/test_prompt_grounding.py": "1084db817eb96eeb33ccaef4647e933074af66966e920d16e42425ec3716d49a"
+  },
+  "comparison": {
+    "recorded_at": "2026-11-16T10:59:05.199672+08:00",
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "max_tokens": 1024,
+    "calls": 6,
+    "variants": {
+      "before": {
+        "usage": {
+          "prompt_tokens": 22148,
+          "prompt_cache_hit_tokens": 8832,
+          "prompt_cache_miss_tokens": 13316,
+          "completion_tokens": 374,
+          "cache_hit_ratio": 0.39877189813978686
+        },
+        "common_prefix_chars": 2314
+      },
+      "after": {
+        "usage": {
+          "prompt_tokens": 15232,
+          "prompt_cache_hit_tokens": 10368,
+          "prompt_cache_miss_tokens": 4864,
+          "completion_tokens": 365,
+          "cache_hit_ratio": 0.680672268907563
+        },
+        "common_prefix_chars": 14957
+      }
+    },
+    "prompt_token_reduction": 0.3122629582806574
+  },
+  "requests": [
+    {
+      "variant": "before",
+      "turn": 0,
+      "prompt_chars": 19375,
+      "prompt_sha256": "538de937fddd2b889f6bf7d0a4bc999669158295e488b91ed40e922f046af900",
+      "usage": {
+        "prompt_tokens": 7210,
+        "completion_tokens": 126,
+        "total_tokens": 7336,
+        "prompt_tokens_details": {
+          "cached_tokens": 7040
+        },
+        "prompt_cache_hit_tokens": 7040,
+        "prompt_cache_miss_tokens": 170
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "你好，旅行者。一起出发当然好——路上要是遇到岔路，我会先提醒你一声。",
+        "emotion_id": "emotion.bright",
+        "gesture_id": "gesture.small_wave",
+        "facial_expression_id": "face.bright_smile",
+        "interruptible": true,
+        "topics": [
+          "一起出发"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "同行",
+          "岔路"
+        ],
+        "relationship_signal": "warm",
+        "salient": false
+      },
+      "schema_valid": true,
+      "elapsed_ms": 1734
+    },
+    {
+      "variant": "before",
+      "turn": 1,
+      "prompt_chars": 20366,
+      "prompt_sha256": "edb266dd4a9363f11a0502f16e3e68d4c51a15b3f6d730943b573cfe011f4cec",
+      "usage": {
+        "prompt_tokens": 7442,
+        "completion_tokens": 130,
+        "total_tokens": 7572,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 6546
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "先看看干粮和清水够不够，再确认一下你的装备有没有松动的地方。这两样齐了，路上就没什么好慌的。",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "topics": [
+          "出发准备"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "补给",
+          "装备"
+        ],
+        "relationship_signal": "none",
+        "salient": false
+      },
+      "schema_valid": true,
+      "elapsed_ms": 1547
+    },
+    {
+      "variant": "before",
+      "turn": 2,
+      "prompt_chars": 20583,
+      "prompt_sha256": "fb9dca8aa74824ef75d02fa13f4543bea33dd61f28e59cf910af37018d06d5b0",
+      "usage": {
+        "prompt_tokens": 7496,
+        "completion_tokens": 118,
+        "total_tokens": 7614,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 6600
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "行啊，钓鱼的事我听你说。你平时都在什么样的水边下竿？",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "topics": [
+          "钓鱼"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "钓鱼",
+          "水边"
+        ],
+        "relationship_signal": "warm",
+        "salient": false
+      },
+      "schema_valid": true,
+      "elapsed_ms": 1281
+    },
+    {
+      "variant": "after",
+      "turn": 0,
+      "prompt_chars": 14957,
+      "prompt_sha256": "670c0ed6f46daef72574fb08caf7e9b6fbe62e2f947d338fc0144f31e58d3b8b",
+      "usage": {
+        "prompt_tokens": 4995,
+        "completion_tokens": 119,
+        "total_tokens": 5114,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 4099
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "你好，旅行者。一起出发可以，不过路上有什么打算，先跟我说说？",
+        "emotion_id": "emotion.bright",
+        "gesture_id": "gesture.small_wave",
+        "facial_expression_id": "face.bright_smile",
+        "interruptible": true,
+        "topics": [
+          "出发同行"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "行程安排"
+        ],
+        "relationship_signal": "warm",
+        "salient": false
+      },
+      "schema_valid": true,
+      "grounding_violations": [],
+      "elapsed_ms": 1704
+    },
+    {
+      "variant": "after",
+      "turn": 1,
+      "prompt_chars": 15388,
+      "prompt_sha256": "1f3f5c9aaa0670556a869b4c64a328ad02f002b7b705150fcfa2e4648fad34a9",
+      "usage": {
+        "prompt_tokens": 5092,
+        "completion_tokens": 125,
+        "total_tokens": 5217,
+        "prompt_tokens_details": {
+          "cached_tokens": 4736
+        },
+        "prompt_cache_hit_tokens": 4736,
+        "prompt_cache_miss_tokens": 356
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "食物和水先备足，路上可没地方补给。再看看你的装备有没有磨损，别走到一半出岔子。",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "topics": [
+          "出发准备"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "补给",
+          "装备"
+        ],
+        "relationship_signal": "none",
+        "salient": false
+      },
+      "schema_valid": true,
+      "grounding_violations": [],
+      "elapsed_ms": 953
+    },
+    {
+      "variant": "after",
+      "turn": 2,
+      "prompt_chars": 15605,
+      "prompt_sha256": "d763fe9a8451c8d109de8c5062abdc04f313ff68638b99bb18f69ca9e7cce5f7",
+      "usage": {
+        "prompt_tokens": 5145,
+        "completion_tokens": 121,
+        "total_tokens": 5266,
+        "prompt_tokens_details": {
+          "cached_tokens": 4736
+        },
+        "prompt_cache_hit_tokens": 4736,
+        "prompt_cache_miss_tokens": 409
+      },
+      "http_status": 200,
+      "result": {
+        "action": "reply",
+        "reply_text": "钓鱼啊，我了解得不多，不过听你讲应该挺有意思。你平时都在什么样的地方钓？",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "topics": [
+          "钓鱼"
+        ],
+        "facts": [],
+        "corrected_fact_ids": [],
+        "reply_topics": [
+          "钓鱼地点"
+        ],
+        "relationship_signal": "warm",
+        "salient": false
+      },
+      "schema_valid": true,
+      "grounding_violations": [],
+      "elapsed_ms": 1453
+    }
+  ],
+  "total_generation_requests": 12,
+  "content": "synthetic test inputs and responses only",
+  "core_tests": {
+    "tests": "1663",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "13",
+    "time": "94.736"
+  },
+  "limitations": [
+    "small synthetic sample, cache state not controlled",
+    "source-aware patterns are not a universal entailment checker",
+    "streaming deltas cannot be retracted after final validation",
+    "target server not reached; SSH alias baota-server unresolved"
+  ]
+}

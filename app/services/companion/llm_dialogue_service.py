@@ -192,6 +192,13 @@ class LLMCompanionDialogueService:
         # 原先用完即弃（只进第二轮 prompt），现在透传给埋点落盘。
         self.last_lookup: ToolResult | None = None
 
+    def _observation_evidence(self, memories) -> list[str]:
+        evidence = [entry.content for entry in memories
+                    if entry.source in {"observation", "shared_experience"}]
+        if self.last_lookup is not None and self.last_lookup.found:
+            evidence.append(self.last_lookup.content)
+        return evidence
+
     def reply(
         self,
         request: CompanionDialogueRequest,
@@ -248,6 +255,7 @@ class LLMCompanionDialogueService:
                     memories=list(memories),
                     impressions=list(impressions),
                     relationship_stage=relationship_stage,
+                    world_context=world_context,
                 ),
                 user_prompt=wrap_untrusted_input(request.text),
             )
@@ -266,6 +274,10 @@ class LLMCompanionDialogueService:
                 response_payload.reply_text,
                 injected_memories=memories or None,
                 injected_impressions=impressions or None,
+                observation_evidence=self._observation_evidence(memories),
+                speaker_names=(self._profile.display_name, *self._profile.wake_words),
+                self_status_available=world_context is not None or bool(
+                    self.last_lookup and self.last_lookup.found and self.last_lookup.tool == "tool.self.status"),
             )
             if not violations:
                 self.last_topics = response_payload.topics
@@ -305,6 +317,7 @@ class LLMCompanionDialogueService:
         """
         lookup = _lookup_request(payload)
         if lookup is None:
+            self.last_lookup = None
             return payload
 
         result = run_lookup(
@@ -322,6 +335,7 @@ class LLMCompanionDialogueService:
                 memories=list(memories),
                 impressions=list(impressions),
                 relationship_stage=relationship_stage,
+                world_context=world_context,
                 lookup_result=result,
             ),
             user_prompt=wrap_untrusted_input(request.text),
@@ -370,6 +384,7 @@ class LLMCompanionDialogueService:
         风格校验在完整流接收后进行：若发现违规，已发出的 delta 无法收回，
         只能向上抛异常，由 dialogue_service 在 SSE 中发出 error 事件并停止。
         """
+        self.last_lookup = None
         deadline = _lookup_deadline()
         payload: dict[str, Any] = {}
         for kind, value in self._stream_round(
@@ -379,6 +394,7 @@ class LLMCompanionDialogueService:
                 memories=list(memories),
                 impressions=list(impressions),
                 relationship_stage=relationship_stage,
+                world_context=world_context,
             ),
             user_prompt=wrap_untrusted_input(request.text),
         ):
@@ -404,6 +420,7 @@ class LLMCompanionDialogueService:
                     memories=list(memories),
                     impressions=list(impressions),
                     relationship_stage=relationship_stage,
+                    world_context=world_context,
                     lookup_result=result,
                 ),
                 user_prompt=wrap_untrusted_input(request.text),
@@ -425,6 +442,10 @@ class LLMCompanionDialogueService:
             response_payload.reply_text,
             injected_memories=memories or None,
             injected_impressions=impressions or None,
+            observation_evidence=self._observation_evidence(memories),
+            speaker_names=(self._profile.display_name, *self._profile.wake_words),
+            self_status_available=world_context is not None or bool(
+                self.last_lookup and self.last_lookup.found and self.last_lookup.tool == "tool.self.status"),
         )
         if violations:
             # #110：先留快照再抛——dialogue_service 在 error 帧分支据此落一行

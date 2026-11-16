@@ -33,7 +33,7 @@
 | 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
 | Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
-| 真实测试/联调发生过什么 | [P0 最新核查](records/_03_p0_delivery_verification.md) · [验证记录](records/_01_verification_records.md) · [里程碑](../CHANGELOG.md) |
+| 真实测试/联调发生过什么 | [缓存与事实约束](records/_04_prompt_grounding_verification.md) · [P0 核查](records/_03_p0_delivery_verification.md) · [验证记录](records/_01_verification_records.md) · [里程碑](../CHANGELOG.md) |
 
 ## 字段定义看契约
 
