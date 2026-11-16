@@ -14,15 +14,12 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 FILES = (
     "docs/examples/ue-scoped.http",
-    "docs/guides/ue-service-adaptation.md",
-    "docs/guides/asr-self-hosted.md",
-    "docs/guides/scoped-development.md",
-    "docs/guides/persistent-development.md",
-    "docs/guides/deployment.md",
-    "docs/protocols/npc-scope-contract-v0.4-draft.md",
-    "docs/protocols/npc-loop-contract-v0.4.md",
-    "docs/protocols/npc-async-loop-v0.5-draft.md",
-    "docs/protocols/npc-persistence-contract-v0.4.md",
+    "docs/guides/_05_client_integration_guide.md",
+    "docs/guides/_11_asr_guide.md",
+    "docs/guides/_04_scoped_development_guide.md",
+    "docs/guides/_06_persistence_guide.md",
+    "docs/guides/_07_deployment_guide.md",
+    "docs/protocols/_01_npc_contract.md",
     "deploy/README.md",
     "deploy/aesir-ai.service",
     "deploy/service.env.example",
@@ -59,7 +56,7 @@ def export(destination: Path) -> Path:
     files["manifest.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     files["START-HERE.txt"] = (
         "Aesir UE service handoff\n\n"
-        "Read docs/guides/ue-service-adaptation.md first.\n"
+        "Read docs/guides/_05_client_integration_guide.md first.\n"
         "Request examples: docs/examples/ue-scoped.http\n"
         "Machine-readable contract: openapi.json\n"
         "Deployment preparation: deploy/README.md\n\n"

@@ -1,6 +1,6 @@
 # NPC持久化数据库设计
 
-> 2026-10-22，`database-design-v1`。对应第四步PR #88已合入的源码schema v1；本轮在 `fix/npc-schema-validation` 继续完善结构门禁与既有dev库整改。这是实现后补齐的需求与数据库设计审查，不追记为编码前已完成。规则与接口仍以原需求、部署指南和持久化契约为准，运行结果另记[验证记录](../../logs/verification-records.md#database-design-20261022)。
+> 2026-10-22，`database-design-v1`。对应第四步PR #88已合入的源码schema v1；本轮在 `fix/npc-schema-validation` 继续完善结构门禁与既有dev库整改。这是实现后补齐的需求与数据库设计审查，不追记为编码前已完成。规则与接口仍以原需求、部署指南和持久化契约为准，运行结果另记[验证记录](../../records/_01_verification_records.md#database-design-20261022)。
 
 ## 1. 设计范围与阅读顺序
 
@@ -8,13 +8,13 @@
 
 | 需要审查什么 | 阅读入口 |
 | --- | --- |
-| 原始需求怎样落到实体、身份、关系和聚合 | [需求与逻辑模型](01-requirements-and-logical-model.md)，含需求追踪、17类逻辑实体和10个documents命名空间 |
-| 实际有哪8张表、哪些关系是数据库约束 | [物理模型](02-physical-model.md)，含主外键、索引、访问路径与JSON拆表条件 |
-| 每列是什么类型、可否为空、怎样赋值 | [数据字典](03-data-dictionary.md)，8表44列；区分数据库默认与Python客户端默认 |
+| 原始需求怎样落到实体、身份、关系和聚合 | [需求与逻辑模型](_01_logical_model.md)，含需求追踪、17类逻辑实体和10个documents命名空间 |
+| 实际有哪8张表、哪些关系是数据库约束 | [物理模型](_02_physical_model.md)，含主外键、索引、访问路径与JSON拆表条件 |
+| 每列是什么类型、可否为空、怎样赋值 | [数据字典](_03_data_dictionary.md)，8表44列；区分数据库默认与Python客户端默认 |
 | 怎样初始化、处理已有库漂移和后续升级 | [SQL与迁移规范](sql/README.md)，保留初始DDL与有依据的v1修复SQL |
-| 怎样运行、授权、导入和备份恢复 | [持久化开发指南](../../guides/persistent-development.md) |
+| 怎样运行、授权、导入和备份恢复 | [持久化开发指南](../../guides/_06_persistence_guide.md) |
 
-需求基线为[NPC SDD](../../planning/aesir-agent-sdd-v1.1.md)、[DEP规则](../../guides/deployment.md)及[第四步计划](../../planning/step-04-persistence-access-plan.md)；外部字段与错误见[持久化契约](../../protocols/npc-persistence-contract-v0.4.md)。任务状态继续由[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)与PR维护，不另复制任务看板。
+需求基线为[NPC SDD](../../planning/_11_npc_requirements.md)、[DEP规则](../../guides/_07_deployment_guide.md)及[第四步计划](../../planning/_05_persistence_plan.md)；外部字段与错误见[持久化契约](../../protocols/_01_npc_contract.md#persistence)。任务状态继续由[DEP4里程碑](https://github.com/YYchainsAw/aesir-ai-service/milestone/8)与PR维护，不另复制任务看板。
 
 ## 2. 图源与Desktop导出
 
@@ -34,7 +34,7 @@
 
 `sql/001-initial-schema.sql`是从当前SQLAlchemy metadata编译并核对的初始v1结构，只在明确选定的新空库执行。已有库不重跑初始DDL；`schema_versions`不是自动迁移器，`create_all()`不更新已有列。尚无v2结构，不制作空占位迁移。
 
-`sql/repairs/001-v1-credential-expiry-not-null.sql`针对首次设计审查发现的v1漂移：dev库的credentials.expires_at允许NULL，而源码要求DOUBLE NOT NULL。后续推进已先备份dev库，再核对版本、DOUBLE及NULL=0并执行该修复；dev/test/restore三个项目库的只读结构审计现均通过，schema版本仍为1。原始发现与本轮整改分别保留在[验证记录](../../logs/verification-records.md#schema-gate-20261022)，不将当前一致倒写为历史无差异。
+`sql/repairs/001-v1-credential-expiry-not-null.sql`针对首次设计审查发现的v1漂移：dev库的credentials.expires_at允许NULL，而源码要求DOUBLE NOT NULL。后续推进已先备份dev库，再核对版本、DOUBLE及NULL=0并执行该修复；dev/test/restore三个项目库的只读结构审计现均通过，schema版本仍为1。原始发现与本轮整改分别保留在[验证记录](../../records/_01_verification_records.md#schema-gate-20261022)，不将当前一致倒写为历史无差异。
 
 metadata是当前实现结构基线，保留SQL由检查器对照，图和字典不得另立一套表。运行时 `check_schema()` 与离线MySQL审计复用 `app/persistence/validation.py` 的结构检查；未声明的collation不硬编码为样本的0900规则，部署仍须明确大小写策略。逻辑模型与物理实现的差异有意保留：通用JSON文档适合当前有界快照，但高增长事实/回执账本、按scope/时间检索和保留治理需按测量结果设计独立表或投影索引，不能把JSON当作无限扩展的默认存储。
 
@@ -52,4 +52,4 @@ metadata是当前实现结构基线，保留SQL由检查器对照，图和字典
   --database-url-file /etc/aesir-ai/dev/mysql84-test-runtime.url
 ```
 
-第二条只读检查既有目标；运行账号不因审计获得DDL权限。数据库业务测试、结构审计和图纸目视检查各证明不同事项，完整证据见[本轮记录](../../logs/verification-records.md#database-design-20261022)。
+第二条只读检查既有目标；运行账号不因审计获得DDL权限。数据库业务测试、结构审计和图纸目视检查各证明不同事项，完整证据见[本轮记录](../../records/_01_verification_records.md#database-design-20261022)。

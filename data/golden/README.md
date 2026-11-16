@@ -12,7 +12,7 @@
 
 用法：UE 直接把文件内容作为 `/v1/tactical/resolve` 的 `combat_context` 字段、
 或 `/v1/combat/events` 的快照上传；也可以用 `scripts/command_service/mock_ue_flow.py` 一键全链路演示。
-修改字段须先改 `docs/protocols/combat-tactical-protocol-v0.2.md` 再改本目录。
+修改字段须先改 `docs/protocols/_01_npc_contract.md` 再改本目录。
 
 ## v0.3 世界快照与主入口样例（SDD T017）
 

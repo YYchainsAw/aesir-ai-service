@@ -1,6 +1,6 @@
 # NPC 服务发布准备
 
-本目录提供可审查的 Linux/systemd/Nginx 模板，尚未安装或运行。真实 LLM 配置、服务器 OS/权限、域名证书、数据库、Redis 和目标机器 ASR 性能均待部署阶段确认。沿用[部署需求](../docs/guides/deployment.md)，不另建任务状态看板。
+本目录提供可审查的 Linux/systemd/Nginx 模板，尚未安装或运行。真实 LLM 配置、服务器 OS/权限、域名证书、数据库、Redis 和目标机器 ASR 性能均待部署阶段确认。沿用[部署需求](../docs/guides/_07_deployment_guide.md)，不另建任务状态看板。
 
 ## 文件与路径
 
@@ -30,7 +30,7 @@
 2. 从固定提交创建独立发布副本。安装项目、核心依赖及 `requirements-ml.txt` 的语音依赖，记录实际锁定版本；不安装 Boss 训练依赖作为 NPC 启动条件。
 3. 预置 Whisper 模型并核对模型文件/来源/版本。模板设 `HF_HUB_OFFLINE=1`，因此模型缺失会失败，不会在演示时自动下载。`ProtectHome=true` 下不能引用 `/root/.cache` 或个人 home 中的模型。
 4. 将模板复制到私有 `service.env` 后填写可用通用 LLM 或自部署 LLM 的地址、模型和凭据。当前无有效 Coding Plan 订阅，不填写假凭据来绕过门禁，也不自动改动计费路径。
-5. 准备受支持的 MySQL 专用库、最小权限运行账号和 Redis；初始化/迁移使用独立管理配置，按[持久化指南](../docs/guides/persistent-development.md)操作。该 systemd 服务不会自动建表、迁移或发放玩家凭据。
+5. 准备受支持的 MySQL 专用库、最小权限运行账号和 Redis；初始化/迁移使用独立管理配置，按[持久化指南](../docs/guides/_06_persistence_guide.md)操作。该 systemd 服务不会自动建表、迁移或发放玩家凭据。
 6. 在与 systemd 相同的环境下运行只读门禁；只有填写配置不等于供应商、SQL 或 Redis 连通性已验证。
 7. 安装 unit 后在目标服务器检查 `systemd-analyze verify`；替换 Nginx 域名/证书并执行 `nginx -t`。这些命令本轮未执行。确认配置通过后再启动与开放网络。
 8. 进入后置验收：健康、Bearer/存档授权、真实文本/指令/语音、服务重启、备份恢复、回滚、UE 录音与打包运行。每次记录发布 SHA、模型快照、设备及原始证据。
