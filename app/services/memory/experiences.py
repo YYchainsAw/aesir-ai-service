@@ -55,6 +55,11 @@ def build_experience(
     details: dict[str, str] | None = None,
     occurred_at: str = "",
     region_id: str = "",
+    event_id: str = "",
+    origin: str = "ue",
+    request_id: str = "",
+    origin_run_id: str = "",
+    origin_memory_epoch: str = "",
 ) -> MemoryEntry | None:
     """把一个世界事件转成共同经历条目；非共同经历类事件返回 ``None``。
 
@@ -76,7 +81,12 @@ def build_experience(
         importance="high" if event_type in _HIGH_IMPORTANCE else "normal",
         source="shared_experience",
         game_time=occurred_at,
-        tags=["world_event", event_type],
+        tags=["world_event", event_type, f'trace.origin={origin}', 'trace.confirmation=source_report',
+              *([f'trace.request_id={request_id}'] if request_id else []),
+              *([f'trace.origin_run_id={origin_run_id}'] if origin_run_id else []),
+              *([f'trace.origin_memory_epoch={origin_memory_epoch}'] if origin_memory_epoch else []),
+              *([f'trace.event_id={event_id}'] if event_id else []),
+              *([f'trace.occurred_at={occurred_at}'] if occurred_at else [])],
     )
 
 
@@ -88,6 +98,11 @@ def record_world_event_experience(
     details: dict[str, str] | None = None,
     occurred_at: str = "",
     region_id: str = "",
+    event_id: str = "",
+    origin: str = "ue",
+    request_id: str = "",
+    origin_run_id: str = "",
+    origin_memory_epoch: str = "",
 ) -> bool:
     """把事件写进该角色的经历摘要层；非共同经历类或写入失败返回 ``False``。
 
@@ -95,7 +110,9 @@ def record_world_event_experience(
     存储层另按内容去重兜底（``MemoryStore.record_experience``）。
     """
     entry = build_experience(
-        event_type, details=details, occurred_at=occurred_at, region_id=region_id
+        event_type, details=details, occurred_at=occurred_at, region_id=region_id,
+        event_id=event_id, origin=origin,
+        request_id=request_id, origin_run_id=origin_run_id, origin_memory_epoch=origin_memory_epoch,
     )
     if entry is None:
         return False

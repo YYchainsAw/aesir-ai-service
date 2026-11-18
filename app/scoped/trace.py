@@ -16,6 +16,11 @@ _lock = RLock()
 _logger = logging.getLogger(__name__)
 
 
+def logical_request_id() -> str | None:
+    context = _trace.get()
+    return context['logical_request_id'] if context is not None else None
+
+
 def record_trace(event, **fields):
     context = _trace.get()
     if context is None:

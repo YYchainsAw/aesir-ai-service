@@ -117,6 +117,8 @@ AESIR_COMPANION_BACKEND=mock AESIR_INTENT_BACKEND=rule AESIR_PARSER_BACKEND=rule
 
 ## 3. 请求、恢复与同步
 
+条目级管理新增 `GET /v1/scoped/console/memory/entries` 与 `POST /v1/scoped/console/memory/forget`，分别要求 console:read / memory:reset。遗忘原子移除所选 ID 并更新 epoch，保留关系/其他长期条目，清印象与该 NPC 会话历史；是管理操作，不是模型任意改档或日志/备份擦除。字段、重放/越权/未知目标和旧 epoch 分项确认见[契约](../protocols/_01_npc_contract.md#memory-management)，实测见[功能测评](../records/_08_project_functionality_assessment.md)。
+
 1. 携带Bearer发现context并显式bind；战斗显式begin/end。普通业务继续原scope/binding/epoch/单调预算，不把UTC墙钟差当有效期。
 2. 网络重试保留原request_id和语义载荷；同会话FIFO提交后再放行。实际供应商调用前独立预留额度，缓存重试不再调用；已预留不会因取消或SQLrollback退款。控制/同步重试仍可能计入请求额度，HTTP传输频率另由发布层限制。
 3. 服务重启后重新发现/绑定；不要重播旧聊天/音频/心跳/建议。用 `/recovery/state` 获取自有权威快照，用 `/recovery/operations/{id}` 或 `/recovery/directives/{id}`核对原run确认。这些响应不能直接驱动Action/GAS。

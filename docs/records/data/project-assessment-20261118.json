@@ -1,0 +1,160 @@
+{
+  "date": "2026-11-18",
+  "base_commit": "724cf1c0555b9953df9ca5d56e6efbda63513874",
+  "tested_worktree_modified": true,
+  "platform": "Windows",
+  "python": "3.12.7",
+  "tests": {
+    "passed": 1707,
+    "skipped": 13,
+    "failed": 0,
+    "seconds": 112.091
+  },
+  "skipped": [
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribes_silent_wav_returns_empty",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribe_raises_on_invalid_audio",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_fewshot_consistency.test_examples_reference_only_whitelisted_emotion_gesture_face[example_file2]",
+      "reason": "companion.narrator 未注册，无白名单可校验"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_symlink_without_overwriting_target",
+      "reason": "POSIX secure output semantics"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_source_and_static_output_paths_without_minting_token[web-root]",
+      "reason": "POSIX static web root policy"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_nonprivate_parent_directory",
+      "reason": "POSIX directory access policy"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_other_web_roots_without_creating_any_file",
+      "reason": "Linux deployment web root boundary"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_nonprivate_parent",
+      "reason": "POSIX private directory permissions"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_84_runtime_has_dml_but_no_ddl_or_cross_database_privilege",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_uow_failure_rolls_back_both_documents_and_authoritative_version",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_committed_document_is_visible_to_a_fresh_python_process",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_http_event_restart_rebind_and_recovery_never_reapply",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_actual_state_version_conflict_preserves_the_winner",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    }
+  ],
+  "optional_modules": {
+    "faster_whisper": true,
+    "redis": true,
+    "pymysql": true,
+    "numpy": true,
+    "sb3_contrib": false
+  },
+  "live_model_retrieval": {
+    "budget": {
+      "cases": 8,
+      "correct": 4,
+      "errors": 0,
+      "false_recall": 14,
+      "omitted": 4,
+      "prompt_tokens": 1521,
+      "cache_hit_tokens": 0,
+      "completion_tokens": 111,
+      "total_ms": 8402,
+      "selection_and_read_ms": 0
+    },
+    "index_read": {
+      "cases": 8,
+      "correct": 8,
+      "errors": 0,
+      "false_recall": 1,
+      "omitted": 0,
+      "prompt_tokens": 3486,
+      "cache_hit_tokens": 0,
+      "completion_tokens": 273,
+      "total_ms": 12641,
+      "selection_and_read_ms": 6356
+    }
+  },
+  "real_memory_forget_passed": true,
+  "live_calls": {
+    "retrieval_generation_invocations": 24,
+    "memory_success": 3,
+    "memory_initial_unknown": 1
+  },
+  "exclusions": [
+    "target server",
+    "current real MySQL",
+    "UE/GAS execution",
+    "TTS/VAD",
+    "Boss training or frozen model",
+    "production capacity"
+  ],
+  "earlier_failure": {
+    "state": "REQUEST_OUTCOME_UNKNOWN",
+    "evidence": "data/runtime/project-evaluation-20261118/live-memory/result.json",
+    "note": "First long-directory run failed after generation; short-directory isolated rerun passed. Do not claim this first run succeeded or infer general filesystem reliability."
+  },
+  "training_data": {
+    "total": 457,
+    "known_seed_texts": 75,
+    "known_seed_rows": 376,
+    "llm_rows_excluding_known_seeds": 60,
+    "remaining_by_npc": {
+      "companion.alice": 57,
+      "companion.bruno": 3
+    },
+    "reward_nonzero": 12,
+    "positive": 10,
+    "negative": 2,
+    "missing_request_id": 60,
+    "count_gate_met": false,
+    "provenance_verified": false,
+    "off_policy_propensities_available": false,
+    "training_approved": false,
+    "decision": "audit remaining provenance before counting natural interaction data"
+  },
+  "sha256": {
+    "app/api/v1/scoped.py": "de586f5c26fd76604ef72c37e796df9c2baa947f3b4425c873011475ddd7aafc",
+    "app/persistence/sync.py": "b8a48442669a6c8069f7fd09b58103f68b9ea56657614e9a84ff62786c28ad49",
+    "app/schemas/scoped.py": "d86bf32ce71be88f7851a3b751a24875462518bb4e0e569638dc6ef72f22ff87",
+    "app/scoped/storage.py": "012cf01cb38faa0ea9e4272aa9f21c8eff4f059e0484e35ef8c6aca115995c1b",
+    "app/scoped/trace.py": "c4069c7e6d3675fd51cda1ef6254f0e04ee785c7df5f0182ca17a6b8662b09a6",
+    "app/services/companion/dialogue_service.py": "7ce1a70c13870c2e22df00c417c224b02bb410f19c969267c4645f72a46c23aa",
+    "app/services/memory/experiences.py": "8e9c132178e13dccae5cd3067dc35912b9977f5fb18a152922ede186902d9b49",
+    "app/services/memory/provenance.py": "a6e8ddc1647e772ddb1777e4a26b362cb384e05ff06c23c7d1f40fe333ceb711",
+    "app/services/memory/store.py": "58b28d8c30d4fd55c06594a345c0f0deff4d3149093bd16a56a2d89ec3fba417",
+    "app/services/memory/summarizer.py": "b437b534125050f986598934feb3ec9014ea69d741f33f94cfb5d3f58fb34626",
+    "app/services/tactical/event_policy.py": "7d988f19ce85a9af327bbc7d54a6b1b42874cc81de92cf5837c4477e25a1ed0d",
+    "scripts/evaluate_memory_retrieval_live.py": "95f2011781c826c4ebdb6b666aca07c943c94c4aa41573f5b27cb06788807516",
+    "scripts/export_ue_handoff.py": "c572a27cb3d01437ece999edc029a0b36ca0ee1fa78a1df7a5e4670c7046a2b8",
+    "scripts/rl/dialogue_data_quality.py": "6cb82d796f253d0c2d56d2603015072609e50ae25b39cbf033d47d8c0e69c9bb",
+    "tests/persistence/test_memory_forget_sql.py": "d8e8433a1417f62efe2f3fb5ada0665fc7307aaba30651d433e67faf570d800c",
+    "tests/schemas/test_memory_management.py": "2f58dcd32ab7e6f06344e7c1ff8ef60914645cb8514ea416f9bb089b4e3dac48",
+    "tests/scoped/test_memory_forget.py": "cf0f0ac65486133bddf74c77817dd2efbb6ba5e790c51a3c7f21f3af0fff3391",
+    "tests/scoped/test_memory_provenance.py": "c4306688ae9d18c8413d6712388e3ccae796efe8654e6721616d8fc3973e2f52",
+    "tests/scripts/test_dialogue_data_quality.py": "0572e0d510c91da04ac9d2c65c9529329181ec26064a128ee22fc3cbf1eef1b1",
+    "tests/scripts/test_memory_live_selection.py": "312b10ce86af75500f17e28be391bb8189d962490cdc41a0803bf88dab092b97"
+  }
+}

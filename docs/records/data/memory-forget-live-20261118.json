@@ -1,0 +1,344 @@
+{
+  "scope": "development/json/memory",
+  "server_verified": false,
+  "ue_verified": false,
+  "cases": [
+    {
+      "case": "remember",
+      "request": {
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "protocol_version": "0.5",
+        "request_id": "8b7e9797-35f5-478b-9881-61a1d6afbb3c",
+        "save_id": "22222222-2222-4222-8222-222222222222",
+        "companion_id": "companion.alice",
+        "text": "请记住，我最喜欢的水果是香蕉。",
+        "timing": {
+          "capture_age_ms": 0,
+          "request_age_ms": 0,
+          "max_snapshot_age_ms": 120000,
+          "max_request_age_ms": 120000
+        }
+      },
+      "response": {
+        "protocol_version": "0.4",
+        "request_id": null,
+        "scope": {
+          "game_id": "aesir",
+          "player_id": "11111111-1111-4111-8111-111111111111",
+          "save_id": "22222222-2222-4222-8222-222222222222",
+          "companion_id": "companion.alice"
+        },
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "encounter_id": null,
+        "used_snapshot_id": null,
+        "target_request_id": "8b7e9797-35f5-478b-9881-61a1d6afbb3c",
+        "operation": "chat",
+        "state": "completed",
+        "reason_code": null,
+        "queue_ms": 16,
+        "processing_ms": 1936,
+        "total_ms": 1953,
+        "upstream_attempts": 1,
+        "cancel_requested": false,
+        "result": {
+          "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "reply_text": "香蕉，记下了。以后分水果的时候，我会留一份给你。",
+          "emotion_id": "emotion.pleased",
+          "gesture_id": "gesture.enthusiastic_nod",
+          "facial_expression_id": "face.gentle_smile",
+          "interruptible": true,
+          "source": "llm",
+          "relationship_stage": "distant",
+          "relationship_stage_display": "疏远",
+          "relationship_delta": 1,
+          "persona_revision": "0.2",
+          "memory_layers": {
+            "long_term": 0,
+            "impressions": 0
+          },
+          "protocol_version": "0.4",
+          "scope": {
+            "game_id": "aesir",
+            "player_id": "11111111-1111-4111-8111-111111111111",
+            "save_id": "22222222-2222-4222-8222-222222222222",
+            "companion_id": "companion.alice"
+          },
+          "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+          "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+          "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+          "encounter_id": null,
+          "used_snapshot_id": null,
+          "request_id": "8b7e9797-35f5-478b-9881-61a1d6afbb3c",
+          "timing": {
+            "valid_for_ms": 120000
+          }
+        },
+        "completed_at": null
+      },
+      "total_ms": 2235
+    },
+    {
+      "case": "recall-before-forget",
+      "request": {
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "protocol_version": "0.5",
+        "request_id": "e4250bd6-5aef-4776-817a-adc551ec52f1",
+        "save_id": "22222222-2222-4222-8222-222222222222",
+        "companion_id": "companion.alice",
+        "text": "我最喜欢什么水果？",
+        "timing": {
+          "capture_age_ms": 0,
+          "request_age_ms": 0,
+          "max_snapshot_age_ms": 120000,
+          "max_request_age_ms": 120000
+        }
+      },
+      "response": {
+        "protocol_version": "0.4",
+        "request_id": null,
+        "scope": {
+          "game_id": "aesir",
+          "player_id": "11111111-1111-4111-8111-111111111111",
+          "save_id": "22222222-2222-4222-8222-222222222222",
+          "companion_id": "companion.alice"
+        },
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "encounter_id": null,
+        "used_snapshot_id": null,
+        "target_request_id": "e4250bd6-5aef-4776-817a-adc551ec52f1",
+        "operation": "chat",
+        "state": "completed",
+        "reason_code": null,
+        "queue_ms": 15,
+        "processing_ms": 1344,
+        "total_ms": 1359,
+        "upstream_attempts": 1,
+        "cancel_requested": false,
+        "result": {
+          "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "reply_text": "香蕉呀，你特意叮嘱过我的，这点小事我哪会忘。",
+          "emotion_id": "emotion.pleased",
+          "gesture_id": "gesture.enthusiastic_nod",
+          "facial_expression_id": "face.gentle_smile",
+          "interruptible": true,
+          "source": "llm",
+          "relationship_stage": "distant",
+          "relationship_stage_display": "疏远",
+          "relationship_delta": 0,
+          "persona_revision": "0.2",
+          "memory_layers": {
+            "long_term": 2,
+            "impressions": 0
+          },
+          "protocol_version": "0.4",
+          "scope": {
+            "game_id": "aesir",
+            "player_id": "11111111-1111-4111-8111-111111111111",
+            "save_id": "22222222-2222-4222-8222-222222222222",
+            "companion_id": "companion.alice"
+          },
+          "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+          "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+          "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+          "encounter_id": null,
+          "used_snapshot_id": null,
+          "request_id": "e4250bd6-5aef-4776-817a-adc551ec52f1",
+          "timing": {
+            "valid_for_ms": 120000
+          }
+        },
+        "completed_at": null
+      },
+      "total_ms": 1609
+    },
+    {
+      "case": "recall-after-forget",
+      "request": {
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "77559dd1-8013-45bf-b986-188d2518daff",
+        "protocol_version": "0.5",
+        "request_id": "27fe60d5-0e1a-4809-9772-ae12652b53a7",
+        "save_id": "22222222-2222-4222-8222-222222222222",
+        "companion_id": "companion.alice",
+        "text": "我最喜欢什么水果？",
+        "timing": {
+          "capture_age_ms": 0,
+          "request_age_ms": 0,
+          "max_snapshot_age_ms": 120000,
+          "max_request_age_ms": 120000
+        }
+      },
+      "response": {
+        "protocol_version": "0.4",
+        "request_id": null,
+        "scope": {
+          "game_id": "aesir",
+          "player_id": "11111111-1111-4111-8111-111111111111",
+          "save_id": "22222222-2222-4222-8222-222222222222",
+          "companion_id": "companion.alice"
+        },
+        "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+        "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+        "memory_epoch": "77559dd1-8013-45bf-b986-188d2518daff",
+        "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "encounter_id": null,
+        "used_snapshot_id": null,
+        "target_request_id": "27fe60d5-0e1a-4809-9772-ae12652b53a7",
+        "operation": "chat",
+        "state": "completed",
+        "reason_code": null,
+        "queue_ms": 15,
+        "processing_ms": 2390,
+        "total_ms": 2405,
+        "upstream_attempts": 2,
+        "cancel_requested": false,
+        "result": {
+          "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "reply_text": "这个我还真不知道呢，旅行者。你直接告诉我的话，我会记住的。",
+          "emotion_id": "emotion.thoughtful",
+          "gesture_id": "gesture.think",
+          "facial_expression_id": "face.thoughtful",
+          "interruptible": true,
+          "source": "llm",
+          "relationship_stage": "distant",
+          "relationship_stage_display": "疏远",
+          "relationship_delta": 0,
+          "persona_revision": "0.2",
+          "memory_layers": {
+            "long_term": 0,
+            "impressions": 0
+          },
+          "protocol_version": "0.4",
+          "scope": {
+            "game_id": "aesir",
+            "player_id": "11111111-1111-4111-8111-111111111111",
+            "save_id": "22222222-2222-4222-8222-222222222222",
+            "companion_id": "companion.alice"
+          },
+          "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+          "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+          "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+          "memory_epoch": "77559dd1-8013-45bf-b986-188d2518daff",
+          "encounter_id": null,
+          "used_snapshot_id": null,
+          "request_id": "27fe60d5-0e1a-4809-9772-ae12652b53a7",
+          "timing": {
+            "valid_for_ms": 120000
+          }
+        },
+        "completed_at": null
+      },
+      "total_ms": 2656
+    }
+  ],
+  "provenance_entries": [
+    {
+      "entry_id": "fd2334ea-0beb-4932-ae09-f1d9019bb6dc",
+      "content": "请记住，我最喜欢的水果是香蕉。",
+      "importance": "high",
+      "source": "player_statement",
+      "game_time": "",
+      "real_time": "2026-11-18T02:06:32Z",
+      "tags": [
+        "dialogue",
+        "salient",
+        "trace.origin=verbatim_player",
+        "trace.confirmation=player_text",
+        "trace.game_id=aesir",
+        "trace.player_id=11111111-1111-4111-8111-111111111111",
+        "trace.save_id=22222222-2222-4222-8222-222222222222",
+        "trace.companion_id=companion.alice",
+        "trace.run_id=e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "trace.memory_epoch=89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "trace.request_id=8b7e9797-35f5-478b-9881-61a1d6afbb3c"
+      ],
+      "superseded_by": null
+    },
+    {
+      "entry_id": "dc7d870e-a1d7-4590-ae8d-dee5105178f5",
+      "content": "玩家最喜欢的水果是香蕉",
+      "importance": "normal",
+      "source": "player_statement",
+      "game_time": "",
+      "real_time": "2026-11-18T02:06:32Z",
+      "tags": [
+        "dialogue",
+        "fact",
+        "trace.origin=model_extraction",
+        "trace.confirmation=lexically_grounded",
+        "trace.game_id=aesir",
+        "trace.player_id=11111111-1111-4111-8111-111111111111",
+        "trace.save_id=22222222-2222-4222-8222-222222222222",
+        "trace.companion_id=companion.alice",
+        "trace.run_id=e4a56665-749d-40a0-8bef-c3cec0160acd",
+        "trace.memory_epoch=89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+        "trace.request_id=8b7e9797-35f5-478b-9881-61a1d6afbb3c"
+      ],
+      "superseded_by": null
+    }
+  ],
+  "forget": {
+    "request": {
+      "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+      "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+      "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+      "memory_epoch": "89c97c6e-c231-41a6-82e3-6bd86b6c59d3",
+      "protocol_version": "0.4",
+      "request_id": "0a2cd35d-9820-4806-9df3-56c4825aafc4",
+      "save_id": "22222222-2222-4222-8222-222222222222",
+      "companion_id": "companion.alice",
+      "entry_ids": [
+        "fd2334ea-0beb-4932-ae09-f1d9019bb6dc",
+        "dc7d870e-a1d7-4590-ae8d-dee5105178f5"
+      ]
+    },
+    "response": {
+      "protocol_version": "0.4",
+      "request_id": "0a2cd35d-9820-4806-9df3-56c4825aafc4",
+      "scope": {
+        "game_id": "aesir",
+        "player_id": "11111111-1111-4111-8111-111111111111",
+        "save_id": "22222222-2222-4222-8222-222222222222",
+        "companion_id": "companion.alice"
+      },
+      "service_instance_id": "e4ddd3ad-63bd-407c-89a9-c5c9ebc7b7e6",
+      "run_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+      "run_binding_id": "e27ab6a5-bad3-4d75-be4c-a883ad1037d4",
+      "memory_epoch": "77559dd1-8013-45bf-b986-188d2518daff",
+      "session_id": "e4a56665-749d-40a0-8bef-c3cec0160acd",
+      "encounter_id": null,
+      "used_snapshot_id": null,
+      "forgotten_entry_ids": [
+        "fd2334ea-0beb-4932-ae09-f1d9019bb6dc",
+        "dc7d870e-a1d7-4590-ae8d-dee5105178f5"
+      ],
+      "cleared_sessions": 1
+    }
+  },
+  "old_request_rejected": {
+    "detail": {
+      "code": "MEMORY_EPOCH_STALE",
+      "message": "Memory was reset; refresh the NPC scope"
+    }
+  },
+  "checks_passed": true
+}

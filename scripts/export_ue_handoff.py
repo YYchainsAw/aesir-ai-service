@@ -13,6 +13,14 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = (
+    "docs/records/_08_project_functionality_assessment.md",
+    "docs/records/data/project-assessment-20261118.json",
+    "docs/records/data/memory-forget-live-20261118.json",
+    "docs/records/data/memory-model-eval-20261118.json",
+    "docs/records/data/dialogue-data-quality-20261118.json",
+    "data/golden/memory/forget_request.json",
+    "data/golden/memory/forget_response.json",
+    "data/golden/memory/entries_response.json",
     "docs/guides/_13_service_handoff_guide.md",
     "docs/records/_07_p0_closure_verification.md",
     "docs/records/data/p0-closure-20261118.json",

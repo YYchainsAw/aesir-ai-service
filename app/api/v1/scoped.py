@@ -23,7 +23,8 @@ from app.schemas.recovery import (RecoveryStateResponse, RecoveryOperationRespon
                                   RecoveryReceiptsRequest, RecoveryReceiptsResponse)
 from app.scoped.idempotency import get_request_store, get_event_store
 from app.scoped.runtime import get_runtime
-from app.scoped.storage import commit_guard, memory_epoch, reset_memory
+from app.scoped.storage import commit_guard, memory_epoch, reset_memory, forget_memory, read_memory_document
+from app.schemas.scoped import ScopedForgetRequest, ScopedForgetResponse, ScopedMemoryEntriesResponse
 from app.scoped.timing import TimingBudget, current_budget
 from app.scoped.requests import get_coordinator, final_commit
 from app.scoped.trace import request_trace
@@ -507,13 +508,37 @@ def console_view(
 
 @router.post("/console/memory/reset", response_model=ScopedResetResponse)
 def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(require_permission("memory:reset"))):
+    return _memory_change(request, principal)
+
+
+@router.post('/console/memory/forget', response_model=ScopedForgetResponse)
+def memory_forget(request: ScopedForgetRequest, principal: Principal = Depends(require_permission('memory:reset'))):
+    return _memory_change(request, principal, entry_ids=request.entry_ids)
+
+
+@router.get('/console/memory/entries', response_model=ScopedMemoryEntriesResponse)
+def memory_entries(save_id: UUID, companion_id: str, run_id: UUID, run_binding_id: UUID,
+                   service_instance_id: UUID, memory_epoch_value: UUID = Query(alias='memory_epoch'),
+                   session_id: UUID | None = None, encounter_id: UUID | None = None,
+                   principal: Principal = Depends(require_permission('console:read'))):
+    scope = _query_scope(save_id, companion_id, run_id, run_binding_id, service_instance_id,
+                         memory_epoch_value, session_id, encounter_id, principal)
+    with use_principal(principal), use_scope(scope), commit_guard(scope):
+        _, snapshot = read_memory_document(scope.npc)
+        return {**_base(scope), 'entries': [*snapshot.archive, *snapshot.summaries, *snapshot.short_term]}
+
+
+def _memory_change(request, principal, entry_ids=None):
     scope = _scope(request, principal)
     with use_principal(principal), use_scope(scope):
         def apply_reset():
             with commit_guard(scope):
-                result = reset_memory(scope.npc, scope.memory_epoch)
-                output = {**_base(scope, request.request_id), "memory_epoch": str(result["memory_epoch"]),
-                          "reset": True, "cleared_sessions": result["cleared_sessions"]}
+                result = (reset_memory(scope.npc, scope.memory_epoch) if entry_ids is None
+                          else forget_memory(scope.npc, scope.memory_epoch, entry_ids))
+                output = {**_base(scope, request.request_id), 'memory_epoch': str(result['memory_epoch']),
+                          'cleared_sessions': result['cleared_sessions']}
+                output.update({'reset': True} if entry_ids is None else
+                              {'forgotten_entry_ids': result['forgotten_entry_ids']})
                 if database_enabled():
                     # The old epoch was checked on guard entry; the staged
                     # replacement intentionally has a new epoch now.
@@ -535,7 +560,7 @@ def memory_reset(request: ScopedResetRequest, principal: Principal = Depends(req
 
         reset_store = get_durable_request_store() if database_enabled() else get_request_store()
         result = reset_store.execute(
-            (*scope.key, "memory-reset", str(request.request_id)), request, run,
+            (*scope.key, 'memory-reset' if entry_ids is None else 'memory-forget', str(request.request_id)), request, run,
             validate=validate_reset, request_id=request.request_id,
         )
         with get_runtime().guard(scope):

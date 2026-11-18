@@ -1,0 +1,19 @@
+{
+  "total": 457,
+  "known_seed_texts": 75,
+  "known_seed_rows": 376,
+  "llm_rows_excluding_known_seeds": 60,
+  "remaining_by_npc": {
+    "companion.alice": 57,
+    "companion.bruno": 3
+  },
+  "reward_nonzero": 12,
+  "positive": 10,
+  "negative": 2,
+  "missing_request_id": 60,
+  "count_gate_met": false,
+  "provenance_verified": false,
+  "off_policy_propensities_available": false,
+  "training_approved": false,
+  "decision": "audit remaining provenance before counting natural interaction data"
+}

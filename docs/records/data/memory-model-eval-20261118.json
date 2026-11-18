@@ -1,0 +1,662 @@
+{
+  "synthetic": true,
+  "provider": "https://api.deepseek.com",
+  "model": "deepseek-flash",
+  "fixture": "data/evals/memory_retrieval.json",
+  "live_strategy_changed": false,
+  "cases": [
+    {
+      "case": "old_preference",
+      "query": "我最喜欢什么水果？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 1,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有相关信息"
+        },
+        "correct": false,
+        "total_ms": 3027,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 190,
+              "completion_tokens": 12,
+              "total_tokens": 202,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 190
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 879,
+        "ids": [
+          "10000000-0000-4000-8000-000000000001"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "香蕉"
+        },
+        "correct": true,
+        "total_ms": 1548,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 296,
+              "completion_tokens": 23,
+              "total_tokens": 319,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 296
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 145,
+              "completion_tokens": 10,
+              "total_tokens": 155,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 145
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "hometown",
+      "query": "我来自哪里？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000002"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 1,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有相关信息"
+        },
+        "correct": false,
+        "total_ms": 582,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 189,
+              "completion_tokens": 12,
+              "total_tokens": 201,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 189
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 576,
+        "ids": [
+          "10000000-0000-4000-8000-000000000002"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "港口小镇"
+        },
+        "correct": true,
+        "total_ms": 1389,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 295,
+              "completion_tokens": 23,
+              "total_tokens": 318,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 295
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 143,
+              "completion_tokens": 11,
+              "total_tokens": 154,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 143
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "experience",
+      "query": "北边路线查过吗？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000003"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 1,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "查过，两人检查过北边路线。"
+        },
+        "correct": true,
+        "total_ms": 918,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 192,
+              "completion_tokens": 19,
+              "total_tokens": 211,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 192
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 953,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "查过了，两人检查过北边路线。"
+        },
+        "correct": true,
+        "total_ms": 1796,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 298,
+              "completion_tokens": 23,
+              "total_tokens": 321,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 298
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 149,
+              "completion_tokens": 19,
+              "total_tokens": 168,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 149
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "promise",
+      "query": "我对地图有过什么承诺？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000006"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 1,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "承诺归还借走的地图。"
+        },
+        "correct": true,
+        "total_ms": 654,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 191,
+              "completion_tokens": 16,
+              "total_tokens": 207,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 191
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 594,
+        "ids": [
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "承诺归还借走的地图。"
+        },
+        "correct": true,
+        "total_ms": 1233,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 297,
+              "completion_tokens": 23,
+              "total_tokens": 320,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 297
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 147,
+              "completion_tokens": 16,
+              "total_tokens": 163,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 147
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "allergy",
+      "query": "我对什么过敏？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000005"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 1,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有相关信息"
+        },
+        "correct": false,
+        "total_ms": 536,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 189,
+              "completion_tokens": 12,
+              "total_tokens": 201,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 189
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 1018,
+        "ids": [
+          "10000000-0000-4000-8000-000000000005"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "花生"
+        },
+        "correct": true,
+        "total_ms": 1810,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 295,
+              "completion_tokens": 23,
+              "total_tokens": 318,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 295
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 143,
+              "completion_tokens": 10,
+              "total_tokens": 153,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 143
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "unsupported",
+      "query": "我出生在哪一年？",
+      "expected_ids": [],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于出生年份的信息。"
+        },
+        "correct": true,
+        "total_ms": 1011,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 190,
+              "completion_tokens": 16,
+              "total_tokens": 206,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 190
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 670,
+        "ids": [],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "correct": true,
+        "total_ms": 1811,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 296,
+              "completion_tokens": 5,
+              "total_tokens": 301,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 296
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 102,
+              "completion_tokens": 16,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 102
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "synonym_omission",
+      "query": "我不能吃哪种坚果？",
+      "expected_ids": [
+        "10000000-0000-4000-8000-000000000005"
+      ],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 1,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有相关信息"
+        },
+        "correct": false,
+        "total_ms": 928,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 190,
+              "completion_tokens": 12,
+              "total_tokens": 202,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 190
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 786,
+        "ids": [
+          "10000000-0000-4000-8000-000000000005"
+        ],
+        "false_recall": 0,
+        "omitted": 0,
+        "answer": {
+          "answerable": true,
+          "answer": "花生"
+        },
+        "correct": true,
+        "total_ms": 1401,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 296,
+              "completion_tokens": 23,
+              "total_tokens": 319,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 296
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 144,
+              "completion_tokens": 10,
+              "total_tokens": 154,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 144
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case": "keyword_false_recall",
+      "query": "今天路边花生多少钱？",
+      "expected_ids": [],
+      "budget": {
+        "selection_and_read_ms": 0,
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "false_recall": 2,
+        "omitted": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有相关信息"
+        },
+        "correct": true,
+        "total_ms": 746,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 190,
+              "completion_tokens": 12,
+              "total_tokens": 202,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 190
+            }
+          }
+        ]
+      },
+      "index_read": {
+        "selection_and_read_ms": 880,
+        "ids": [
+          "10000000-0000-4000-8000-000000000005"
+        ],
+        "false_recall": 1,
+        "omitted": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有花生价格信息。"
+        },
+        "correct": true,
+        "total_ms": 1653,
+        "requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 296,
+              "completion_tokens": 23,
+              "total_tokens": 319,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 296
+            }
+          },
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 144,
+              "completion_tokens": 15,
+              "total_tokens": 159,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 144
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "totals": {
+    "budget": {
+      "cases": 8,
+      "correct": 4,
+      "errors": 0,
+      "false_recall": 14,
+      "omitted": 4,
+      "prompt_tokens": 1521,
+      "cache_hit_tokens": 0,
+      "completion_tokens": 111,
+      "total_ms": 8402,
+      "selection_and_read_ms": 0
+    },
+    "index_read": {
+      "cases": 8,
+      "correct": 8,
+      "errors": 0,
+      "false_recall": 1,
+      "omitted": 0,
+      "prompt_tokens": 3486,
+      "cache_hit_tokens": 0,
+      "completion_tokens": 273,
+      "total_ms": 12641,
+      "selection_and_read_ms": 6356
+    }
+  },
+  "decision": "retain_budget; synthetic sample is not a production acceptance set"
+}

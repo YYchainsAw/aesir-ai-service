@@ -535,7 +535,7 @@ def _remember_facts(
                     content=fact,
                     importance="normal",
                     source="player_statement",
-                    tags=["dialogue", "fact"],
+                    tags=["dialogue", "fact", "trace.origin=model_extraction", "trace.confirmation=lexically_grounded"],
                 )
                 for fact in grounded
             ]
@@ -553,7 +553,7 @@ def _remember_fact(companion_id: str, player_text: str, *, game_id: str) -> None
                 content=player_text,
                 importance="high",
                 source="player_statement",
-                tags=["dialogue", "salient"],
+                tags=["dialogue", "salient", "trace.origin=verbatim_player", "trace.confirmation=player_text"],
             )
         )
     except MemoryStoreError:

@@ -445,6 +445,7 @@ def handle_combat_event(request: CombatEventRequest) -> CombatEventResponse:
             request.event.event_type,
             game_id=_game_id_for(request.combat_context.companion.id),
             occurred_at=request.event.occurred_at,
+            event_id=str(request.event.event_id),
         )
     return _combat_response(request, evaluation, duplicate=duplicate)
 
@@ -618,6 +619,7 @@ def handle_world_event(request: WorldEventRequest) -> WorldEventResponse:
             request.event.event_type,
             game_id=_game_id_for(request.companion_id),
             details=request.event.details,
+            event_id=str(request.event.event_id),
             occurred_at=request.event.occurred_at,
             region_id=(
                 request.world_context.region.region_id
