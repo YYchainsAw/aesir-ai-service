@@ -409,6 +409,20 @@ def _command_step(request: AgentStepRequest) -> AgentStepResponse:
     复用 agency 行为目录的场景/距离校验（FR-025/FR-040：只引用快照中的目标）。
     """
     from app.services.tactical.llm_intent import parse_intent_with_source
+    from app.services.tactical.intent_parser import is_unsupported_basic_attack
+
+    profile = get_registered_profile(request.companion_id)
+    if is_unsupported_basic_attack(request.text, wake_words=profile.wake_words):
+        # Basic attack is an asset capability, but is not an allowed combat
+        # directive here. Never downgrade an explicit command to fictional chat
+        # or silently spend explosion through focus_fire_boss.
+        return AgentStepResponse(
+            protocol_version=PROTOCOL_VERSION, request_id=request.request_id,
+            companion_id=request.companion_id, action="none", directive=None,
+            reply_text="这个招式暂时还不能这样发动，换个可用的招式吧。",
+            observability=_intent_observability(request, "rule", ["BASIC_ATTACK_NOT_SUPPORTED"],
+                                               request.world_context.snapshot_id),
+        )
 
     intent, source = parse_intent_with_source(
         request.text, companion_id=request.companion_id

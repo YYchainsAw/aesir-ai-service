@@ -13,6 +13,21 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = (
+    "docs/guides/_13_service_handoff_guide.md",
+    "docs/records/_07_p0_closure_verification.md",
+    "docs/records/data/p0-closure-20261118.json",
+    "docs/guides/_02_local_setup_guide.md",
+    "docs/guides/_03_llm_integration_guide.md",
+    "docs/guides/_08_remote_development_guide.md",
+    "docs/records/_03_p0_delivery_verification.md",
+    "docs/records/_04_prompt_grounding_verification.md",
+    "docs/records/_05_p1_server_verification.md",
+    "docs/records/_06_issue_audit_verification.md",
+    "docs/records/data/prompt-grounding-20261116.json",
+    "docs/records/data/p1-server-20261116.json",
+    "docs/records/data/p1-server-20261118.json",
+    "docs/records/data/memory-retrieval-20261118.json",
+    "docs/records/data/issue-audit-20261118.json",
     "docs/examples/ue-scoped.http",
     "docs/guides/_05_client_integration_guide.md",
     "docs/guides/_11_asr_guide.md",
@@ -56,7 +71,7 @@ def export(destination: Path) -> Path:
     files["manifest.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     files["START-HERE.txt"] = (
         "Aesir UE service handoff\n\n"
-        "Read docs/guides/_05_client_integration_guide.md first.\n"
+        "Read docs/guides/_13_service_handoff_guide.md first.\n"
         "Request examples: docs/examples/ue-scoped.http\n"
         "Machine-readable contract: openapi.json\n"
         "Deployment preparation: deploy/README.md\n\n"

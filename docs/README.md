@@ -9,6 +9,7 @@
 | 现在要解决的问题 | 阅读入口 |
 | --- | --- |
 | 刚接手项目，从全貌、功能与接口认识当前进度 | [面向新人的项目接手导览](guides/_01_project_overview_guide.md) |
+| 年底服务端首版怎样固定版本、启动、验证、重启和回退 | [服务交接指南](guides/_13_service_handoff_guide.md) · [P0 收口验收](records/_07_p0_closure_verification.md) |
 | 为什么结构复杂、哪些重复可收敛、清理了哪些旧文档 | [代码冗余与文档清理报告](design/_01_architecture_review.md) |
 | 本轮实际改了什么、还存在哪些缺陷、接下来做什么 | [结构整改与后续行动](planning/_14_quality_plan.md) |
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/_02_local_setup_guide.md) |
