@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import uuid
 from contextlib import nullcontext
@@ -362,7 +363,10 @@ class MemoryStore:
             return marked
 
     @guarded_commit
-    def mark_superseded_by_entry_id(self, entry_id: str) -> int:
+    def mark_superseded_by_entry_id(
+        self, entry_id: str, *, allowed_entry_ids: frozenset | None = None,
+        allowed_sources: frozenset[str] | None = None,
+    ) -> int:
         """按 LLM 回传的短 ID（``[ID:xxxxxxxx]`` 的前 8 位）标记旧事实为 superseded。
 
         #101 实测：让 LLM 照抄旧事实原文再走 ``mark_superseded`` 的 dedup_key
@@ -370,17 +374,16 @@ class MemoryStore:
         对不上。改成在 prompt 里给每条记忆标短 ID，让 LLM 直接回传 ID，匹配
         变成 ``entry_id.hex.startswith(prefix)``，零措辞依赖。
 
-        匹配规则：``entry_id`` 大小写不敏感、支持 ``xxxxxxxx`` 或带 ``[ID:...]``
-        包裹；按前 8 位十六进制前缀匹配（prompt 里展示的就是 8 位短码）。
-        找不到匹配时返回 0（LLM 幻觉 ID 不抛错，只记 0）。
+        只接受完整的 8 位 hex 短码或完整 UUID，兼容大小写及 [ID:...] 包裹。
+        短码碰撞、格式不合法、目标未展示或来源不允许时返回 0，不改任何事实。
         """
         if not entry_id:
             return 0
-        # 容错：剥掉可能的 [ID:...] 包裹、取前 8 位 hex、小写
+        # 只处理展示包装与 UUID 连字符，禁止将任意短串或长串截断为授权。
         raw = entry_id.strip().lower()
         raw = raw.removeprefix("[id:").removeprefix("[").removesuffix("]")
-        prefix = raw.replace("-", "")[:8]
-        if not prefix:
+        prefix = raw.replace("-", "")
+        if re.fullmatch(r"(?:[0-9a-f]{8}|[0-9a-f]{32})", prefix) is None:
             return 0
         # 哨兵 UUID：LLM 纠错路径下我们没有新事实的 entry_id（同轮刚写入），
         # 用全零 UUID 表示「被 LLM 标记为 superseded，但无具体替代条目引用」。
@@ -388,12 +391,18 @@ class MemoryStore:
         sentinel = uuid.UUID("00000000-0000-0000-0000-000000000000")
         marked = 0
         with self._lock:
-            for entry in self._snapshot.archive:
-                if entry.superseded_by is not None:
-                    continue
-                if entry.entry_id.hex.startswith(prefix):
-                    entry.superseded_by = sentinel
-                    marked += 1
+            matches = [entry for entry in self._snapshot.archive
+                       if entry.superseded_by is None and entry.entry_id.hex.startswith(prefix)]
+            # A short ID collision must never invalidate multiple facts.
+            if len(matches) != 1:
+                return 0
+            entry = matches[0]
+            if allowed_entry_ids is not None and entry.entry_id not in allowed_entry_ids:
+                return 0
+            if allowed_sources is not None and entry.source not in allowed_sources:
+                return 0
+            entry.superseded_by = sentinel
+            marked = 1
             if marked:
                 self._persist_locked()
             return marked

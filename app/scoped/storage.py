@@ -58,10 +58,13 @@ def signal_directory(root: str | Path, game_id: str) -> Path:
 
 
 def signal_metadata() -> dict[str, str]:
+    from app.scoped.requests import current_request_id
     scope = current_scope()
     if scope is None:
         return {}
+    request_id = current_request_id()
     return {**scope.npc.as_dict(), "run_id": str(scope.run_id),
+            **({"request_id": request_id} if request_id is not None else {}),
             "session_id": str(scope.session_id), "memory_epoch": str(scope.memory_epoch),
             "service_instance_id": str(scope.service_instance_id),
             "run_binding_id": str(scope.run_binding_id),

@@ -71,3 +71,28 @@ def test_external_asr_requires_a_readable_nonempty_speech_credential(tmp_path: P
 def test_unknown_asr_backend_does_not_pass_release_gates(tmp_path: Path) -> None:
     settings = _settings(tmp_path, asr_backend="misspelled")
     assert _by_key(run_preflight("staging", settings))["asr_backend"].status == "BLOCK"
+
+
+def test_unreadable_database_file_is_a_specific_block(tmp_path, monkeypatch):
+    path = tmp_path / 'private.url'
+    path.write_text('synthetic-url', encoding='utf-8')
+    settings = _settings(tmp_path, scope_database_url='', scope_database_url_file=str(path))
+    original = Path.read_text
+    def denied(self, *args, **kwargs):
+        if self == path:
+            raise PermissionError('synthetic-private-location')
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(Path, 'read_text', denied)
+    checks = _by_key(run_preflight('production', settings))
+    assert checks['database_url'].status == 'BLOCK'
+
+
+def test_configuration_error_does_not_print_private_values(monkeypatch, capsys):
+    from scripts import release_preflight
+    def failed():
+        raise ValueError('synthetic-private-key-value')
+    monkeypatch.setattr(release_preflight, 'get_settings', failed)
+    assert release_preflight.main(['--mode','production','--json']) == 1
+    output = capsys.readouterr().out
+    assert 'ValueError' in output
+    assert 'synthetic-private-key-value' not in output

@@ -1,6 +1,69 @@
 # SQL持久化、访问控制与恢复开发指南
 
-2026-10-22，适用于第四步PR #88合入后的main及 `fix/npc-schema-validation` 后续修正。字段和错误以[持久化增量契约](../protocols/_01_npc_contract.md#persistence)、`app/schemas/recovery.py`、`app/schemas/sync.py`与golden为准；本页只维护操作与交接。原v0.4绑定/预算使用[基础指南](_04_scoped_development_guide.md)，范围和真实结果见[第四步计划](../planning/_05_persistence_plan.md)及[验证记录](../records/_01_verification_records.md#persist-20261022)。
+第四步 PR #88 后的 SQL/Bearer 开发与恢复说明；2026-11-16 补齐 JSON/development 对照。字段和错误以[持久化增量契约](../protocols/_01_npc_contract.md#persistence)、`app/schemas/recovery.py`、`app/schemas/sync.py`与golden为准；本页只维护操作与交接。原v0.4绑定/预算使用[基础指南](_04_scoped_development_guide.md)，范围和真实结果见[第四步计划](../planning/_05_persistence_plan.md)及[验证记录](../records/_01_verification_records.md#persist-20261022)。
+
+## 模式速查：JSON/development 与 SQL/Bearer
+
+存储、身份和协调是三个独立配置轴，下表比较两种常用组合。`development` 从服务器配置取得固定玩家与可用存档，不验证传入的 Bearer；拿它的成功请求不能证明正式认证已通过。`sql` 也不会自动启用 Bearer 或 Redis。
+
+| 项目 | JSON + development（本机开发） | SQL + Bearer（正式身份与持久确认） |
+| --- | --- | --- |
+| 身份 | `AESIR_SCOPE_IDENTITY_BACKEND=development`，固定 `AESIR_SCOPE_DEV_PLAYER_ID` 与 `AESIR_SCOPE_DEV_SAVE_IDS` | `AESIR_SCOPE_IDENTITY_BACKEND=bearer`，数据库中的凭据、玩家状态、存档授权与权限 |
+| 权威状态 | `AESIR_SCOPE_STORAGE_BACKEND=json`；记忆、关系为分区文件 | `AESIR_SCOPE_STORAGE_BACKEND=sql`；业务文档、版本、请求/事件/回执确认在数据库 |
+| 物理位置 | `<AESIR_MEMORY_ROOT>/<game>/<player>/<save>/<npc>/memory.json`；关系在 `<AESIR_RELATIONSHIP_ROOT>` 下同样分区；默认根分别为 `data/memory`、`data/relationship` | `AESIR_SCOPE_DATABASE_URL_FILE` 指向私有连接文件；不要从旧 JSON 文件判断 SQL 当前值 |
+| 协调 | 隔离单进程可显式 `AESIR_COORDINATION_BACKEND=memory` | 发布要求 Redis；本机 SQL + memory 只用于隔离验证。Redis + JSON 会被门禁拒绝 |
+| 服务重启 | 记忆/关系文件保留；进程内 binding、请求缓存、FIFO 不保留，不能保证跨重启原 ID 去重 | SQL 保留权威状态和持久确认；仍须获取新 context 并重新 bind，旧实例关联不能执行新动作 |
+| 恢复与同步 | 不提供持久 recovery/sync；不能用重发旧聊天重建丢失确认 | 使用下面的只读恢复与稳定事实/回执归档路径；不重放历史动作 |
+| 日志 | 信号仍是文件；清记忆不等于删除信号或关系 | 信号也仍是文件，不能将其当作 SQL 事务确认或完整恢复备份 |
+| 验收含义 | 可验证开发业务和真实 LLM/ASR，但不证明 Bearer、真实 MySQL、UE/GAS 执行或生产恢复 | SQLite/TestClient 只覆盖隔离逻辑；真实 MySQL、HTTP 进程重启、目标部署和 UE 执行仍分别验收 |
+
+### 本机 JSON 开发启动
+
+在项目根设置当前终端环境，不覆盖私有 `.env`。以下固定身份只用于本机合成数据；mock 是无上游费用的接口检查，不能作为真实模型验收。
+
+```powershell
+$env:AESIR_SCOPE_STORAGE_BACKEND='json'
+$env:AESIR_SCOPE_IDENTITY_BACKEND='development'
+$env:AESIR_SCOPE_DEV_PLAYER_ID='11111111-1111-4111-8111-111111111111'
+$env:AESIR_SCOPE_DEV_SAVE_IDS='["22222222-2222-4222-8222-222222222222"]'
+$env:AESIR_COORDINATION_BACKEND='memory'
+$env:AESIR_SCOPE_LEGACY_ENABLED='false'
+$env:AESIR_COMPANION_BACKEND='mock'
+$env:AESIR_PARSER_BACKEND='rule'
+$env:AESIR_INTENT_BACKEND='rule'
+$env:AESIR_ASR_BACKEND='mock'
+.\.venv\Scripts\python.exe -m scripts.run_server --host 127.0.0.1 --port 18011
+```
+
+需要独立数据时，另将 `AESIR_MEMORY_ROOT`、`AESIR_RELATIONSHIP_ROOT` 和信号目录指向隔离目录。真实模型验证按 [LLM 与数据流](_03_llm_integration_guide.md) 配置，将 companion/ASR 后端显式改为所验实现，并检查返回的 `source`；不要在终端或 Issue 中打印 Key。
+
+### SQL/Bearer 启动与恢复
+
+下文第 2 节给出专用空库初始化、最小权限运行账号、玩家/存档授权与私有 token 文件命令。SQL 服务在启动时校验 schema；不匹配可能在开始监听前直接退出，不能把它描述成已提供 HTTP 503 的服务。生产副本还需 Redis、legacy 关闭及独立进程/HTTPS；旧开发数据库路径仅是历史样本，不是当前目标环境配置。
+
+| 路径（均以 `/v1/scoped` 开头） | 使用条件和结果 |
+| --- | --- |
+| `GET /recovery/state?save_id=…&companion_id=…` | SQL、有效自有 Bearer；返回记忆、关系、epoch、generation 和版本。未初始化返回 `404 STATE_UNKNOWN` |
+| `GET /recovery/operations/{request_id}` | 带原 `run_id`、`operation`、存档和 NPC；只返回持久状态/确认版本/原实例等关联，不返回 reply、directive 或可执行 payload |
+| `GET /recovery/directives/{directive_id}` | 带原 `run_id`、存档和 NPC；返回历史回执账本与终态，不重新发布 directive |
+| `POST /recovery/receipts` | 用稳定回执身份归档原已发布动作；遵守 generation、epoch、版本及原始关联，只归档、不补执行 |
+| `GET /sync/state`、`POST /sync/facts` | SQL 的权威同步；沿用稳定事实 ID，按 memory/relationship 分项确认。清记忆后的旧 epoch 首次确认可能为 `skipped_reset`，已确认 duplicate 返回原 ack |
+| `GET /requests/{request_id}` | 当前活跃 binding 的状态轮询；SQL 缓存未命中时可查询持久状态/已有结果，但历史 scope 字段不会授权重新执行 |
+
+恢复读取依赖当前 Bearer 的归属/权限，不要求复活旧 run binding。重启后先读恢复确认、获取新 context/bind，再发送新的业务请求；不改旧 ID、不重发旧 POST 来尝试“恢复执行”。JSON 模式对已鉴权的 recovery 请求返回 `404 RECOVERY_UNAVAILABLE`，不能将其误读为凭据无效或存档越权。完整参数看契约和 golden；恢复不是 seq/cursor 增量补拉 API。
+
+### 失败响应对照
+
+相同 HTTP 状态不保证两种模式触发条件相同，应同时判断 `detail.code`。以下以通过 schema 校验的 scoped 请求为前提；字段缺失/格式错误通常为 422，超额可能为 429。
+
+| HTTP | JSON/development | SQL/Bearer |
+| --- | --- | --- |
+| 401 `IDENTITY_REQUIRED` | 未启用可信身份，或固定玩家/存档配置不完整；传入无效 Bearer 本身不会触发此开发身份检查 | 缺失、无效、过期、撤销凭据或玩家已停用；客户端不能用请求体冒充玩家 |
+| 403 `SCOPE_FORBIDDEN` / `PERMISSION_DENIED` | 请求存档不在固定允许集合；开发 principal 有默认权限，不能据此证明数据库分权 | 存档未授权/已撤回，或缺少相应业务/管理权限；提交边界会复核撤回 |
+| 409 | 两者均检查 service_instance、run/binding/encounter/epoch、重复 ID 与载荷冲突等生命周期条件 | 除共同条件外，SQL 事务/同步还检查 `STATE_VERSION_CONFLICT`、`SAVE_GENERATION_STALE` 等持久版本屏障 |
+| 503 | 状态文件、人格资源、运行服务不可用等；`/sync/*` 因未启用 SQL 返回 `PERSISTENCE_REQUIRED`；上游失败若允许 mock/fallback，可能返回降级成功，必须看 `source` | 也有公共不可用条件；凭据或准入数据库故障为 `AUTH_UNAVAILABLE`，不能将数据库故障当作无效 token。SQL schema 启动失败另看进程日志 |
+
+发布前可执行 `python -m scripts.release_preflight --mode production --json`，有 BLOCK 时退出码为 1。它只检查配置门禁，不联网验证数据库、提供方、证书、备份、容量或 UE。本机 development/json/memory 被阻止用于生产是预期结果；当前可复现证据见 [P1 服务端验证](../records/_05_p1_server_verification.md)。
 
 ## 1. 环境与配置
 

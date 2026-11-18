@@ -18,6 +18,7 @@
 | 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/_04_execution_loop_plan.md) · [闭环增量契约](protocols/_01_npc_contract.md#loop)（服务端回归通过，UE待验） |
 | 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/_04_scoped_development_guide.md) |
 | 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/_05_persistence_plan.md) · [持久化开发指南](guides/_06_persistence_guide.md) · [增量契约](protocols/_01_npc_contract.md#persistence)（服务端验证通过，UE/正式发布待验） |
+| JSON/development 与 SQL/Bearer 的启动、恢复和错误有什么区别 | [模式与失败响应对照](guides/_06_persistence_guide.md#模式速查jsondevelopment-与-sqlbearer) · [P1 服务端验证](records/_05_p1_server_verification.md) |
 | 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/_07_deployment_guide.md)，含外部ASR、模型发布及AT-DEP验收 |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/_10_verification_guide.md) |
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/_03_llm_integration_guide.md) |

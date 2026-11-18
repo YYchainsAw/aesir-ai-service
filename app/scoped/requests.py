@@ -56,6 +56,12 @@ def has_active_request() -> bool:
     return _active.get() is not None
 
 
+def current_request_id() -> str | None:
+    """Immutable logical identity for scoped audit signals; legacy has none."""
+    entry = _active.get()
+    return str(entry.request_id) if entry is not None else None
+
+
 def check_current(scope: RequestScope | None = None) -> None:
     """Only check the active cancellation token; never acquire runtime/NPC locks."""
     entry = _active.get()

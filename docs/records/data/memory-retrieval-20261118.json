@@ -1,0 +1,282 @@
+{
+  "cases": [
+    {
+      "case": "old_preference",
+      "query": "我最喜欢什么水果？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 1,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0283,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000001"
+        ],
+        "correct": 1,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 718,
+        "local_lookup_ms": 0.0222,
+        "extra_reads": 1
+      }
+    },
+    {
+      "case": "hometown",
+      "query": "我来自哪里？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000002"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 1,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0071,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000002"
+        ],
+        "correct": 1,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 715,
+        "local_lookup_ms": 0.0069,
+        "extra_reads": 1
+      }
+    },
+    {
+      "case": "experience",
+      "query": "北边路线查过吗？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000003"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 1,
+        "false_recall": 1,
+        "omitted": 0,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0045,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003"
+        ],
+        "correct": 1,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 726,
+        "local_lookup_ms": 0.006,
+        "extra_reads": 1
+      }
+    },
+    {
+      "case": "promise",
+      "query": "我对地图有过什么承诺？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000006"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 1,
+        "false_recall": 1,
+        "omitted": 0,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0037,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 1,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 722,
+        "local_lookup_ms": 0.0056,
+        "extra_reads": 1
+      }
+    },
+    {
+      "case": "allergy",
+      "query": "我对什么过敏？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000005"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 1,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0035,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000005"
+        ],
+        "correct": 1,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 714,
+        "local_lookup_ms": 0.0054,
+        "extra_reads": 1
+      }
+    },
+    {
+      "case": "unsupported",
+      "query": "我出生在哪一年？",
+      "expected": [],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 0,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0034,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [],
+        "correct": 0,
+        "false_recall": 0,
+        "omitted": 0,
+        "exact": true,
+        "payload_chars": 497,
+        "local_lookup_ms": 0.0054,
+        "extra_reads": 0
+      }
+    },
+    {
+      "case": "synonym_omission",
+      "query": "我不能吃哪种坚果？",
+      "expected": [
+        "10000000-0000-4000-8000-000000000005"
+      ],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 1,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0031,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [],
+        "correct": 0,
+        "false_recall": 0,
+        "omitted": 1,
+        "exact": false,
+        "payload_chars": 497,
+        "local_lookup_ms": 0.0052,
+        "extra_reads": 0
+      }
+    },
+    {
+      "case": "keyword_false_recall",
+      "query": "今天路边花生多少钱？",
+      "expected": [],
+      "budget": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000003",
+          "10000000-0000-4000-8000-000000000006"
+        ],
+        "correct": 0,
+        "false_recall": 2,
+        "omitted": 0,
+        "exact": false,
+        "payload_chars": 284,
+        "local_lookup_ms": 0.0045,
+        "extra_reads": 0
+      },
+      "index_read": {
+        "ids": [
+          "10000000-0000-4000-8000-000000000005"
+        ],
+        "correct": 0,
+        "false_recall": 1,
+        "omitted": 0,
+        "exact": false,
+        "payload_chars": 714,
+        "local_lookup_ms": 0.0056,
+        "extra_reads": 1
+      }
+    }
+  ],
+  "totals": {
+    "budget": {
+      "correct": 2,
+      "false_recall": 14,
+      "omitted": 4,
+      "payload_chars": 2272,
+      "extra_reads": 0,
+      "exact_cases": 0,
+      "precision": 0.125,
+      "recall": 0.3333333333333333
+    },
+    "index_read": {
+      "correct": 5,
+      "false_recall": 1,
+      "omitted": 1,
+      "payload_chars": 5303,
+      "extra_reads": 6,
+      "exact_cases": 6,
+      "precision": 0.8333333333333334,
+      "recall": 0.8333333333333334
+    }
+  },
+  "limits": {
+    "synthetic": true,
+    "live_strategy_changed": false,
+    "provider_tokens_measured": false,
+    "model_accuracy_measured": false,
+    "tool_network_latency_measured": false
+  },
+  "decision": "retain_budget_pending_representative_model_tool_evaluation"
+}

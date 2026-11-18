@@ -221,6 +221,8 @@ def _build_system_prompt(
         'appear in the "Long-term memories about the player" block above. Copy the 8-char hex '
         'ID exactly as shown (without the [ID:] wrapper is also fine). Only list IDs that '
         'actually appear in that block; empty list if no correction this turn. The old facts '
+        'must be player statements/promises shown as "the player told you" or "the player promised you"; '
+        'never invalidate observations, shared experiences, or entries not shown this turn. '
         'will be marked as superseded so she never quotes both versions at once. Do NOT rewrite '
         'the old fact content — just give the ID.',
         'salient: true only if the player solemnly declares something important about themselves '

@@ -57,6 +57,10 @@ def _complete_reply(request, response, *, profile, stage, memories, impressions,
         request, response, **fields, injected_topics=[item.topic for item in impressions],
         relationship_stage=stage, memory_cited=bool(memories),
         lore_lookup=_lookup_signal(getattr(service, 'last_lookup', None)), game_id=game_id,
+        correction_targets=frozenset(entry.entry_id for entry in memories
+                                     if entry.source in {"player_statement", "promise"}
+                                     and entry.superseded_by is None)
+                           if response.source == "llm" else frozenset(),
     )
     return response
 
@@ -263,6 +267,7 @@ def _record_turn(
     topics: list[str] | None = None,
     facts: list[str] | None = None,
     corrected_fact_ids: list[str] | None = None,
+    correction_targets: frozenset | None = None,
     salient: bool | None = None,
     reply_topics: list[str] | None = None,
     relationship_signal: str | None = None,
@@ -306,6 +311,7 @@ def _record_turn(
     # 是出戏探针（"系统/指令/npc 区别"等），不是真实对话内容——跳过玩家侧
     # topics/salient/fact 挖掘，否则探针碎片会被挖成"玩家印象"注入后续 prompt。
     blocked = bool(style_violations)
+    correction_counts = None
     if not blocked:
         if topics is None:
             topics = extract_topics(request.text)
@@ -326,8 +332,13 @@ def _record_turn(
         # 实测 LLM 改写措辞会导致匹配失败，新老矛盾同时注入 prompt）。
         if corrected_fact_ids:
             store = get_memory_store(request.companion_id, game_id=game_id)
-            for old_id in corrected_fact_ids:
-                store.mark_superseded_by_entry_id(old_id)
+            candidates = list(dict.fromkeys(corrected_fact_ids))
+            applied = sum(store.mark_superseded_by_entry_id(
+                old_id, allowed_entry_ids=correction_targets or frozenset(),
+                allowed_sources=frozenset({"player_statement", "promise"}),
+            ) for old_id in candidates)
+            correction_counts = {"proposed": len(candidates), "applied": applied,
+                                 "rejected": len(candidates) - applied}
         salience_boost = _care_scaled_boost(request.companion_id, game_id=game_id) if salient else None
         _remember_turn(
             request.companion_id, topics, salient=salient, salience_boost=salience_boost, game_id=game_id
@@ -337,6 +348,9 @@ def _record_turn(
         salient = False
         _grounded_count, facts_rejected = 0, 0
         salience_boost = None
+    if corrected_fact_ids is not None and correction_counts is None:
+        correction_counts = {"proposed": len(set(corrected_fact_ids)), "applied": 0,
+                             "rejected": len(set(corrected_fact_ids))}
     if reply_topics is None:
         # mock/回退路径没有 LLM 自述主题，规则提取兜底（玩家侧规则路径维持现状）。
         reply_topics = extract_topics(response.reply_text)
@@ -374,6 +388,7 @@ def _record_turn(
         relationship_delta=delta,
         relationship_reason=relationship_reason,
         lore_lookup=lore_lookup,
+        memory_corrections=correction_counts,
         facts_rejected=facts_rejected or None,
         game_id=game_id,
     )

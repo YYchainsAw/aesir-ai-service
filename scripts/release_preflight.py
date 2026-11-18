@@ -38,7 +38,10 @@ def _database_configured(settings: Settings) -> bool:
     if direct:
         return True
     path = settings.scope_database_url_file.strip()
-    return bool(path and Path(path).is_file() and Path(path).read_text(encoding="utf-8").strip())
+    try:
+        return bool(path and Path(path).is_file() and Path(path).read_text(encoding="utf-8").strip())
+    except (OSError, UnicodeError):
+        return False
 
 
 def _llm_required(settings: Settings) -> bool:
@@ -156,12 +159,12 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # configuration parsing itself is a release blocker
         payload: dict[str, Any] = {
             "mode": args.mode,
-            "checks": [asdict(Check("configuration", "BLOCK", f"Configuration could not be loaded: {exc}"))],
+            "checks": [asdict(Check("configuration", "BLOCK", f"Configuration could not be loaded: {type(exc).__name__}"))],
         }
         if args.as_json:
             print(json.dumps(payload, ensure_ascii=False, indent=2))
         else:
-            print(f"BLOCK configuration: {exc}")
+            print(f"BLOCK configuration: {type(exc).__name__}")
         return 1
 
     payload = {"mode": args.mode, "checks": [asdict(check) for check in checks]}
