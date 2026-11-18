@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from app.schemas.memory import MemoryEntry
+from app.services.memory.provenance import merge_tags
 
 # 分组键：来源 × 游戏日期（缺省按真实日期）
 _GROUP_KEY_SEPARATOR = "\x1f"
@@ -39,7 +40,7 @@ def summarize_experiences(entries: list[MemoryEntry]) -> list[MemoryEntry]:
                 source="summary",
                 game_time=group[0].game_time,
                 real_time=group[0].real_time,
-                tags=[source],
+                tags=merge_tags([source], *(entry.tags for entry in group)),
             )
         )
     return summaries

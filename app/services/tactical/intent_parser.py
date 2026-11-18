@@ -47,6 +47,19 @@ def _intent(
     )
 
 
+def is_unsupported_basic_attack(text: str, *, wake_words: Iterable[str]) -> bool:
+    """Recognize an addressed basic-attack command unsupported by agent directives.
+
+    Do not map it to focus_fire_boss: that intent currently spends explosion.
+    Questions and negations remain dialogue, and another persona is not addressed.
+    """
+    normalized = _normalize(text)
+    return (bool(normalized) and _has_any(normalized, *wake_words)
+            and _has_any(normalized, "普通攻击", "普攻", "奥术弹", "basicattack")
+            and not _has_any(normalized, "什么", "如何", "怎么", "能否", "能不能", "吗", "?",
+                            "不要", "别", "不许"))
+
+
 def parse_text_to_intent(
     text: str, *, wake_words: Iterable[str] | None = None
 ) -> TacticalIntent | None:

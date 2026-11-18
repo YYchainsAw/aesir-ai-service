@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import uuid
 from contextlib import nullcontext
@@ -27,6 +28,7 @@ from app.scoped.storage import (
 from app.config import get_settings
 from app.schemas.memory import MemoryEntry, MemorySnapshot, TopicImpression
 from app.services.memory.facts import dedup_key
+from app.services.memory.provenance import trace_tags, merge_tags
 from app.services.memory.summarizer import summarize_experiences
 from app.services.memory.topics import extract_topics as _extract_topics
 from app.services.memory.topics import impression_weight as _impression_weight
@@ -270,6 +272,7 @@ class MemoryStore:
     @guarded_commit
     def append_short_term(self, entry: MemoryEntry) -> None:
         """会话内短期上下文：滚动窗口淘汰最旧。"""
+        entry.tags = trace_tags(entry.tags)
         with self._lock:
             self._snapshot.short_term.append(entry)
             self._snapshot.short_term = self._snapshot.short_term[-self._short_term_limit:]
@@ -284,15 +287,18 @@ class MemoryStore:
         """
         if not entries:
             return
+        for entry in entries:
+            entry.tags = trace_tags(entry.tags)
         with self._lock:
-            existing = {entry.content for entry in self._snapshot.summaries}
-            fresh = [
-                summary
-                for summary in summarize_experiences(entries)
-                if summary.content not in existing
-            ]
-            if not fresh:
-                return
+            existing = {entry.content: entry for entry in self._snapshot.summaries}
+            fresh = []
+            for summary in summarize_experiences(entries):
+                prior = existing.get(summary.content)
+                if prior is not None:
+                    prior.tags = merge_tags(prior.tags, summary.tags)
+                else:
+                    fresh.append(summary)
+                    existing[summary.content] = summary
             self._snapshot.summaries.extend(fresh)
             self._snapshot.summaries = self._evict(
                 self._snapshot.summaries, self._summary_limit
@@ -314,12 +320,15 @@ class MemoryStore:
         """
         if not entries:
             return 0
+        for entry in entries:
+            entry.tags = trace_tags(entry.tags)
         with self._lock:
             index = {dedup_key(e.content): e for e in self._snapshot.archive}
             added = 0
             for entry in entries:
                 prior = index.get(dedup_key(entry.content))
                 if prior is not None:
+                    prior.tags = merge_tags(prior.tags, entry.tags)
                     prior.real_time = entry.real_time
                     if _IMPORTANCE_ORDER.get(entry.importance, 2) < _IMPORTANCE_ORDER.get(
                         prior.importance, 2
@@ -362,7 +371,10 @@ class MemoryStore:
             return marked
 
     @guarded_commit
-    def mark_superseded_by_entry_id(self, entry_id: str) -> int:
+    def mark_superseded_by_entry_id(
+        self, entry_id: str, *, allowed_entry_ids: frozenset | None = None,
+        allowed_sources: frozenset[str] | None = None,
+    ) -> int:
         """按 LLM 回传的短 ID（``[ID:xxxxxxxx]`` 的前 8 位）标记旧事实为 superseded。
 
         #101 实测：让 LLM 照抄旧事实原文再走 ``mark_superseded`` 的 dedup_key
@@ -370,17 +382,16 @@ class MemoryStore:
         对不上。改成在 prompt 里给每条记忆标短 ID，让 LLM 直接回传 ID，匹配
         变成 ``entry_id.hex.startswith(prefix)``，零措辞依赖。
 
-        匹配规则：``entry_id`` 大小写不敏感、支持 ``xxxxxxxx`` 或带 ``[ID:...]``
-        包裹；按前 8 位十六进制前缀匹配（prompt 里展示的就是 8 位短码）。
-        找不到匹配时返回 0（LLM 幻觉 ID 不抛错，只记 0）。
+        只接受完整的 8 位 hex 短码或完整 UUID，兼容大小写及 [ID:...] 包裹。
+        短码碰撞、格式不合法、目标未展示或来源不允许时返回 0，不改任何事实。
         """
         if not entry_id:
             return 0
-        # 容错：剥掉可能的 [ID:...] 包裹、取前 8 位 hex、小写
+        # 只处理展示包装与 UUID 连字符，禁止将任意短串或长串截断为授权。
         raw = entry_id.strip().lower()
         raw = raw.removeprefix("[id:").removeprefix("[").removesuffix("]")
-        prefix = raw.replace("-", "")[:8]
-        if not prefix:
+        prefix = raw.replace("-", "")
+        if re.fullmatch(r"(?:[0-9a-f]{8}|[0-9a-f]{32})", prefix) is None:
             return 0
         # 哨兵 UUID：LLM 纠错路径下我们没有新事实的 entry_id（同轮刚写入），
         # 用全零 UUID 表示「被 LLM 标记为 superseded，但无具体替代条目引用」。
@@ -388,12 +399,18 @@ class MemoryStore:
         sentinel = uuid.UUID("00000000-0000-0000-0000-000000000000")
         marked = 0
         with self._lock:
-            for entry in self._snapshot.archive:
-                if entry.superseded_by is not None:
-                    continue
-                if entry.entry_id.hex.startswith(prefix):
-                    entry.superseded_by = sentinel
-                    marked += 1
+            matches = [entry for entry in self._snapshot.archive
+                       if entry.superseded_by is None and entry.entry_id.hex.startswith(prefix)]
+            # A short ID collision must never invalidate multiple facts.
+            if len(matches) != 1:
+                return 0
+            entry = matches[0]
+            if allowed_entry_ids is not None and entry.entry_id not in allowed_entry_ids:
+                return 0
+            if allowed_sources is not None and entry.source not in allowed_sources:
+                return 0
+            entry.superseded_by = sentinel
+            marked = 1
             if marked:
                 self._persist_locked()
             return marked

@@ -4,6 +4,8 @@
 
 ## 阅读入口
 
+条目来源与授权遗忘：见[新增管理操作](#memory-management)，包含 entries/forget 路由、epoch 屏障与 trace 标签边界。
+
 - [身份与作用域](#scope)
 - [请求与回执](#loop)
 - [持久化与恢复](#persistence)
@@ -1823,3 +1825,29 @@ v0.1 完全一致，属附加式扩展、不升版本。
 - 目录白名单是解析/接收的约束，UE仍须核验当前角色、技能、目标、冷却、距离、忙碌、有效期及游玩/遭遇身份。未知身份、L0能力门控在不同旧入口的检查并不完整，见[v0.3差距表](_01_npc_contract.md#legacy-agent-7-当前实现差距)。
 - 音频格式是传输约定。当前上传路径把文件读为内存字节交给ASR，没有统一的大小/时长/WAV头门禁；不能把文档写了格式等同每项已由服务器强校验。
 - v0.3玩家指令、世界事件、有限幂等与观测字段集中到[NPC契约](_01_npc_contract.md#legacy-agent)；UE接入步骤集中到[联调指南](../guides/_12_legacy_integration_guide.md)，不在兼容契约重复维护任务状态。
+# 条目来源与受控遗忘增量
+
+<a id="memory-management"></a>
+
+本节是 scoped JSON 0.4 的新增管理操作；既有请求/响应字段与 legacy 路由不变。条目模型继续使用已有 `entry_id/source/game_time/real_time/tags/superseded_by`，不向旧客户端注入新的必填字段。请求和完整响应以 `data/golden/memory/` 三个样例及 `ScopedForgetRequest/ScopedForgetResponse/ScopedMemoryEntriesResponse` 为准。
+
+| 路径 | 权限与输入 | 输出/保证 |
+| --- | --- | --- |
+| `GET /v1/scoped/console/memory/entries` | `console:read`；与现有 console 相同的 save/npc/instance/run/binding/epoch 查询参数 | 当前归属全部 archive/summaries/short_term 条目及完整 ID/来源标签，包括已纠错条目；不跨档、不返回被遗忘条目 |
+| `POST /v1/scoped/console/memory/forget` | `memory:reset`；ScopedResetRequest 相同身份/绑定字段，加 `entry_ids`（1～50 个不同 UUID） | 原子移除所选条目，返回 `forgotten_entry_ids`、新 `memory_epoch` 与 `cleared_sessions`；其余长期条目、人格与关系保留 |
+
+任意目标不存在于本 NPC 的当前三个层级时返回 `404 MEMORY_ENTRY_UNKNOWN`，整个批次无删除；格式、空集合/重复 ID 为 422。越权为 403，过期 instance/binding/epoch 继续适用既有 409。未知条目不透露它是否存在于其他玩家或存档。
+
+遗忘同时清空该 NPC 的模糊印象及所有 run 的对话历史，因为现有两者没有精确的条目归属；这是明确的保守清理，不保证保留其他印象。不会清关系、执行账本、请求确认或日志，也不是日志/备份中的个人数据擦除 API。同一事实若以不同内容/ID 形成多条记录，客户端须列出所有需要移除的条目；本操作不做语义主题批量删除。
+
+删除与 epoch 更新共用 JSON 单文件原子写，或 SQL 同一业务事务。新 epoch 阻止生成中的旧回复在完成时提交；SQL 离线已确认 duplicate 返回原 ack 但不重写记忆，未确认旧 epoch 新事实首次确认的 memory 分项为 `skipped_reset`，关系独立确认。服务已发出的 SSE delta、客户端已见内容无法撤回；客户端接到遗忘成功也应丢弃旧 epoch 的缓存与回调。
+
+原 request_id 与相同载荷可重放遗忘结果，但只有结果 epoch 仍为当前且 run/binding 有效时允许；下一次 reset/forget 后旧结果为 409。JSON 重放仅受进程内缓存保证，SQL 持久确认沿用既有恢复规则，不扩张 JSON 的跨重启承诺。
+
+### `trace.*` 来源标签
+
+新增条目的 `tags` 使用服务器写入的 `trace.key=value` 约定：game/player/save/companion/run/memory_epoch、logical request_id；世界事件再记录 event_id、原 occurred_at、来源 origin。离线事实另保留 origin_run_id/origin_memory_epoch。摘要与按内容去重保留原条目 ID/来源引用，不因生成摘要或重复提及丢掉全部关联。
+
+`trace.origin=verbatim_player` 是玩家逐字陈述，`model_extraction` 是经词面接地校验的模型抽取，UE 来源是上报方主张。`trace.confirmation=player_text/lexically_grounded/source_report` 说明记录种类，**都不是 UE 动作成功证明**。`real_time` 是服务端记录/最近提及时间，`game_time` 和 `trace.occurred_at` 保留上报时间，不用于倒退关系计分日。NPC 生成文本在相同 logical request_id/scope 的 dialogue_signals 中独立保存，不自动升级为世界事实；执行收到/拒绝不产生治疗、命中成功记忆，执行确认继续读独立 directive/receipt 账本。
+
+每个 trace key 保留最早一条及最近 31 条不同引用，避免重复陈述无限放大档案；SQL 确认账本/信号的完整历史依赖既有保留策略，标签不是完整审计日志。旧条目缺少 trace 标签时按未知来源引用处理，不根据内容补造旧请求 ID。

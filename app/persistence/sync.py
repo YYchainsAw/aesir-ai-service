@@ -206,7 +206,10 @@ def sync_facts(npc, principal, request):
                     from app.services.memory.experiences import record_world_event_experience
                     recorded = record_world_event_experience(npc.companion_id, fact.event.event_type,
                         game_id=npc.game_id, details=fact.event.details, occurred_at=fact.event.occurred_at,
-                        region_id=fact.event.details.get("region_id", ""))
+                        region_id=fact.event.details.get("region_id", ""),
+                        event_id=str(fact.event.event_id), origin=fact.source,
+                        request_id=str(request.request_id), origin_run_id=str(fact.origin_run_id),
+                        origin_memory_epoch=str(fact.origin_memory_epoch))
                     memory_status = "recorded" if recorded else "not_applicable"
                 stage_fact_confirmation(npc, fact.origin_run_id, fact.origin_encounter_id, fact.event,
                     {"relationship_status": reason, "relationship_delta": delta, "memory_status": memory_status},

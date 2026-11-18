@@ -9,6 +9,7 @@
 | 现在要解决的问题 | 阅读入口 |
 | --- | --- |
 | 刚接手项目，从全貌、功能与接口认识当前进度 | [面向新人的项目接手导览](guides/_01_project_overview_guide.md) |
+| 年底服务端首版怎样固定版本、启动、验证、重启和回退 | [服务交接指南](guides/_13_service_handoff_guide.md) · [P0 收口验收](records/_07_p0_closure_verification.md) |
 | 为什么结构复杂、哪些重复可收敛、清理了哪些旧文档 | [代码冗余与文档清理报告](design/_01_architecture_review.md) |
 | 本轮实际改了什么、还存在哪些缺陷、接下来做什么 | [结构整改与后续行动](planning/_14_quality_plan.md) |
 | 怎样安装、启动、配置端口和实例 | [启动指南](guides/_02_local_setup_guide.md) |
@@ -18,6 +19,7 @@
 | 第三步怎样实现请求排队、取消和执行反馈 | [第三步实施计划](planning/_04_execution_loop_plan.md) · [闭环增量契约](protocols/_01_npc_contract.md#loop)（服务端回归通过，UE待验） |
 | 怎样使用v0.4身份、显式绑定与隔离状态 | [v0.4开发与交接](guides/_04_scoped_development_guide.md) |
 | 第四步怎样使用SQL、正式凭据、事实/回执恢复 | [第四步实施计划](planning/_05_persistence_plan.md) · [持久化开发指南](guides/_06_persistence_guide.md) · [增量契约](protocols/_01_npc_contract.md#persistence)（服务端验证通过，UE/正式发布待验） |
+| JSON/development 与 SQL/Bearer 的启动、恢复和错误有什么区别 | [模式与失败响应对照](guides/_06_persistence_guide.md#模式速查jsondevelopment-与-sqlbearer) · [P1 服务端验证](records/_05_p1_server_verification.md) |
 | 正式部署、玩家/存档隔离、缓存同步与断网 | [部署指南](guides/_07_deployment_guide.md)，含外部ASR、模型发布及AT-DEP验收 |
 | 当前运行版本和后端怎样核对 | [联调复现](guides/_10_verification_guide.md) |
 | LLM配置、外发上下文和本地数据保留 | [LLM与数据流](guides/_03_llm_integration_guide.md) |
@@ -27,13 +29,15 @@
 | 发布时使用哪些进程守护、HTTPS和环境模板 | [发布准备](../deploy/README.md) |
 | 当前范围、45FR、7UC、规则和验收 | [NPC需求主文](planning/_11_npc_requirements.md) |
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/_01_known_issues.md) |
+| 哪些 Issue 可关闭、未完成工作怎样排序 | [Issue 核查与责任清单](records/_06_issue_audit_verification.md) |
+| 当前功能是否完备、来源/遗忘/检索与训练数据实测如何 | [项目功能测评](records/_08_project_functionality_assessment.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/_06_interaction_evolution_plan.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
 | AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/_08_integration_alignment_plan.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/_10_course_requirements_guide.md) |
 | 数据库ER/PDM、逐列字典、建表SQL与迁移规范 | [数据库设计索引](design/database/README.md) |
 | 图源、预览和维护方式 | [UML索引](design/uml/README.md) |
 | Boss训练、冻结模型、独立评估边界 | [RL说明](../rl/README.md) |
-| 真实测试/联调发生过什么 | [验证记录](records/_01_verification_records.md) · [里程碑](../CHANGELOG.md) |
+| 真实测试/联调发生过什么 | [缓存与事实约束](records/_04_prompt_grounding_verification.md) · [P0 核查](records/_03_p0_delivery_verification.md) · [验证记录](records/_01_verification_records.md) · [里程碑](../CHANGELOG.md) |
 
 ## 字段定义看契约
 

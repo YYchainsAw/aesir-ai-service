@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from typing import Literal
+from app.schemas.memory import MemoryEntry
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -262,6 +263,17 @@ class ScopedResetRequest(_NpcRequest):
     pass
 
 
+class ScopedForgetRequest(_NpcRequest):
+    entry_ids: list[UUID] = Field(min_length=1, max_length=50)
+
+    @field_validator('entry_ids')
+    @classmethod
+    def _unique_entries(cls, values):
+        if len(set(values)) != len(values):
+            raise ValueError('entry_ids must be unique')
+        return values
+
+
 class ScopedSaveScope(ScopedModel):
     game_id: str
     player_id: UUID
@@ -388,6 +400,16 @@ class ScopedExecutionResponse(ScopedResponseBase):
 class ScopedResetResponse(ScopedResponseBase):
     reset: bool
     cleared_sessions: int = Field(ge=0, strict=True)
+
+
+class ScopedForgetResponse(ScopedResponseBase):
+    forgotten_entry_ids: list[UUID]
+    cleared_sessions: int = Field(ge=0, strict=True)
+
+
+class ScopedMemoryEntriesResponse(ScopedResponseBase):
+    request_id: None = None
+    entries: list[MemoryEntry]
 
 
 class ScopedReadResponseBase(ScopedResponseBase):

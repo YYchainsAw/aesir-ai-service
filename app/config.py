@@ -108,6 +108,8 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="", alias="LLM_MODEL")
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
     llm_timeout_seconds: float = Field(default=15.0, alias="LLM_TIMEOUT_SECONDS")
+    llm_thinking_mode: Literal["enabled", "disabled"] | None = Field(default=None, alias="LLM_THINKING_MODE")
+    llm_max_tokens: int | None = Field(default=None, gt=0, alias="LLM_MAX_TOKENS")
 
     # -- LLM 熔断（SDD T084 / FR-041）----------------------------------------
     # 连续失败阈值：达到后进入 OPEN 状态，直接拒绝 LLM 调用并走 fallback

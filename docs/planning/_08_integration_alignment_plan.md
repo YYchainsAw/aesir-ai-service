@@ -31,9 +31,9 @@
 | G2 事件合并/筛选/过期 | **服务端子集**：现有候选仲裁/节流、快照时效、事件稳定身份去重；见`app/services/agency/`及[作用域契约](../protocols/_01_npc_contract.md#scope) | UE事件队列容量/合并/淘汰及高频受击不触发无谓LLM尚未整体验；余项由[#100](https://github.com/YYchainsAw/aesir-ai-service/issues/100)跟踪，不因此新增主动推送 |
 | G3 UE本地条件判断 | **部分基础**：受支持即时动作/目标/条件校验与TTL已有服务端处理；未满足/未知条件返回无动作/澄清 | **条件登记/等待/本地触发尚无契约和实现**；仅当前快照已满足的已知眩晕条件可给即时建议。不得宣称“Boss破防后雷击”登记后断网仍可执行；设计余项见[#100](https://github.com/YYchainsAw/aesir-ai-service/issues/100) |
 | G4 命令身份与回执 | **服务端子集**：稳定directive、同逻辑请求回放、原指令关联、sequence冲突和终态防倒退、SQL持久账本；见[闭环契约](../protocols/_01_npc_contract.md#loop) | UE需按directive去重并报告实际Action/GAS结果；现枚举没有started/hit/completed，`accepted`仅收到、`executed`仅UE自报执行 |
-| M1 索引按需读对照 | **后置采纳**：保留现有分层/预算检索 | 索引/按需读与准确率/token/时延对照由[#101](https://github.com/YYchainsAw/aesir-ai-service/issues/101)跟踪；不预设向量库为前置 |
-| M2 事实/主张/输出分离 | **服务端子集**：记忆已有来源类型；SQL真实事实确认保存原event、run/encounter/epoch、`source=ue`与分项确认；回执关联原指令；见[持久化契约](../protocols/_01_npc_contract.md#persistence) | 全部聊天事实的消息级证据/确认状态尚不完整；NPC自述不能当UE执行事实，最终语义与实际世界需跨端验证 |
-| M3 更新/纠错/受控遗忘 | **已有基础+规划增量**：事实接地/去重、规则关系、授权reset已有实现 | 稳定条目级纠错/更新/遗忘及模型候选修改权限尚未完整设计实施；全量reset不等于条目forget |
+| M1 索引按需读对照 | **本机对照已实现**：预算基线与受限 ID 的模型选索引/读全文实验；八题有真实 usage/耗时 | 小型合成题不是生产代表集；保留预算线上策略，不预设向量库，后续真实分布采样见 #101 |
+| M2 事实/主张/输出分离 | **服务端增量已实现**：条目 trace 关联原请求/作用域，事件/离线时间与身份透传摘要/去重；NPC 生成和 SQL 执行确认分开 | 旧无 trace 记录不补造来源；有界标签不是完整审计历史，上报事实不是 UE 成功证明，跨端语义仍待验 |
+| M3 更新/纠错/受控遗忘 | **服务端增量已实现**：稳定 ID 纠错受注入集合/来源授权；管理 entries/forget 原子删除与更新 epoch，清历史/印象，关系保留 | UE 管理 UI 未接入；条目遗忘不等于日志/备份擦除或语义主题删除；两端验收仍由 #101/#57 跟踪 |
 | M4 独立重置屏障 | **服务端子集**：持久`memory_epoch`与提交重核；未确认的旧epoch新事实首次同步时记忆`skipped_reset`、关系独立确认；已确认重复事实返回原ack且不复写记忆/关系。见[重置规则](../protocols/_01_npc_contract.md#scope-4-记忆重置与晚到写入)和持久化契约 | UE缓存/队列清理、重启后旧积压不复活仍待；任意分支读档/跨设备合并不在当前实现。旧备份恢复后的后续reset收敛属于发布门禁 |
 | C1 认证主体作用域 | **服务端子集**：开发固定principal与SQL Bearer/玩家活跃/存档授权/权限分离均已在main；完整game/player/save/npc分区 | UE凭据接入与切玩家/档隔离待做；CLI签发能力不等于正式账号门户或HTTPS发布已上线 |
 | C2 持久幂等/事务确认 | **SQL服务端子集**：claim、指纹冲突、最终状态/结果原子提交、确认版本及跨重启只读恢复；实际MySQL/重启证据在[验证记录](../records/_01_verification_records.md#persist-20261022) | JSON/内存开发后端无跨重启事务；旧实例普通业务仍拒绝，不能“重放旧响应→再执行”；UE实际动作去重及正式切换待验 |
@@ -43,6 +43,8 @@
 因此方向已应用到规划及DEP2～4代码。下一步应把已有服务端子集接入UE、补真实验收，再按缺口扩展；不能把20项全标“尚未开发”，也不能把它们全标“完成”。AIRI的edit-wins删除语义不直接复用，继续使用M4的独立记忆屏障。
 
 ## 交接使用的唯一协议入口
+
+2026-11-18 的服务端来源/遗忘和检索增量见[项目功能测评](../records/_08_project_functionality_assessment.md)。其余 17 项保持原服务端子集/跨端限制；本次没有 UE 新构建或实机结果，不用新 Python 提交替换历史 UE 基线并宣布整套 20 项完成。
 
 v0.4是JSON信封版本，URL前缀为`/v1/scoped`，不是`/v0.4`。完整字段、错误、状态和限制引用[作用域契约](../protocols/_01_npc_contract.md#scope)、[闭环增量](../protocols/_01_npc_contract.md#loop)、[持久化增量](../protocols/_01_npc_contract.md#persistence)；以`app/schemas/scoped.py`、`loop.py`、`recovery.py`、`sync.py`和对应golden复核，不在本文另写平行字段表。
 

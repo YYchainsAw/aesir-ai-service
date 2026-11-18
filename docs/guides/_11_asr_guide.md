@@ -58,4 +58,6 @@ AESIR_ASR_MAX_AUDIO_SECONDS=30
 
 ## 本次验证边界
 
-本机真实模型转写和 scoped HTTP 上传已验证；下游 NPC 回复使用 mock 隔离测试。真实 LLM 当前返回 `InvalidSubscription`，需要恢复可用凭据后补整条链路。服务器部署、真实 UE 录音上传、断网切文本以及 Windows 游戏包仍分别待验。
+2026-11-16 有效 DeepSeek Key 恢复后，本机 scoped HTTP 的真实 faster-whisper→LLM 整链路通过，回复 source=llm。5.616 秒样例首请求 4640 ms、热请求 3047 ms、同 ID 重放 31 ms；重放不再调用 ASR 或 LLM，同 ID 更换音频冲突。空音频、坏格式、超大上传和过期绑定均被拒绝。独立进程指定缺失模型后得到 ASR_UNAVAILABLE，故障重放不再调用 ASR，该进程的真实文本请求仍成功。未向日常 .env 写入故障配置。
+
+早期 mock 回复隔离测试的 7032/1469/31 ms 为历史结果。完整环境见 [P0 核查记录](../records/_03_p0_delivery_verification.md)。本轮为 development/JSON/memory；目标服务器、Bearer、UE 麦克风与故障切换界面、Windows 游戏包仍待验，单条音频不代表正式延迟或容量指标。

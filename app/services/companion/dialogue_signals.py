@@ -144,6 +144,7 @@ def record_turn_signal(
     relationship_reason: str | None = None,
     lore_lookup: dict | None = None,
     facts_rejected: int | None = None,
+    memory_corrections: dict[str, int] | None = None,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
@@ -195,6 +196,8 @@ def record_turn_signal(
         # 可选埋点仅在显式传入时落盘（保持旧记录结构稳定，缺省字段缺失不报错）。
         if memory_cited is not None:
             record["memory_cited"] = memory_cited
+        if memory_corrections is not None:
+            record["memory_corrections"] = memory_corrections
         if relationship_stage:
             record["relationship_stage"] = relationship_stage
         if latency_ms is not None:

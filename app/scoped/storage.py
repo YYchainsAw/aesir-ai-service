@@ -58,10 +58,13 @@ def signal_directory(root: str | Path, game_id: str) -> Path:
 
 
 def signal_metadata() -> dict[str, str]:
+    from app.scoped.requests import current_request_id
     scope = current_scope()
     if scope is None:
         return {}
+    request_id = current_request_id()
     return {**scope.npc.as_dict(), "run_id": str(scope.run_id),
+            **({"request_id": request_id} if request_id is not None else {}),
             "session_id": str(scope.session_id), "memory_epoch": str(scope.memory_epoch),
             "service_instance_id": str(scope.service_instance_id),
             "run_binding_id": str(scope.run_binding_id),
@@ -229,3 +232,31 @@ def reset_memory(scope: NpcScope, expected_epoch: UUID) -> dict:
         invalidate_scope(scope)
         cleared = clear_scoped_sessions(scope)
         return {"memory_epoch": epoch, "epoch": epoch, "cleared_sessions": cleared}
+
+
+def forget_memory(scope: NpcScope, expected_epoch: UUID, entry_ids: list[UUID]) -> dict:
+    """Atomically remove selected entries and rotate the epoch as a stale-write barrier.
+
+    All topic impressions and session history are cleared because they do not
+    carry exact entry attribution. Relationship/persona/logs remain unchanged.
+    """
+    from app.services.memory.store import invalidate_scope
+    from app.services.companion.session_memory import clear_scoped_sessions
+    with scope_lock(scope):
+        epoch, snapshot = read_memory_document(scope)
+        if epoch != UUID(str(expected_epoch)):
+            raise ScopeError(409, 'MEMORY_EPOCH_STALE', 'Memory epoch does not match')
+        targets = set(entry_ids)
+        layers = ('archive', 'summaries', 'short_term')
+        known = {entry.entry_id for layer in layers for entry in getattr(snapshot, layer)}
+        if not targets <= known:
+            raise ScopeError(404, 'MEMORY_ENTRY_UNKNOWN', 'A selected entry does not exist in this NPC scope')
+        for layer in layers:
+            setattr(snapshot, layer, [entry for entry in getattr(snapshot, layer) if entry.entry_id not in targets])
+        snapshot.impressions = []
+        epoch = uuid4()
+        write_memory_document(scope, epoch, snapshot)
+        invalidate_scope(scope)
+        cleared = clear_scoped_sessions(scope)
+        return {'memory_epoch': epoch, 'forgotten_entry_ids': [str(value) for value in entry_ids],
+                'cleared_sessions': cleared}
