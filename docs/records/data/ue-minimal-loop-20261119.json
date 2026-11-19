@@ -1,0 +1,130 @@
+{
+  "date": "2026-11-19",
+  "result": "BLOCKED; no complete UE execution loop passed",
+  "service_commit": "4489c47094f4675d7a6def0277063631447acec1",
+  "ue_origin_main": "af5510f7c1a5244b0714893483a9475cab236bdb",
+  "original_local_head": "06f24159300140c7289758e50838cbc213d0ca7c",
+  "original_local_divergence": {
+    "ahead": 1,
+    "behind": 44
+  },
+  "original_modified_files_preserved": [
+    "AesirWarden.uproject",
+    "Config/DefaultEngine.ini",
+    "Source/AesirWarden/Private/Services/Companion/CommandServiceSubsystem.cpp"
+  ],
+  "isolated_checkout": {
+    "path": ".workbuddy/ue",
+    "sparse": [
+      "Source",
+      "Config",
+      "Docs"
+    ],
+    "tracked_changes": false,
+    "content_lfs_or_third_party_restored": false
+  },
+  "engine": {
+    "version": "5.8.3",
+    "changelist": 58210709,
+    "path": "D:/UE_5.8",
+    "rules_assembly_rebuilt": true,
+    "final_blocker": "fatal error C1083: PrimaryAssetId.generated.h: No such file or directory"
+  },
+  "build_attempts": [
+    {
+      "log": "build-latest.log",
+      "exit_code": 6,
+      "blocker": "UE5Rules.dll missing"
+    },
+    {
+      "log": "build-latest-force-rules.log",
+      "exit_code": 6,
+      "blocker": "UE5Rules.dll missing"
+    },
+    {
+      "log": "build-rules-recovery.log",
+      "exit_code": 6,
+      "blocker": "PrimaryAssetId.generated.h missing"
+    }
+  ],
+  "automation": {
+    "discovered_in_source": [
+      "Aesir.Companion.ScopedProtocol.ContextAndBind",
+      "Aesir.Companion.ScopedProtocol.IdentityIsolation",
+      "Aesir.Companion.ScopedProtocol.MonotonicValidity",
+      "Aesir.Companion.ScopedProtocol.ExplorationActions",
+      "Aesir.Companion.Lifecycle.CallbacksAndSessionIsolation",
+      "Aesir.Companion.HttpContract.ExplorationRouting",
+      "Aesir.Companion.ExplorationExecution"
+    ],
+    "executed": 0,
+    "passed": 0,
+    "reason": "latest project DLL could not be built"
+  },
+  "backend_precheck": {
+    "evidence_level": "Python-only readiness precheck; NOT a UE runtime test",
+    "identity": "development",
+    "storage": "json",
+    "backend": "mock/rule",
+    "port": 8011,
+    "cases": [
+      {
+        "case": "health",
+        "status": 200,
+        "data": {
+          "status": "ok",
+          "service": "aesir-ai-service",
+          "protocol_version": "0.1",
+          "service_commit": "4489c47"
+        }
+      },
+      {
+        "case": "contract-context",
+        "status": 200,
+        "data": {
+          "protocol_version": "0.4",
+          "scope": {
+            "game_id": "aesir",
+            "player_id": "11111111-1111-4111-8111-111111111111",
+            "save_id": "27190000-0019-4019-8019-000000000019",
+            "companion_id": "companion.alice"
+          },
+          "service_instance_id": "ad9998fe-3e00-4513-880e-03b3a6bd05d7",
+          "control_revision": 0,
+          "run_id": null,
+          "run_binding_id": null,
+          "encounter_revision": 0,
+          "encounter_id": null,
+          "memory_epoch": "372036a0-f21d-431b-ac3b-dc6424e4a9d4"
+        }
+      }
+    ]
+  },
+  "coverage": {
+    "chat": "source exists; latest UE runtime not verified",
+    "wait": "source and fixture exist; latest UE runtime not verified",
+    "follow": "source exists; no real navigation evidence; existing fixture expects no-navigation failure",
+    "burst": "not wired into latest companion directive executor",
+    "execution_receipt": "not wired into latest companion runtime loop"
+  },
+  "cleanup": {
+    "original_game_test_stopped": true,
+    "isolated_service_stopped": true,
+    "server_deployment_untouched": true,
+    "boss_training_untouched": true
+  },
+  "source_sha256": {
+    "Source/AesirWarden/Private/Services/Companion/CompanionChatSubsystem.cpp": "5a1b4ede1fc218ebaf053ff905a37d18ddd1857a441065783e5d1927b456f0d4",
+    "Source/AesirWarden/Private/Services/Companion/CompanionScopedProtocol.cpp": "ae4e7d35592c43d48e3198a8ae6977a48c850efd15d310ddd17603ea57654511",
+    "Source/AesirWarden/Private/AI/Companion/AesirCompanionAIController.cpp": "d5da0f440c966d90f2f687ed48c304b6ab5ec302fc4cd00bc1d661036339e804",
+    "Source/AesirWarden/Private/Tests/CompanionScopedProtocolTests.cpp": "cff3224f36ddb9f0b10614c3b038fef52404f1bb95463ce50988de3c3569589e",
+    "Source/AesirWarden/Private/Tests/CompanionChatLifecycleTests.cpp": "2452fcc464d7357464d077821a06423e2791a93c3bbb033b7f46d7e6b942395c",
+    "Source/AesirWarden/Private/Tests/CompanionScopedHttpTests.cpp": "5cc960d6410b9b73bb2a8cadd2098e2d7f827f4b1033ea3479517ca2d28f86f9",
+    "Source/AesirWarden/Private/Tests/AesirCompanionExplorationTests.cpp": "49e8e2cd2ed21f1eacb9473d2adf442e993e58c758cdd131e26b2cd95d601294"
+  },
+  "log_sha256": {
+    "build-latest.log": "ee228a55669445cb725a3bc2ade95d442661c76ec499087c11cd2b915779cf7a",
+    "build-latest-force-rules.log": "e2fd80765c45d91df3fc48e5d54bf56106f88887cbc271dd9a1b89826bb4cd92",
+    "build-rules-recovery.log": "b5e6e4b7f09cc986e44ad231fc54ea2201f53b6efc9fe62bdefb417907b42e40"
+  }
+}

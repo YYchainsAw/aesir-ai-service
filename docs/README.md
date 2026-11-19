@@ -31,6 +31,7 @@
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/_01_known_issues.md) |
 | 哪些 Issue 可关闭、未完成工作怎样排序 | [Issue 核查与责任清单](records/_06_issue_audit_verification.md) |
 | 当前功能是否完备、来源/遗忘/检索与训练数据实测如何 | [项目功能测评](records/_08_project_functionality_assessment.md) |
+| 最新 UE 最小闭环测试是否通过、卡在哪一步 | [UE 最小闭环测试](records/_09_ue_minimal_loop_verification.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/_06_interaction_evolution_plan.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
 | AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/_08_integration_alignment_plan.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/_10_course_requirements_guide.md) |
