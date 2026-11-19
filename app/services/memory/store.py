@@ -115,7 +115,7 @@ class MemoryStore:
 
         try:
             data = json.loads(raw)
-            self._snapshot = MemorySnapshot.model_validate(data)
+            self._snapshot = MemorySnapshot.from_document(data)
         except (json.JSONDecodeError, ValueError):
             # 保留损坏现场，隔离后以空记忆继续（FR-018 同思路的保守恢复）
             self._quarantine()
@@ -134,6 +134,7 @@ class MemoryStore:
         salient: bool = False,
         salience_boost: float | None = None,
         origin: str = "player",
+        context_refs: tuple[str, ...] = (),
     ) -> None:
         """模糊印象：合并同主题计数、刷新权重后落盘；超限淘汰最淡印象。
 
@@ -151,7 +152,7 @@ class MemoryStore:
         with self._lock:
             self._merge_mentions_locked(
                 topics, now=now, salient=salient,
-                salience_boost=salience_boost, origin=origin
+                salience_boost=salience_boost, origin=origin, context_refs=context_refs
             )
             self._evict_impressions_locked()
             self._persist_locked()
@@ -195,6 +196,7 @@ class MemoryStore:
         salient: bool = False,
         salience_boost: float | None = None,
         origin: str = "player",
+        context_refs: tuple[str, ...] = (),
     ) -> None:
         """按主题合并计数并刷新权重（调用方须持锁）。
 
@@ -210,6 +212,8 @@ class MemoryStore:
         仅在首次出现时留痕（她记得自己说过什么），此后只有玩家提及才升级。
         """
         existing = {i.topic: i for i in self._snapshot.impressions}
+        from app.services.memory.attribution import current_references
+        references = [*current_references(self._snapshot), *context_refs]
         for topic in topics:
             if (
                 _is_blocked_topic(topic, self_reference_blacklist=self._self_reference_blacklist)
@@ -218,6 +222,10 @@ class MemoryStore:
                 continue
             effective_boost = salience_boost if salient else None
             prior = existing.get(topic)
+            if prior is None or origin != "companion":
+                previous = self._snapshot._memory_links.get(topic, [""] if prior else [])
+                refs = list(dict.fromkeys([*previous, *(references or [""])]))
+                self._snapshot._memory_links[topic] = refs if len(refs) <= 128 else ["", *refs[-127:]]
             if prior is None:
                 impression = TopicImpression(
                     topic=topic,
@@ -461,6 +469,9 @@ class MemoryStore:
 
     def _persist_locked(self) -> None:
         """原子写入（tmp + rename）+ 单版本备份（.bak）。调用方须持锁。"""
+        topics = {item.topic for item in self._snapshot.impressions}
+        self._snapshot._memory_links = {topic: refs for topic, refs in self._snapshot._memory_links.items()
+                                        if topic in topics}
         if self._scope:
             write_memory_document(self._scope, self._epoch, self._snapshot, self._root)
             return
@@ -469,7 +480,7 @@ class MemoryStore:
         except OSError as error:
             raise MemoryStoreError(f"记忆目录不可创建：{self._dir}") from error
 
-        payload = json.dumps(self._snapshot.model_dump(mode="json"), ensure_ascii=False, indent=2)
+        payload = json.dumps(self._snapshot.to_document(), ensure_ascii=False, indent=2)
         tmp = self._path.with_suffix(".json.tmp")
         try:
             tmp.write_text(payload, encoding="utf-8")

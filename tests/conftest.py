@@ -39,6 +39,8 @@ def _isolate_backends(monkeypatch: pytest.MonkeyPatch) -> None:
     # 旧协议回归显式进入开发兼容模式；scoped HTTP 测试自行关闭。
     monkeypatch.setenv("AESIR_SCOPE_LEGACY_ENABLED", "true")
     monkeypatch.setenv("AESIR_COMPANION_BACKEND", "mock")
+    monkeypatch.setenv("AESIR_DIALOGUE_DATA_ORIGIN", "unknown")
+    monkeypatch.setenv("AESIR_DIALOGUE_DATA_RUN_ID", "")
     monkeypatch.delenv("AESIR_PARSER_BACKEND", raising=False)
     # 阶段 0e：生产默认 Redis 后端；测试环境强制内存后端（Redis 语义已被
     # test_redis_scheduling / test_shadow_scheduling / test_redis_chaos 直接覆盖）。

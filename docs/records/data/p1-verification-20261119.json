@@ -1,0 +1,173 @@
+{
+  "date": "2026-11-19",
+  "base_commit": "4489c47094f4675d7a6def0277063631447acec1",
+  "scope": [
+    "local_relevance_with_conservative_fallback",
+    "attributed_forgetting",
+    "dialogue_data_governance"
+  ],
+  "core_tests": {
+    "passed": 1733,
+    "skipped": 13,
+    "failures": 0,
+    "errors": 0,
+    "elapsed_seconds": 107.615,
+    "warnings": 7,
+    "warning_categories": [
+      "StarletteDeprecationWarning: TestClient httpx",
+      "StarletteDeprecationWarning: HTTP 422 constant"
+    ]
+  },
+  "skipped_tests": [
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribes_silent_wav_returns_empty",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribe_raises_on_invalid_audio",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_fewshot_consistency.test_examples_reference_only_whitelisted_emotion_gesture_face[example_file2]",
+      "reason": "companion.narrator 未注册，无白名单可校验"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_symlink_without_overwriting_target",
+      "reason": "POSIX secure output semantics"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_source_and_static_output_paths_without_minting_token[web-root]",
+      "reason": "POSIX static web root policy"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_nonprivate_parent_directory",
+      "reason": "POSIX directory access policy"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_other_web_roots_without_creating_any_file",
+      "reason": "Linux deployment web root boundary"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_nonprivate_parent",
+      "reason": "POSIX private directory permissions"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_84_runtime_has_dml_but_no_ddl_or_cross_database_privilege",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_uow_failure_rolls_back_both_documents_and_authoritative_version",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_committed_document_is_visible_to_a_fresh_python_process",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_http_event_restart_rebind_and_recovery_never_reapply",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_actual_state_version_conflict_preserves_the_winner",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    }
+  ],
+  "source_sha256": {
+    "app/api/v1/scoped.py": "0752d39950fd7f701381a8a775600709a5bf16fe9e9bda708ac712ceb07a91db",
+    "app/config.py": "8d69d2a241fa64e5e84189b647b41c4db981b73270e294e83a8fe0c6cd601ae1",
+    "app/schemas/memory.py": "19ff2724db7346f496060cf815c5a5853788d638bd850505b4b490372bb514b3",
+    "app/scoped/storage.py": "de3f8a959714a1a88b137ffbcb7087dbfc34e469b27537417d6765ea9c379655",
+    "app/services/companion/dialogue_service.py": "9a2dcbbc884bb689f59c0950cbdba80ed90bcb6b7fc64730644831e32e114eb5",
+    "app/services/companion/dialogue_signals.py": "cab7addf111e459b147fb05af63e3455a23998cb9f3bbcf2850af8b337cf570b",
+    "app/services/companion/session_memory.py": "c5db3f78e9a1a41d3c41be749b6474cab30bd3550b8fc5b529db6047fa2cf918",
+    "app/services/memory/attribution.py": "711903b1f094aef7865928b76b5e4e4ef0de7fd48e38e94247e9d0d0ef338a7d",
+    "app/services/memory/provenance.py": "b1ef69920950ceb209dd6ed5cd11ba87312b42cde0d2c30aa58abd9927bfaab0",
+    "app/services/memory/relevance.py": "97d2d58e1618a20253c4b4649e2e06ea87bf08c709f3893619f827af53bb7049",
+    "app/services/memory/retrieval.py": "925fe100266ef8e1efbe2aba141dd8919513fad83634718d27e0e8cea4306ab6",
+    "app/services/memory/store.py": "e1a994a8846481c066cf6406204355a468610d19d2e1d0c5be51395aac974204",
+    "data/evals/memory_relevance.json": "8ef15a748b53abd6c8614e979fb7e80329d4cc4926db9bee30dddbc4540f64a7",
+    "scripts/emotion_regression.py": "12dc16373769bd42cb875c4f16573f67084e8be2be1da363a2ff47dd7bf36c82",
+    "scripts/evaluate_memory_relevance.py": "9c921ee5e4a40dd57825898b444f3b4cb86ebc4856d504f28ffddbf1df605a0d",
+    "scripts/persistence_data.py": "c353c89874eeca0621653478b2a92b640f24dbab040a08dafcb51527138dd3b6",
+    "scripts/rl/dialogue_data_quality.py": "b497cc4ebf4a58c3890915a77ad359c4b38374e38c15713af02d42ffcf40eb13",
+    "tests/conftest.py": "7dc87f4bebb5ce146de2b963cd91c9c14cf1757c5287afd6151cd1de5356e0c3",
+    "tests/persistence/test_database.py": "dba4e0abcf5e80d408c1cd5cc8188652c24c33cd6e4d2349ce6adcbb5386d151",
+    "tests/persistence/test_selective_forget_sql.py": "214c5678c1c2957fdca2814747542a32c49a07bc4d35943cc3e89add501a6166",
+    "tests/scoped/test_memory_correction_scope.py": "ef8c4725053673c2df527c6627480aa14be2d3f86df40194361d489cb1ad2ec6",
+    "tests/scoped/test_memory_selective_forget.py": "2cb6299046c30cce5b6ad2478844f51d9d2df27f84c9091642354764ad76f423",
+    "tests/scripts/test_dialogue_data_quality.py": "5505cd624be01e1a67dfe20717c0f5364f1a2e8644ec8b3869ac4216afb7baae",
+    "tests/scripts/test_memory_relevance_eval.py": "0aa176e5acc05f72accb2ec2c19d8f4121a52390a6e80978467d152c00380e0f",
+    "tests/services/test_dialogue_commit_parity.py": "e4cd03c7f239740b0180649151f92d9ad9cd98c48fcf29058fc53284460df3bb",
+    "tests/services/test_dialogue_data_origin.py": "7a0dd0c5df990a66754b7a6b82791b52c73c2c0de17e860520c3bebc844e9950",
+    "tests/services/test_memory_local_relevance.py": "97e06a6b9c939b16c78ac8c68fad4cc9a6b1c141c9f9edf0025e36a0ec29550e"
+  },
+  "core_source_sha256": {
+    "app/api/v1/scoped.py": "0752d39950fd7f701381a8a775600709a5bf16fe9e9bda708ac712ceb07a91db",
+    "app/config.py": "10b2ccaa70a824058dd1584718ee0e1c130312a3f193bcaceb6a91006aeaece4",
+    "app/schemas/memory.py": "19ff2724db7346f496060cf815c5a5853788d638bd850505b4b490372bb514b3",
+    "app/scoped/storage.py": "de3f8a959714a1a88b137ffbcb7087dbfc34e469b27537417d6765ea9c379655",
+    "app/services/companion/dialogue_service.py": "9a2dcbbc884bb689f59c0950cbdba80ed90bcb6b7fc64730644831e32e114eb5",
+    "app/services/companion/dialogue_signals.py": "cab7addf111e459b147fb05af63e3455a23998cb9f3bbcf2850af8b337cf570b",
+    "app/services/companion/session_memory.py": "c5db3f78e9a1a41d3c41be749b6474cab30bd3550b8fc5b529db6047fa2cf918",
+    "app/services/memory/attribution.py": "711903b1f094aef7865928b76b5e4e4ef0de7fd48e38e94247e9d0d0ef338a7d",
+    "app/services/memory/provenance.py": "b1ef69920950ceb209dd6ed5cd11ba87312b42cde0d2c30aa58abd9927bfaab0",
+    "app/services/memory/relevance.py": "97d2d58e1618a20253c4b4649e2e06ea87bf08c709f3893619f827af53bb7049",
+    "app/services/memory/retrieval.py": "925fe100266ef8e1efbe2aba141dd8919513fad83634718d27e0e8cea4306ab6",
+    "app/services/memory/store.py": "e1a994a8846481c066cf6406204355a468610d19d2e1d0c5be51395aac974204",
+    "data/evals/memory_relevance.json": "8ef15a748b53abd6c8614e979fb7e80329d4cc4926db9bee30dddbc4540f64a7",
+    "scripts/emotion_regression.py": "12dc16373769bd42cb875c4f16573f67084e8be2be1da363a2ff47dd7bf36c82",
+    "scripts/evaluate_memory_relevance.py": "9c921ee5e4a40dd57825898b444f3b4cb86ebc4856d504f28ffddbf1df605a0d",
+    "scripts/persistence_data.py": "c353c89874eeca0621653478b2a92b640f24dbab040a08dafcb51527138dd3b6",
+    "scripts/rl/dialogue_data_quality.py": "b497cc4ebf4a58c3890915a77ad359c4b38374e38c15713af02d42ffcf40eb13",
+    "tests/conftest.py": "7dc87f4bebb5ce146de2b963cd91c9c14cf1757c5287afd6151cd1de5356e0c3",
+    "tests/persistence/test_database.py": "dba4e0abcf5e80d408c1cd5cc8188652c24c33cd6e4d2349ce6adcbb5386d151",
+    "tests/persistence/test_selective_forget_sql.py": "214c5678c1c2957fdca2814747542a32c49a07bc4d35943cc3e89add501a6166",
+    "tests/scoped/test_memory_correction_scope.py": "ef8c4725053673c2df527c6627480aa14be2d3f86df40194361d489cb1ad2ec6",
+    "tests/scoped/test_memory_selective_forget.py": "2cb6299046c30cce5b6ad2478844f51d9d2df27f84c9091642354764ad76f423",
+    "tests/scripts/test_dialogue_data_quality.py": "5505cd624be01e1a67dfe20717c0f5364f1a2e8644ec8b3869ac4216afb7baae",
+    "tests/scripts/test_memory_relevance_eval.py": "0aa176e5acc05f72accb2ec2c19d8f4121a52390a6e80978467d152c00380e0f",
+    "tests/services/test_dialogue_commit_parity.py": "e4cd03c7f239740b0180649151f92d9ad9cd98c48fcf29058fc53284460df3bb",
+    "tests/services/test_dialogue_data_origin.py": "c0a677ce87d33c68f580b0a277e4b940ac2fdffa192c2ab65e6b9ba96bc6a9ed",
+    "tests/services/test_memory_local_relevance.py": "97e06a6b9c939b16c78ac8c68fad4cc9a6b1c141c9f9edf0025e36a0ec29550e"
+  },
+  "changes_after_core": [
+    "app/config.py: reject dot-only/trailing-dot capture tags",
+    "tests/services/test_dialogue_data_origin.py: add three invalid-tag cases"
+  ],
+  "final_targeted_validation": {
+    "passed": 25,
+    "failures": 0,
+    "errors": 0,
+    "elapsed_seconds": 2.731
+  },
+  "artifact_sha256": {
+    "data/evals/memory_relevance.json": "8ef15a748b53abd6c8614e979fb7e80329d4cc4926db9bee30dddbc4540f64a7",
+    "docs/records/data/p1-dialogue-quality-20261119.json": "74ac3ee1cb61e975bd9577ab9120b35177731cff0194ee820f5060cd56f534c7",
+    "docs/records/data/p1-memory-relevance-live-20261119.json": "d8ccba01a0870bbd5964726c9ea4f6d081355e43a9631a1a2dc593cb149d55df",
+    "data/runtime/p1/core-tests-final.xml": "5bcf99e122d6494e6eff8e15351745b741317d9464e0cc5957fd9e8b46f68956",
+    "data/runtime/p1/final-validation.xml": "9e244a00a0380397a9174869ce982618cbe50b458a77e7c1536734a44eda69c4"
+  },
+  "boundaries": {
+    "server_acceptance": "deferred_by_user",
+    "ue_minimal_loop": "blocked_previous_turn",
+    "production_mysql_tested_this_round": false,
+    "natural_samples_verified": 0,
+    "training_enabled": false,
+    "semantic_factuality_guaranteed": false,
+    "model_retrieval_enabled": false,
+    "private_env_changed": false
+  },
+  "evaluations": {
+    "primary": "p1-memory-relevance-live-20261119.json",
+    "cases": 40,
+    "budget": 12,
+    "baseline_correct": 39,
+    "local_correct": 39,
+    "input_tokens": {
+      "baseline": 12585,
+      "local": 6355
+    },
+    "label_correction": "hometown does not establish childhood residence",
+    "provider_calls_primary_successful": 80
+  }
+}

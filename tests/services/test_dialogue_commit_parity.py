@@ -7,7 +7,8 @@ from app.services.companion import dialogue_service as dialogue
 def test_mock_sync_and_sse_share_stage_memory_and_delta_commit(monkeypatch):
     calls = []
     monkeypatch.setattr(dialogue, "_relationship_stage", lambda *a, **k: "close")
-    monkeypatch.setattr(dialogue, "_recall", lambda *a, **k: [MemoryEntry(content="玩家喜欢长剑")])
+    entry = MemoryEntry(content="玩家喜欢长剑")
+    monkeypatch.setattr(dialogue, "_recall", lambda *a, **k: [entry])
     monkeypatch.setattr(dialogue, "_recall_impressions", lambda *a, **k: [])
     def record(request, response, **fields):
         calls.append(fields)

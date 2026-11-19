@@ -36,7 +36,7 @@ def _prepare_dialogue(request):
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
 
-    memories = _recall(request.companion_id, game_id=game_id)
+    memories = _recall(request.companion_id, game_id=game_id, query=request.text)
     impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
     stage = _relationship_stage(request.companion_id, game_id=game_id)
 
@@ -55,7 +55,9 @@ def _complete_reply(request, response, *, profile, stage, memories, impressions,
     fields['style_violations'] = getattr(service, 'last_style_violations', None)
     response.relationship_delta = _record_turn(
         request, response, **fields, injected_topics=[item.topic for item in impressions],
+        injected_entry_ids=tuple(str(entry.entry_id) for entry in memories),
         relationship_stage=stage, memory_cited=bool(memories),
+        fallback_reason=getattr(service, 'last_fallback_reason', None),
         lore_lookup=_lookup_signal(getattr(service, 'last_lookup', None)), game_id=game_id,
         correction_targets=frozenset(entry.entry_id for entry in memories
                                      if entry.source in {"player_statement", "promise"}
@@ -86,7 +88,8 @@ def create_dialogue_reply(request: CompanionDialogueRequest) -> CompanionDialogu
                 relationship_stage=stage,
                 world_context=request.world_context,
             )
-        except LLMClientError:
+        except LLMClientError as error:
+            service.last_fallback_reason = _fallback_reason(error, service)
             response = _create_mock_dialogue_reply(request, profile=profile, source="fallback")
     else:
         response = _create_mock_dialogue_reply(request, profile=profile, source="mock")
@@ -155,33 +158,29 @@ def _stream_llm_reply(
                             impressions=impressions, game_id=game_id, service=service)
             yield event
             return
-    except LLMClientError:
+    except LLMClientError as error:
+        service.last_fallback_reason = _fallback_reason(error, service)
         if emitted_delta:
-            # #110：style_guard 拦截（已发 delta 无法收回）也落一行信号——否则拦截
-            # 事件对 dialogue_signals 完全失明，回归报告永远报 0 拦截。不写会话记忆
-            # （中断轮不进历史），只记录观测；非 style 类中断保持原行为不落盘。
+            # Partial output remains observable, including transport failures;
+            # incomplete turns never enter session or long-term memory.
             blocked = getattr(service, "last_style_violations", None) or []
-            if blocked:
-                record_turn_signal(
-                    request.companion_id,
-                    request.session_id,
-                    player_text=request.text,
-                    reply_text="".join(delta_parts),
-                    source="llm_blocked",
-                    emotion_id="",
-                    gesture_id="",
-                    facial_expression_id="",
-                    game_state=request.game_state,
-                    previous_player_texts=[t.user_text for t in history],
-                    previous_reply_texts=[t.reply_text for t in history],
-                    style_violations=blocked,
-                    game_id=game_id,
-                )
+            record_turn_signal(
+                request.companion_id, request.session_id,
+                player_text=request.text, reply_text="".join(delta_parts),
+                source="llm_blocked" if blocked else "llm_interrupted",
+                emotion_id="", gesture_id="", facial_expression_id="",
+                game_state=request.game_state,
+                previous_player_texts=[t.user_text for t in history],
+                previous_reply_texts=[t.reply_text for t in history],
+                style_violations=blocked, game_id=game_id,
+                fallback_reason=service.last_fallback_reason, turn_complete=False,
+            )
             yield StreamEvent(kind="error", text="LLM stream interrupted; this turn is incomplete.")
             return
         yield from _stream_mock_reply(
             request, profile=profile, source="fallback", stage=stage,
             memories=memories, impressions=impressions, game_id=game_id,
+            service=service,
         )
 
 
@@ -194,14 +193,36 @@ def _stream_mock_reply(
     memories: list[MemoryEntry],
     impressions: list,
     game_id: str,
+    service=None,
 ) -> Iterator[StreamEvent]:
     """mock / fallback 流式输出：单 delta（全文）+ meta，保持客户端体验一致。"""
     response = _create_mock_dialogue_reply(request, profile=profile, source=source)
     _complete_reply(request, response, profile=profile, stage=stage, memories=memories,
-                    impressions=impressions, game_id=game_id)
+                    impressions=impressions, game_id=game_id, service=service)
     if response.reply_text:
         yield StreamEvent(kind="delta", text=response.reply_text)
     yield StreamEvent(kind="meta", response=response)
+
+
+def _fallback_reason(error, service):
+    """Stable categories only; never log provider messages or credentials."""
+    import httpx
+    if getattr(service, 'last_style_violations', None):
+        return 'style_guard'
+    cause = error
+    seen = set()
+    while cause is not None and id(cause) not in seen:
+        seen.add(id(cause))
+        if isinstance(cause, httpx.TimeoutException):
+            return 'upstream_timeout'
+        if isinstance(cause, httpx.HTTPStatusError):
+            status = cause.response.status_code
+            return ('upstream_auth' if status in (401, 403) else
+                    'upstream_rate_limit' if status == 429 else 'upstream_http')
+        if isinstance(cause, (ValueError, KeyError, TypeError)):
+            return 'invalid_response'
+        cause = cause.__cause__
+    return 'upstream_error_unspecified'
 
 
 
@@ -272,6 +293,8 @@ def _record_turn(
     reply_topics: list[str] | None = None,
     relationship_signal: str | None = None,
     injected_topics: list[str] | None = None,
+    injected_entry_ids: tuple[str, ...] = (),
+    fallback_reason: str | None = None,
     style_violations: list[str] | None = None,
     relationship_stage: str = "",
     memory_cited: bool | None = None,
@@ -296,17 +319,21 @@ def _record_turn(
     """
     memory = get_session_memory(get_settings().dialogue_history_turns)
     prior_history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
+    context_refs = [*(f'e:{value}' for value in injected_entry_ids)]
+    for turn in prior_history:
+        context_refs.extend(f'e:{value}' for value in turn.entry_ids)
+        context_refs.extend(f'r:{value}' for value in (turn.request_id, *turn.prior_request_ids) if value)
+        if turn.unattributed_context or not turn.request_id:
+            context_refs.append('')
+    if injected_topics:
+        try:
+            context_snapshot = get_memory_store(request.companion_id, game_id=game_id).snapshot()
+            for topic in injected_topics:
+                context_refs.extend(context_snapshot._memory_links.get(topic, ['']))
+        except MemoryStoreError:
+            context_refs.append('')
+    context_refs = list(dict.fromkeys(context_refs))
     _note_runtime(request, response)
-    if request.session_id:
-        # 情绪一并落窗口：下一轮把它作为「当前心情」注入，情绪才有惯性
-        # （mock/回退路径同样有 emotion_id，故降级时也延续）。
-        memory.record(
-            request.session_id,
-            request.text,
-            response.reply_text,
-            emotion_id=response.emotion_id,
-            companion_id=request.companion_id,
-        )
     # 六修（#110 后续）：style_guard 拦截轮（style_violations 非空）的玩家输入
     # 是出戏探针（"系统/指令/npc 区别"等），不是真实对话内容——跳过玩家侧
     # topics/salient/fact 挖掘，否则探针碎片会被挖成"玩家印象"注入后续 prompt。
@@ -357,7 +384,24 @@ def _record_turn(
     if reply_topics:
         # 艾莉自己的话也入印象，但标 origin=companion——注入时按「她说过的话」
         # 而非「玩家提过的话题」措辞，避免她把自己的话记成玩家说的。
-        _remember_turn(request.companion_id, reply_topics, origin="companion", game_id=game_id)
+        _remember_turn(request.companion_id, reply_topics, origin="companion", game_id=game_id,
+                       context_refs=tuple(context_refs))
+
+    if request.session_id:
+        from app.services.memory.attribution import current_references
+        refs = []
+        unknown_context = '' in context_refs
+        try:
+            snapshot = get_memory_store(request.companion_id, game_id=game_id).snapshot()
+            refs = current_references(snapshot)
+        except MemoryStoreError:
+            unknown_context = True
+        memory.record(request.session_id, request.text, response.reply_text,
+                      emotion_id=response.emotion_id, companion_id=request.companion_id,
+                      entry_ids=tuple(dict.fromkeys([*injected_entry_ids,
+                                                   *(ref[2:] for ref in [*refs, *context_refs] if ref.startswith('e:'))])),
+                      context_request_ids=tuple(ref[2:] for ref in context_refs if ref.startswith('r:')),
+                      unattributed_context=unknown_context)
 
     # 关系信号先落地拿到本轮实际 delta（冷却/日上限可能吃掉），再随信号一并
     # 落盘——FIX-13：sentiment（LLM 判定）与 relationship_delta（实收）配对
@@ -390,6 +434,7 @@ def _record_turn(
         lore_lookup=lore_lookup,
         memory_corrections=correction_counts,
         facts_rejected=facts_rejected or None,
+        fallback_reason=fallback_reason,
         game_id=game_id,
     )
     return delta
@@ -437,10 +482,10 @@ def _apply_relationship_signal(
         return 0, "store_error"
 
 
-def _recall(companion_id: str, *, game_id: str) -> list[MemoryEntry]:
+def _recall(companion_id: str, *, game_id: str, query: str | None = None) -> list[MemoryEntry]:
     """检索长期记忆（预算内）；故障降级为空列表（FR-011）。"""
     try:
-        return retrieve(get_memory_store(companion_id, game_id=game_id))
+        return retrieve(get_memory_store(companion_id, game_id=game_id), query=query)
     except MemoryStoreError:
         return []
 
@@ -480,12 +525,14 @@ def _remember_turn(
     salient: bool = False,
     salience_boost: float | None = None,
     origin: str = "player",
+    context_refs: tuple[str, ...] = (),
     game_id: str,
 ) -> None:
     """把本轮主题写入模糊印象（频率强化）；写失败静默降级（服务继续，不记得而已）。"""
     try:
         get_memory_store(companion_id, game_id=game_id).record_mention(
-            topics, salient=salient, salience_boost=salience_boost, origin=origin
+            topics, salient=salient, salience_boost=salience_boost, origin=origin,
+            **({'context_refs':context_refs} if context_refs else {}),
         )
     except MemoryStoreError:
         pass
@@ -529,13 +576,22 @@ def _remember_facts(
     if not grounded:
         return 0, rejected
     try:
+        # Only cross-turn extractions need older player-turn dependencies.
+        from app.scoped.context import current_scope
+        scope = current_scope()
+        history = get_session_memory(get_settings().dialogue_history_turns).history(
+            str(scope.session_id), companion_id) if scope else ()
+        def dependencies(fact):
+            if sources and is_grounded(fact, sources[:1]):
+                return []
+            return [f'trace.depends_on_request_id={turn.request_id}' for turn in history if turn.request_id]
         get_memory_store(companion_id, game_id=game_id).record_facts(
             [
                 MemoryEntry(
                     content=fact,
                     importance="normal",
                     source="player_statement",
-                    tags=["dialogue", "fact", "trace.origin=model_extraction", "trace.confirmation=lexically_grounded"],
+                    tags=["dialogue", "fact", "trace.origin=model_extraction", "trace.confirmation=lexically_grounded", *dependencies(fact)],
                 )
                 for fact in grounded
             ]

@@ -240,6 +240,19 @@ def test_import_apply_is_idempotent_and_keeps_original_epoch(database, tmp_path,
     assert database.state_version(scope) == 1
 
 
+def test_json_import_preserves_internal_attribution(database, tmp_path, scope):
+    from app.schemas.memory import TopicImpression
+    memory, relationship, document = source_files(tmp_path, scope)
+    document['impressions'] = [TopicImpression(topic='钓鱼').model_dump(mode='json')]
+    document['_memory_links'] = {'钓鱼':['r:source-request']}
+    memory.joinpath(*scope, 'memory.json').write_text(json.dumps(document), encoding='utf-8')
+    import_json(database, memory, relationship, apply=True)
+    assert database.read_document('memory', scope) == document
+    second = import_json(database, memory, relationship, apply=True)
+    assert (second["imported"], second["unchanged"]) == (0, 2)
+    assert database.state_version(scope) == 1
+
+
 def test_import_conflict_rolls_back_earlier_staged_documents(database, tmp_path, scope):
     memory, relationship, _ = source_files(tmp_path, scope)
     database.write_document("relationship", scope, {"value": 88}, scope_parts=scope)

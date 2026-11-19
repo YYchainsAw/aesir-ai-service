@@ -117,7 +117,7 @@ AESIR_COMPANION_BACKEND=mock AESIR_INTENT_BACKEND=rule AESIR_PARSER_BACKEND=rule
 
 ## 3. 请求、恢复与同步
 
-条目级管理新增 `GET /v1/scoped/console/memory/entries` 与 `POST /v1/scoped/console/memory/forget`，分别要求 console:read / memory:reset。遗忘原子移除所选 ID 并更新 epoch，保留关系/其他长期条目，清印象与该 NPC 会话历史；是管理操作，不是模型任意改档或日志/备份擦除。字段、重放/越权/未知目标和旧 epoch 分项确认见[契约](../protocols/_01_npc_contract.md#memory-management)，实测见[功能测评](../records/_08_project_functionality_assessment.md)。
+条目级管理新增 `GET /v1/scoped/console/memory/entries` 与 `POST /v1/scoped/console/memory/forget`，分别要求 console:read / memory:reset。遗忘原子移除所选 ID 及已知依赖、更新 epoch，保留关系与可确认无关的条目/印象/历史轮次；旧数据无归属或关联截断时保守清理，混合来源主题整主题移除。`cleared_sessions` 计有轮次被移除的会话数，完整 reset 仍全清。内部关联保存在原 JSON/SQL 文档，不改变 UE 字段或进程内历史的恢复承诺。字段、重放/越权/未知目标和旧 epoch 分项确认见[契约](../protocols/_01_npc_contract.md#memory-management)，实测见[P1 交付](../records/_10_p1_memory_quality_verification.md)。这是管理操作，不是模型任意改档或日志/备份擦除。
 
 1. 携带Bearer发现context并显式bind；战斗显式begin/end。普通业务继续原scope/binding/epoch/单调预算，不把UTC墙钟差当有效期。
 2. 网络重试保留原request_id和语义载荷；同会话FIFO提交后再放行。实际供应商调用前独立预留额度，缓存重试不再调用；已预留不会因取消或SQLrollback退款。控制/同步重试仍可能计入请求额度，HTTP传输频率另由发布层限制。

@@ -14,7 +14,10 @@ def merge_tags(*groups):
         if tag.startswith('trace.') and '=' in tag:
             by_key.setdefault(tag.split('=', 1)[0], []).append(tag)
     keep = {tag for refs in by_key.values() for tag in (refs[:1] + refs[-31:])}
-    return [tag for tag in values if not tag.startswith('trace.') or '=' not in tag or tag in keep]
+    result = [tag for tag in values if not tag.startswith('trace.') or '=' not in tag or tag in keep]
+    if any(key.startswith('trace.depends_on_') and len(refs) > 32 for key, refs in by_key.items()):
+        result = list(dict.fromkeys([*result, 'trace.attribution_truncated=true']))
+    return result
 
 
 def trace_tags(tags=()):

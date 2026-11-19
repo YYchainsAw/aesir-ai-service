@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     # -- 回执与 LLM Provider -------------------------------------------------
     receipts_dir: str = "data/runtime/command_service/executions"
     dialogue_signals_dir: str = "data/runtime/dialogue_signals"  # 对话信号埋点（RL 前置数据，JSONL 按角色分文件）
+    dialogue_data_origin: Literal["unknown", "natural", "seed", "fault", "evaluation"] = "unknown"
+    dialogue_data_run_id: str = Field(default="", max_length=80,
+        pattern=r"^(?:[A-Za-z0-9_-](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?)?$")
     agent_steps_dir: str = "data/runtime/agent_steps"  # agent/step 决策埋点（T38：SC-005/006/013 数据源）
     event_signals_dir: str = "data/runtime/event_signals"  # 事件幂等埋点（T38：SC-007 数据源）
     persona_reviews_dir: str = "data/persona_reviews"  # 外部人格包人工审核记录（S5/T30，入库、人写签字）

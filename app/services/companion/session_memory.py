@@ -29,6 +29,10 @@ class DialogueTurn:
     user_text: str
     reply_text: str
     emotion_id: str = ""
+    request_id: str = ""
+    entry_ids: tuple[str, ...] = ()
+    prior_request_ids: tuple[str, ...] = ()
+    unattributed_context: bool = False
 
 
 class SessionMemoryStore:
@@ -72,6 +76,9 @@ class SessionMemoryStore:
         reply_text: str,
         companion_id: str | None = None,
         emotion_id: str = "",
+        entry_ids: tuple[str, ...] = (),
+        context_request_ids: tuple[str, ...] = (),
+        unattributed_context: bool = False,
     ) -> None:
         """记录一轮对话；超出窗口自动淘汰最旧一轮。
 
@@ -80,12 +87,26 @@ class SessionMemoryStore:
         """
         if self._max_turns == 0:
             return
+        from app.services.memory.attribution import request_id
+        rid = request_id()
+        history = self.history(session_id, companion_id)
+        # Carry closure forward when source turns leave the rolling window.
+        # Truncation is explicit and falls back to conservative forgetting.
+        entry_refs = tuple(dict.fromkeys([*entry_ids, *(value for turn in history for value in turn.entry_ids)]))
+        request_refs = tuple(dict.fromkeys([
+            *(t.request_id for t in history if t.request_id),
+            *(value for t in history for value in t.prior_request_ids),
+            *(value for value in context_request_ids if value != rid)]))
+        unknown = (unattributed_context or any(t.unattributed_context or not t.request_id for t in history)
+                   or len(entry_refs) > 256 or len(request_refs) > 256)
+        turn = DialogueTurn(user_text=user_text, reply_text=reply_text, emotion_id=emotion_id,
+                            request_id=rid, entry_ids=entry_refs[-256:],
+                            prior_request_ids=request_refs[-256:], unattributed_context=unknown)
         from app.persistence.database import database_enabled
         from app.persistence.uow import current_uow
         unit = current_uow() if database_enabled() else None
         if unit is not None:
             key = self._key(session_id, companion_id)
-            turn = DialogueTurn(user_text=user_text, reply_text=reply_text, emotion_id=emotion_id)
             def append_committed():
                 with self._lock:
                     self._sessions.setdefault(key, deque(maxlen=self._max_turns)).append(turn)
@@ -95,11 +116,48 @@ class SessionMemoryStore:
             turns = self._sessions.setdefault(
                 self._key(session_id, companion_id), deque(maxlen=self._max_turns)
             )
-            turns.append(
-                DialogueTurn(
-                    user_text=user_text, reply_text=reply_text, emotion_id=emotion_id
-                )
-            )
+            turns.append(turn)
+
+    def affected_requests(self, npc, entry_ids, request_ids):
+        """Reply context is a dependency; compute closure even across windows."""
+        affected = set(request_ids)
+        with self._lock:
+            turns = [turn for key, history in self._sessions.items()
+                     if key[:5] == ('scoped', *npc.key) for turn in history]
+        while True:
+            before = affected.copy()
+            for turn in turns:
+                if (turn.unattributed_context or not turn.request_id or set(turn.entry_ids) & entry_ids or
+                        set(turn.prior_request_ids) & affected):
+                    if turn.request_id:
+                        affected.add(turn.request_id)
+            if before == affected:
+                return affected
+
+    def forget_scope(self, npc, entry_ids, request_ids) -> int:
+        from app.persistence.database import database_enabled
+        from app.persistence.uow import current_uow
+        def affected(turn):
+            return (not turn.request_id or turn.unattributed_context or turn.request_id in request_ids or
+                    bool(set(turn.entry_ids) & entry_ids) or
+                    bool(set(turn.prior_request_ids) & request_ids))
+        with self._lock:
+            keys = [key for key, turns in self._sessions.items()
+                    if key[:5] == ('scoped', *npc.key) and any(affected(turn) for turn in turns)]
+        def prune():
+            with self._lock:
+                for key in keys:
+                    kept = [turn for turn in self._sessions.get(key, ()) if not affected(turn)]
+                    if kept:
+                        self._sessions[key] = deque(kept, maxlen=self._max_turns)
+                    else:
+                        self._sessions.pop(key, None)
+        unit = current_uow() if database_enabled() else None
+        if unit is not None:
+            unit.after_commit(prune)
+        else:
+            prune()
+        return len(keys)
 
     def clear(self, companion_id: str | None = None) -> int:
         """清空指定角色的全部会话记忆（console 记忆重置入口，SDD T015/T029）。

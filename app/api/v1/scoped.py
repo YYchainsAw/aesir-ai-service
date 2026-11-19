@@ -641,7 +641,8 @@ def recovery_state(save_id: UUID, companion_id: str,
             relationship = read_document("relationship", npc.key)
             return {**_recovery_base(npc), "save_generation": generation["generation"],
                     "memory_epoch": memory["memory_epoch"],
-                    "memory": {key: value for key, value in memory.items() if key != "memory_epoch"},
+                    "memory": {key: value for key, value in memory.items()
+                               if key in {"archive", "summaries", "short_term", "impressions"}},
                     "relationship": relationship}
 
 

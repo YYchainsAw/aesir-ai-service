@@ -11,7 +11,8 @@ from test_scoped_api import h
 
 
 @pytest.mark.parametrize('extra_target', ['world', 'other'])
-def test_llm_cannot_correct_hidden_world_or_other_companion_memory(h, monkeypatch, extra_target):
+@pytest.mark.parametrize('query,applied', [('苹果那条不对，请作废。', 1), ('我喜欢在雨天钓鱼', 0)])
+def test_llm_cannot_correct_hidden_world_or_other_companion_memory(h, monkeypatch, extra_target, query, applied):
     context = h.bind()
     shown = MemoryEntry(content='玩家喜欢苹果', importance='critical')
     hidden = MemoryEntry(content='玩家来自港口', importance='low')
@@ -35,11 +36,12 @@ def test_llm_cannot_correct_hidden_world_or_other_companion_memory(h, monkeypatc
                                     (shown, hidden, world if extra_target == 'world' else other)])
     monkeypatch.setattr('app.services.companion.llm_dialogue_service.create_llm_client', lambda: Model())
     body = h.chat(context)
+    body['text'] = query
     response = h.client.post('/v1/scoped/companion/chat', json=body)
     assert response.status_code == 200 and response.json()['source'] == 'llm', response.text
     with use_scope(h.scope(context)):
         entries = {entry.entry_id:entry for entry in store.snapshot().archive}
-        assert entries[shown.entry_id].superseded_by is not None
+        assert (entries[shown.entry_id].superseded_by is not None) == bool(applied)
         assert entries[hidden.entry_id].superseded_by is None
         assert entries[world.entry_id].superseded_by is None
     with use_scope(h.scope(other_context)):
@@ -47,5 +49,5 @@ def test_llm_cannot_correct_hidden_world_or_other_companion_memory(h, monkeypatc
     rows = [json.loads(line) for path in Path(os.environ['AESIR_DIALOGUE_SIGNALS_DIR']).rglob('*.jsonl')
             for line in path.read_text(encoding='utf-8').splitlines()]
     row = next(row for row in rows if row.get('request_id') == body['request_id'])
-    assert row['memory_corrections'] == dict(proposed=3, applied=1, rejected=2)
+    assert row['memory_corrections'] == dict(proposed=3, applied=applied, rejected=3-applied)
     assert h.client.post('/v1/scoped/companion/chat', json=body).json() == response.json()

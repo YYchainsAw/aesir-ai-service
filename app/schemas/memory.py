@@ -11,7 +11,7 @@
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, TypeAdapter
 
 MemoryImportance = Literal["low", "normal", "high", "critical"]
 MemorySource = Literal["player_statement", "shared_experience", "promise", "observation", "summary"]
@@ -80,3 +80,22 @@ class MemorySnapshot(BaseModel):
     summaries: list[MemoryEntry] = Field(default_factory=list)
     archive: list[MemoryEntry] = Field(default_factory=list)
     impressions: list[TopicImpression] = Field(default_factory=list)
+    # Internal persistence only; absent from model_dump and all UE responses.
+    _memory_links: dict[str, list[str]] = PrivateAttr(default_factory=dict)
+
+    @classmethod
+    def from_document(cls, data):
+        snapshot = cls.model_validate(data)
+        links = TypeAdapter(dict[str, list[str]]).validate_python(data.get('_memory_links', {}), strict=True)
+        if any(len(topic) > 32 or len(refs) > 128 or any(len(ref) > 256 for ref in refs)
+               for topic, refs in links.items()) or len(links) > 10000:
+            raise ValueError('Invalid internal memory attribution')
+        snapshot._memory_links = links
+        return snapshot
+
+    def to_document(self):
+        data = self.model_dump(mode='json')
+        if self._memory_links:
+            topics = {item.topic for item in self.impressions}
+            data['_memory_links'] = {topic: refs for topic, refs in self._memory_links.items() if topic in topics}
+        return data

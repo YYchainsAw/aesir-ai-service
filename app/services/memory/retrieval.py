@@ -25,7 +25,8 @@ class _SnapshotProvider(Protocol):
         ...
 
 
-def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[MemoryEntry]:
+def retrieve(store: _SnapshotProvider, *, budget: int | None = None,
+             query: str | None = None) -> list[MemoryEntry]:
     """检索注入预算内的记忆条目；故障时返回空列表（降级，不抛异常）。"""
     if budget is None:
         budget = get_settings().memory_injection_budget
@@ -45,6 +46,15 @@ def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[Mem
     )
     # reverse 后同级内部时间也是新→旧；但重要性序也反了，重新按重要性升序展示注入
     merged.sort(key=lambda e: _IMPORTANCE_ORDER.get(e.importance, 2))
+    if query is not None:
+        from app.services.memory.relevance import score, needs_budget_fallback
+        ranked = [(score(query, entry.content), entry) for entry in merged]
+        ranked = [pair for pair in ranked if pair[0] > 0]
+        ranked.sort(key=lambda pair: pair[0], reverse=True)
+        if ranked and ranked[0][0] >= 0.3:
+            merged = [entry for _, entry in ranked]
+        elif not needs_budget_fallback(query):
+            merged = []
     return merged[:budget]
 
 

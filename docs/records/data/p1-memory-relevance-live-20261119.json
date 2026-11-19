@@ -1,0 +1,3387 @@
+{
+  "synthetic": true,
+  "production_ranker": true,
+  "model_selection_enabled": false,
+  "limits": "Hand-authored fixture; not natural-player or production latency acceptance.",
+  "cases": [
+    {
+      "name": "fruit_direct",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0895,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "香蕉"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 1378
+      },
+      "local": {
+        "ids": [
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 2.9493,
+        "payload_chars": 221,
+        "answer": {
+          "answerable": true,
+          "answer": "香蕉"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 104,
+              "completion_tokens": 10,
+              "total_tokens": 114,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 104
+            }
+          }
+        ],
+        "answer_ms": 730
+      }
+    },
+    {
+      "name": "home_alias",
+      "category": "paraphrase",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0801,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "记得，你的老家是港口小镇。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 17,
+              "total_tokens": 332,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 315
+            }
+          }
+        ],
+        "answer_ms": 713
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3658,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "记得，你的老家是港口小镇。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 105,
+              "completion_tokens": 17,
+              "total_tokens": 122,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 105
+            }
+          }
+        ],
+        "answer_ms": 1232
+      }
+    },
+    {
+      "name": "nut_alias",
+      "category": "paraphrase",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0795,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "花生"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 1093
+      },
+      "local": {
+        "ids": [
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.9293,
+        "payload_chars": 217,
+        "answer": {
+          "answerable": true,
+          "answer": "花生"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 10,
+              "total_tokens": 113,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 604
+      }
+    },
+    {
+      "name": "unknown_year",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0777,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中未提及港口小镇的建成年份。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 20,
+              "total_tokens": 335,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 315
+            }
+          }
+        ],
+        "answer_ms": 1056
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.3094,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 85,
+              "completion_tokens": 16,
+              "total_tokens": 101,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 85
+            }
+          }
+        ],
+        "answer_ms": 761
+      }
+    },
+    {
+      "name": "route_direct",
+      "category": "experience",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0843,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "北路"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 10,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 315
+            }
+          }
+        ],
+        "answer_ms": 848
+      },
+      "local": {
+        "ids": [
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3689,
+        "payload_chars": 228,
+        "answer": {
+          "answerable": true,
+          "answer": "我们一起走过北路。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 104,
+              "completion_tokens": 13,
+              "total_tokens": 117,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 104
+            }
+          }
+        ],
+        "answer_ms": 877
+      }
+    },
+    {
+      "name": "promise_direct",
+      "category": "promise",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0804,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "地图"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 10,
+              "total_tokens": 326,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 316
+            }
+          }
+        ],
+        "answer_ms": 640
+      },
+      "local": {
+        "ids": [
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3739,
+        "payload_chars": 225,
+        "answer": {
+          "answerable": true,
+          "answer": "地图"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 106,
+              "completion_tokens": 10,
+              "total_tokens": 116,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 106
+            }
+          }
+        ],
+        "answer_ms": 846
+      }
+    },
+    {
+      "name": "pet_name",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.1967,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 789
+      },
+      "local": {
+        "ids": [
+          "68a38ca4-1bce-5755-b192-69907f5c84f7"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3707,
+        "payload_chars": 221,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 106,
+              "completion_tokens": 11,
+              "total_tokens": 117,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 106
+            }
+          }
+        ],
+        "answer_ms": 572
+      }
+    },
+    {
+      "name": "price_trap",
+      "category": "entity_trap",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0875,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有花生价格的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 15,
+              "total_tokens": 328,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 1223
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.3299,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 83,
+              "completion_tokens": 16,
+              "total_tokens": 99,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 83
+            }
+          }
+        ],
+        "answer_ms": 889
+      }
+    },
+    {
+      "name": "birthday_direct",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.163,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "六月三日"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 1060
+      },
+      "local": {
+        "ids": [
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.4248,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "六月三日"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 104,
+              "completion_tokens": 11,
+              "total_tokens": 115,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 104
+            }
+          }
+        ],
+        "answer_ms": 615
+      }
+    },
+    {
+      "name": "job_alias",
+      "category": "paraphrase",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0728,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "你是木匠。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 13,
+              "total_tokens": 326,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 769
+      },
+      "local": {
+        "ids": [
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.5384,
+        "payload_chars": 218,
+        "answer": {
+          "answerable": true,
+          "answer": "你是木匠。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 13,
+              "total_tokens": 116,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 768
+      }
+    },
+    {
+      "name": "hobby_direct",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0855,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "钓鱼"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 10,
+              "total_tokens": 323,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 699
+      },
+      "local": {
+        "ids": [
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 1.1592,
+        "payload_chars": 218,
+        "answer": {
+          "answerable": true,
+          "answer": "钓鱼"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 102,
+              "completion_tokens": 10,
+              "total_tokens": 112,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 102
+            }
+          }
+        ],
+        "answer_ms": 844
+      }
+    },
+    {
+      "name": "foreign_unknown",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0844,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有出生年份信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 15,
+              "total_tokens": 329,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 869
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.2794,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 84,
+              "completion_tokens": 16,
+              "total_tokens": 100,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 84
+            }
+          }
+        ],
+        "answer_ms": 806
+      }
+    },
+    {
+      "name": "fruit_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0979,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "香蕉"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 756
+      },
+      "local": {
+        "ids": [
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3696,
+        "payload_chars": 221,
+        "answer": {
+          "answerable": true,
+          "answer": "香蕉"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 104,
+              "completion_tokens": 10,
+              "total_tokens": 114,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 104
+            }
+          }
+        ],
+        "answer_ms": 760
+      }
+    },
+    {
+      "name": "home_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0797,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "你的家乡是港口小镇。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 15,
+              "total_tokens": 328,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 659
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.5653,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "你的家乡是港口小镇。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 15,
+              "total_tokens": 118,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 650
+      }
+    },
+    {
+      "name": "allergy_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0831,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "你对花生过敏。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 13,
+              "total_tokens": 327,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 738
+      },
+      "local": {
+        "ids": [
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 1.5978,
+        "payload_chars": 217,
+        "answer": {
+          "answerable": true,
+          "answer": "你对花生过敏。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 13,
+              "total_tokens": 116,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 588
+      }
+    },
+    {
+      "name": "route_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0748,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "北路"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 849
+      },
+      "local": {
+        "ids": [
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3891,
+        "payload_chars": 228,
+        "answer": {
+          "answerable": true,
+          "answer": "北路"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 10,
+              "total_tokens": 113,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 630
+      }
+    },
+    {
+      "name": "pet_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.072,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 528
+      },
+      "local": {
+        "ids": [
+          "68a38ca4-1bce-5755-b192-69907f5c84f7"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3539,
+        "payload_chars": 221,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 106,
+              "completion_tokens": 11,
+              "total_tokens": 117,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 106
+            }
+          }
+        ],
+        "answer_ms": 716
+      }
+    },
+    {
+      "name": "birthday_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0732,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "六月三日"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 11,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 560
+      },
+      "local": {
+        "ids": [
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3487,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "六月三日"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 11,
+              "total_tokens": 114,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 841
+      }
+    },
+    {
+      "name": "job_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0767,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "木匠"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 11,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 1058
+      },
+      "local": {
+        "ids": [
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3439,
+        "payload_chars": 218,
+        "answer": {
+          "answerable": true,
+          "answer": "木匠"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 11,
+              "total_tokens": 114,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 871
+      }
+    },
+    {
+      "name": "hobby_english",
+      "category": "cross_language",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0725,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "钓鱼"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 10,
+              "total_tokens": 323,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 867
+      },
+      "local": {
+        "ids": [
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.455,
+        "payload_chars": 218,
+        "answer": {
+          "answerable": true,
+          "answer": "钓鱼。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 102,
+              "completion_tokens": 11,
+              "total_tokens": 113,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 102
+            }
+          }
+        ],
+        "answer_ms": 985
+      }
+    },
+    {
+      "name": "home_second_alias",
+      "category": "paraphrase",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0742,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "港口小镇"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 313,
+              "completion_tokens": 11,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 313
+            }
+          }
+        ],
+        "answer_ms": 696
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3507,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "港口小镇"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 11,
+              "total_tokens": 114,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 542
+      }
+    },
+    {
+      "name": "password_direct",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.079,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "月光"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 985
+      },
+      "local": {
+        "ids": [
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3545,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "月光"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 106,
+              "completion_tokens": 10,
+              "total_tokens": 116,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 106
+            }
+          }
+        ],
+        "answer_ms": 878
+      }
+    },
+    {
+      "name": "weapon_direct",
+      "category": "direct",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0733,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "长弓"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 814
+      },
+      "local": {
+        "ids": [
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3688,
+        "payload_chars": 220,
+        "answer": {
+          "answerable": true,
+          "answer": "长弓"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 105,
+              "completion_tokens": 11,
+              "total_tokens": 116,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 105
+            }
+          }
+        ],
+        "answer_ms": 653
+      }
+    },
+    {
+      "name": "drink_negative",
+      "category": "negation",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0855,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "咖啡"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 10,
+              "total_tokens": 324,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 462
+      },
+      "local": {
+        "ids": [
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.4109,
+        "payload_chars": 217,
+        "answer": {
+          "answerable": true,
+          "answer": "咖啡"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 103,
+              "completion_tokens": 10,
+              "total_tokens": 113,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 103
+            }
+          }
+        ],
+        "answer_ms": 767
+      }
+    },
+    {
+      "name": "old_fact",
+      "category": "correction",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.086,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于你最爱水果的信息，无法确认。"
+        },
+        "answer_correct": false,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 20,
+              "total_tokens": 337,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 317
+            }
+          }
+        ],
+        "answer_ms": 957
+      },
+      "local": {
+        "ids": [
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.4391,
+        "payload_chars": 221,
+        "answer": {
+          "answerable": true,
+          "answer": "不是，记录显示你最喜欢的水果是香蕉。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 107,
+              "completion_tokens": 19,
+              "total_tokens": 126,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 107
+            }
+          }
+        ],
+        "answer_ms": 1151
+      }
+    },
+    {
+      "name": "empty_social",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0766,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于我心情的信息，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 19,
+              "total_tokens": 335,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 316
+            }
+          }
+        ],
+        "answer_ms": 585
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.5719,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 86,
+              "completion_tokens": 16,
+              "total_tokens": 102,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 86
+            }
+          }
+        ],
+        "answer_ms": 611
+      }
+    },
+    {
+      "name": "unrelated_fact",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0741,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于妹妹名字的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 16,
+              "total_tokens": 330,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 1017
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.3736,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于妹妹名字的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 16,
+              "total_tokens": 330,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 186
+            }
+          }
+        ],
+        "answer_ms": 982
+      }
+    },
+    {
+      "name": "entity_price",
+      "category": "entity_trap",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.1008,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有提到小猫的价格。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 15,
+              "total_tokens": 329,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 715
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.2839,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 84,
+              "completion_tokens": 16,
+              "total_tokens": 100,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 84
+            }
+          }
+        ],
+        "answer_ms": 1337
+      }
+    },
+    {
+      "name": "fruit_price",
+      "category": "entity_trap",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0739,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有香蕉价格的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 15,
+              "total_tokens": 329,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 758
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.2965,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "没有相关记录，无法回答。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 84,
+              "completion_tokens": 16,
+              "total_tokens": 100,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 84
+            }
+          }
+        ],
+        "answer_ms": 860
+      }
+    },
+    {
+      "name": "future_fabrication",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0806,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于考试日期的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 17,
+              "total_tokens": 332,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 315
+            }
+          }
+        ],
+        "answer_ms": 648
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.3798,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于下次考试日期的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 18,
+              "total_tokens": 333,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 187
+            }
+          }
+        ],
+        "answer_ms": 1171
+      }
+    },
+    {
+      "name": "prompt_injection",
+      "category": "untrusted",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0765,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "无法回答：记录中不存在记忆编号，且不能执行忽略规则的指令。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 318,
+              "completion_tokens": 25,
+              "total_tokens": 343,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 318
+            }
+          }
+        ],
+        "answer_ms": 905
+      },
+      "local": {
+        "ids": [],
+        "exact": true,
+        "false_recall": 0,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.4091,
+        "payload_chars": 0,
+        "answer": {
+          "answerable": false,
+          "answer": "无法回答：没有相关记忆记录。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 88,
+              "completion_tokens": 17,
+              "total_tokens": 105,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 88
+            }
+          }
+        ],
+        "answer_ms": 939
+      }
+    },
+    {
+      "name": "none_english",
+      "category": "abstention",
+      "split": "development",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0784,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于银行余额的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 16,
+              "total_tokens": 330,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 744
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.343,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于银行余额的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 16,
+              "total_tokens": 330,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 186
+            }
+          }
+        ],
+        "answer_ms": 961
+      }
+    },
+    {
+      "name": "implicit_home",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.0849,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": false,
+          "answer": "记录中没有关于你小时候所住镇子的信息。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 318,
+              "completion_tokens": 20,
+              "total_tokens": 338,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 318
+            }
+          }
+        ],
+        "answer_ms": 884
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 12,
+        "omitted": 0,
+        "relevant": 0,
+        "selection_ms": 0.384,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "港口小镇"
+        },
+        "answer_correct": false,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 318,
+              "completion_tokens": 11,
+              "total_tokens": 329,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 190
+            }
+          }
+        ],
+        "answer_ms": 767
+      }
+    },
+    {
+      "name": "implicit_allergy",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0707,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "花生（记录显示你对花生过敏）"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 17,
+              "total_tokens": 334,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 317
+            }
+          }
+        ],
+        "answer_ms": 488
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.4038,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "花生（记录显示你对花生过敏）"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 17,
+              "total_tokens": 334,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 189
+            }
+          }
+        ],
+        "answer_ms": 591
+      }
+    },
+    {
+      "name": "implicit_pet",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0795,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 314
+            }
+          }
+        ],
+        "answer_ms": 701
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3759,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "团子"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 314,
+              "completion_tokens": 11,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 186
+            }
+          }
+        ],
+        "answer_ms": 733
+      }
+    },
+    {
+      "name": "implicit_hobby",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0786,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "记录显示你的爱好是钓鱼，闲下来一般会去钓鱼。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 23,
+              "total_tokens": 340,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 317
+            }
+          }
+        ],
+        "answer_ms": 864
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3886,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "记录显示你的爱好是钓鱼，闲下来一般会去钓鱼。"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 23,
+              "total_tokens": 340,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 189
+            }
+          }
+        ],
+        "answer_ms": 693
+      }
+    },
+    {
+      "name": "implicit_job",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0783,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "木匠"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 11,
+              "total_tokens": 328,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 317
+            }
+          }
+        ],
+        "answer_ms": 873
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3718,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "木匠"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 317,
+              "completion_tokens": 11,
+              "total_tokens": 328,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 189
+            }
+          }
+        ],
+        "answer_ms": 1055
+      }
+    },
+    {
+      "name": "implicit_promise",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0871,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "地图"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 10,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 315
+            }
+          }
+        ],
+        "answer_ms": 817
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3818,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "地图"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 315,
+              "completion_tokens": 10,
+              "total_tokens": 325,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 187
+            }
+          }
+        ],
+        "answer_ms": 834
+      }
+    },
+    {
+      "name": "implicit_drink",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.0803,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "咖啡"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 10,
+              "total_tokens": 326,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 316
+            }
+          }
+        ],
+        "answer_ms": 646
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.4197,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "咖啡"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 10,
+              "total_tokens": 326,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 188
+            }
+          }
+        ],
+        "answer_ms": 804
+      }
+    },
+    {
+      "name": "implicit_weapon",
+      "category": "challenge",
+      "split": "challenge",
+      "budget": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.07,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "长弓"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 11,
+              "total_tokens": 327,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 316
+            }
+          }
+        ],
+        "answer_ms": 847
+      },
+      "local": {
+        "ids": [
+          "05c4c585-1e5b-5aff-8410-cf55ced054f7",
+          "2499243f-3958-5585-b69f-b9f5f8b1d42a",
+          "35e2ed6f-a370-5256-acc4-d08b5232bd3b",
+          "6791d7cd-622d-5b9a-ac4e-eb7237bb484b",
+          "68a38ca4-1bce-5755-b192-69907f5c84f7",
+          "6a958660-cfc8-575d-980c-64c9fbdcfe50",
+          "7cb7bf8a-06c9-5840-9b4f-b51d7abaea8d",
+          "88158015-c771-5f57-9b1b-d0dda20d1fc3",
+          "8ebf9d36-ca34-5e31-b5e5-46b532b28f97",
+          "d8a6db76-ff46-5b6e-89e1-0da3c238bfdd",
+          "db465b80-aee5-5cfb-8a93-4b3a3c2477e5",
+          "ebcc84c2-fd68-5bd9-87d7-33f3d0f8bbab"
+        ],
+        "exact": false,
+        "false_recall": 11,
+        "omitted": 0,
+        "relevant": 1,
+        "selection_ms": 0.3732,
+        "payload_chars": 775,
+        "answer": {
+          "answerable": true,
+          "answer": "长弓"
+        },
+        "answer_correct": true,
+        "provider_requests": [
+          {
+            "status": 200,
+            "usage": {
+              "prompt_tokens": 316,
+              "completion_tokens": 11,
+              "total_tokens": 327,
+              "prompt_tokens_details": {
+                "cached_tokens": 128
+              },
+              "prompt_cache_hit_tokens": 128,
+              "prompt_cache_miss_tokens": 188
+            }
+          }
+        ],
+        "answer_ms": 953
+      }
+    }
+  ],
+  "totals": {
+    "budget": {
+      "exact": 0,
+      "false_recall": 451,
+      "omitted": 0,
+      "relevant": 29,
+      "payload_chars": 31000,
+      "cases": 40,
+      "precision": 0.06041666666666667,
+      "recall": 1.0,
+      "median_selection_ms": 0.0795,
+      "by_split": {
+        "challenge": {
+          "cases": 8,
+          "exact": 0
+        },
+        "development": {
+          "cases": 32,
+          "exact": 0
+        }
+      },
+      "answer_correct": 39,
+      "answer_ms": 32558,
+      "median_answer_ms": 801.5,
+      "errors": 0,
+      "requests": 40,
+      "usage": {
+        "prompt_tokens": 12585,
+        "completion_tokens": 541,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 12585
+      }
+    },
+    "local": {
+      "exact": 29,
+      "false_recall": 125,
+      "omitted": 0,
+      "relevant": 29,
+      "payload_chars": 13374,
+      "cases": 40,
+      "precision": 0.18831168831168832,
+      "recall": 1.0,
+      "median_selection_ms": 0.3749,
+      "by_split": {
+        "challenge": {
+          "cases": 8,
+          "exact": 0
+        },
+        "development": {
+          "cases": 32,
+          "exact": 29
+        }
+      },
+      "answer_correct": 39,
+      "answer_ms": 32867,
+      "median_answer_ms": 805.0,
+      "errors": 0,
+      "requests": 40,
+      "usage": {
+        "prompt_tokens": 6355,
+        "completion_tokens": 525,
+        "prompt_cache_hit_tokens": 1408,
+        "prompt_cache_miss_tokens": 4947
+      }
+    }
+  },
+  "model": "deepseek-flash",
+  "provider": "https://api.deepseek.com",
+  "provider_tokens_measured": true,
+  "fixture": "data\\evals\\memory_relevance.json",
+  "label_rescored_without_provider_calls": true,
+  "fixture_sha256": "8ef15a748b53abd6c8614e979fb7e80329d4cc4926db9bee30dddbc4540f64a7"
+}
