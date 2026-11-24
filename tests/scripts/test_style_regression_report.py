@@ -73,3 +73,10 @@ def test_candidate_extension_terms_scanned(tmp_path):
     report = build_report(tmp_path)
     assert report["candidate_extension_hits"].get("算法") == 1
     assert report["candidate_extension_hits"].get("神经网络") == 1
+def test_metadata_only_rows_cannot_satisfy_text_review_gate(tmp_path):
+    import json
+    from scripts.style_regression_report import build_report
+    (tmp_path/'metadata.jsonl').write_text('\n'.join(json.dumps({'source':'llm','text_available':False}) for _ in range(30)),encoding='utf-8')
+    report=build_report(tmp_path)
+    assert report['total_turns']==30 and report['text_available_turns']==0
+    assert report['text_missing_turns']==30 and not report['text_count_gate_met']

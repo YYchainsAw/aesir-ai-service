@@ -60,6 +60,7 @@ def audit(rows,seeds):
         missing_request_id=sum(not r.get('request_id') for r in remaining),
         count_gate_met=len(remaining)>=300 and nonzero>=30,
         quality_by_origin=quality, attributed_natural_unique_complete_llm=len(natural),
+        attributed_natural_text_available=sum(r.get('text_available') is True for r in natural),
         attributed_natural_reward_nonzero=natural_rewards,
         natural_count_gate_met=len(natural)>=300 and natural_rewards>=30,
         provenance_verified=False,off_policy_propensities_available=False,

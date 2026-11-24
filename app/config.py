@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     receipts_dir: str = "data/runtime/command_service/executions"
     dialogue_signals_dir: str = "data/runtime/dialogue_signals"  # 对话信号埋点（RL 前置数据，JSONL 按角色分文件）
     dialogue_data_origin: Literal["unknown", "natural", "seed", "fault", "evaluation"] = "unknown"
+    dialogue_signal_text_mode: Literal["metadata", "full"] = "metadata"
+    dialogue_signal_max_bytes: int = Field(default=10*1024*1024, ge=4096, le=100*1024*1024)
     dialogue_data_run_id: str = Field(default="", max_length=80,
         pattern=r"^(?:[A-Za-z0-9_-](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?)?$")
     agent_steps_dir: str = "data/runtime/agent_steps"  # agent/step 决策埋点（T38：SC-005/006/013 数据源）

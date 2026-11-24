@@ -5,6 +5,7 @@ from collections.abc import Iterator
 
 from app.scoped.storage import guarded_commit
 from app.scoped.hooks import final_generation_commit
+from app.scoped.trace import measure_stage, record_trace
 
 from app.schemas.companion_dialogue import (
     CompanionDialogueRequest,
@@ -36,9 +37,11 @@ def _prepare_dialogue(request):
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
 
-    memories = _recall(request.companion_id, game_id=game_id, query=request.text,
-                       display_name=profile.display_name)
-    impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
+    with measure_stage('memory_retrieval'):
+        memories = _recall(request.companion_id, game_id=game_id, query=request.text,
+                           display_name=profile.display_name)
+        impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
+    record_trace('memory_retrieved', entries=len(memories), impressions=len(impressions))
     stage = _relationship_stage(request.companion_id, game_id=game_id)
 
     return profile, game_id, history, memories, impressions, stage

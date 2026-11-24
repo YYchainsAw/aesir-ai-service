@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
@@ -15,6 +16,7 @@ import httpx
 
 from app.scoped.hooks import scoped_upstream
 from app.scoped.requests import timeout_for_upstream, has_active_request
+from app.scoped.trace import record_trace, measure_stage
 
 
 class LLMClientError(RuntimeError):
@@ -124,6 +126,12 @@ class OpenAICompatibleLLMClient:
 
         if not isinstance(parsed, dict):
             raise LLMClientError("LLM response root must be a JSON object.")
+        usage = response_body.get('usage')
+        if isinstance(usage, dict):
+            measured = {key:value for key,value in usage.items() if key in (
+                'prompt_tokens','completion_tokens','total_tokens','prompt_cache_hit_tokens','prompt_cache_miss_tokens')
+                and type(value) is int and value >= 0}
+            record_trace('llm_usage', **measured)
         return parsed
 
     def stream_completion(
@@ -150,15 +158,21 @@ class OpenAICompatibleLLMClient:
             **self._generation_options(),
         }
 
+        started = time.monotonic()
         try:
-            with self._http_client.stream(
+            with measure_stage('llm_stream'), self._http_client.stream(
                 "POST",
                 f"{self._settings.base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {self._settings.api_key}"},
                 json=payload,
             ) as response:
                 response.raise_for_status()
-                yield from self._iter_sse_content(response)
+                first = True
+                for content in self._iter_sse_content(response):
+                    if first:
+                        record_trace('llm_first_content',elapsed_ms=max(0,int((time.monotonic()-started)*1000)))
+                        first = False
+                    yield content
         except LLMClientError:
             raise
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:

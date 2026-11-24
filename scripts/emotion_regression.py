@@ -49,6 +49,7 @@ def seed_capture():
     from app.config import get_settings
     get_settings()  # Load .env before taking/restoring the environment snapshot.
     changes = {'AESIR_DIALOGUE_DATA_ORIGIN':'seed',
+               'AESIR_DIALOGUE_SIGNAL_TEXT_MODE':'full',
                'AESIR_DIALOGUE_DATA_RUN_ID':f'emotion-{uuid.uuid4().hex[:8]}'}
     previous = {key:os.environ.get(key) for key in changes}
     os.environ.update(changes)

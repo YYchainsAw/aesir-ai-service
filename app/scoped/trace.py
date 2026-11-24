@@ -16,6 +16,21 @@ _lock = RLock()
 _logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def measure_stage(stage):
+    """Local monotonic duration; no provider/player content in diagnostics."""
+    start = time.monotonic()
+    outcome = 'returned'
+    try:
+        yield
+    except BaseException:
+        outcome = 'interrupted'
+        raise
+    finally:
+        record_trace('stage_finished', stage=stage, outcome=outcome,
+                     elapsed_ms=max(0, int((time.monotonic()-start)*1000)))
+
+
 def logical_request_id() -> str | None:
     context = _trace.get()
     return context['logical_request_id'] if context is not None else None

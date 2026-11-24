@@ -226,6 +226,16 @@ def record_turn_signal(
             record["lore_lookup"] = lore_lookup
         if facts_rejected is not None:
             record["facts_rejected"] = facts_rejected
+        text_mode = getattr(settings, 'dialogue_signal_text_mode', 'metadata')
+        record['text_mode'] = text_mode
+        record['text_available'] = text_mode == 'full'
+        if text_mode == 'metadata':
+            record.pop('player_text', None)
+            record.pop('reply_text', None)
+            record['injected_topic_count'] = len(record.pop('injected_topics'))
+            record['style_violations'] = [
+                {'category':item.get('category', 'unknown')} if isinstance(item, dict)
+                else {'category':'unstructured'} for item in style_violations or []]
         root = signal_directory(settings.dialogue_signals_dir, game_id)
         # Unknown retains the historical location. Explicit origins are partitioned.
         if data_origin != "unknown":
@@ -233,7 +243,9 @@ def record_turn_signal(
             if data_run_id:
                 root = root / data_run_id
         record.update(signal_metadata())
-        append_jsonl(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False))
+        from app.services.companion.signal_files import write_signal
+        write_signal(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False),
+                     getattr(settings, 'dialogue_signal_max_bytes', 10*1024*1024))
     except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞对话主流程
         if current_scope():
             raise unavailable() from error
