@@ -65,11 +65,11 @@ def scan_sources(memory_root, relationship_root):
             raw = path.read_bytes()
             data = json.loads(raw)
             if kind == "memory":
-                if set(data) != {"memory_epoch", "short_term", "summaries", "archive", "impressions"}:
+                if set(data) - {'_memory_links'} != {"memory_epoch", "short_term", "summaries", "archive", "impressions"}:
                     raise ValueError("Memory source must include its complete scoped epoch document")
                 epoch = str(UUID(data["memory_epoch"]))
-                snapshot = MemorySnapshot.model_validate(data)
-                payload = {"memory_epoch": epoch, **snapshot.model_dump(mode="json")}
+                snapshot = MemorySnapshot.from_document(data)
+                payload = {"memory_epoch": epoch, **snapshot.to_document()}
             else:
                 if isinstance(data.get("value"), bool) or not isinstance(data.get("value"), int) or not 0 <= data["value"] <= 100:
                     raise ValueError("Relationship source value is invalid")

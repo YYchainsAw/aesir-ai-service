@@ -1,7 +1,7 @@
 """按预算检索与注入（SDD T027 / FR-009 + 模糊印象层）。
 
 合并档案 + 摘要 + 近期短期三层，按重要性优先、同级按时间新者优先排序，
-在预算（条数）内截断——避免上下文无限增长。模糊印象单独走
+同时应用条数与渲染字符预算；超限整条跳过，不截断事实。模糊印象单独走
 ``retrieve_impressions``：按现算权重排序、占固定小份额（不挤占上面的
 预算），注入为「对玩家常提话题的印象」而非逐字内容。
 
@@ -25,11 +25,15 @@ class _SnapshotProvider(Protocol):
         ...
 
 
-def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[MemoryEntry]:
+def retrieve(store: _SnapshotProvider, *, budget: int | None = None,
+             query: str | None = None, char_budget: int | None = None,
+             display_name: str = "她") -> list[MemoryEntry]:
     """检索注入预算内的记忆条目；故障时返回空列表（降级，不抛异常）。"""
     if budget is None:
         budget = get_settings().memory_injection_budget
-    if budget <= 0:
+    if char_budget is None:
+        char_budget = get_settings().memory_injection_char_budget
+    if budget <= 0 or char_budget <= 0:
         return []
     try:
         snapshot = store.snapshot()
@@ -45,7 +49,25 @@ def retrieve(store: _SnapshotProvider, *, budget: int | None = None) -> list[Mem
     )
     # reverse 后同级内部时间也是新→旧；但重要性序也反了，重新按重要性升序展示注入
     merged.sort(key=lambda e: _IMPORTANCE_ORDER.get(e.importance, 2))
-    return merged[:budget]
+    if query is not None:
+        from app.services.memory.relevance import score, needs_budget_fallback, supports_qualifiers
+        merged = [entry for entry in merged if supports_qualifiers(query, entry.content)]
+        ranked = [(score(query, entry.content), entry) for entry in merged]
+        ranked = [pair for pair in ranked if pair[0] > 0]
+        ranked.sort(key=lambda pair: pair[0], reverse=True)
+        if ranked and ranked[0][0] >= 0.3:
+            merged = [entry for _, entry in ranked]
+        elif not needs_budget_fallback(query):
+            merged = []
+    selected = []
+    for entry in merged:
+        if len(selected) >= budget:
+            break
+        # Count the rendered block, including IDs/source phrases/header. Never
+        # slice a fact: removing a trailing negation could reverse its meaning.
+        if len(format_memory_block([*selected, entry], display_name)) <= char_budget:
+            selected.append(entry)
+    return selected
 
 
 def retrieve_impressions(

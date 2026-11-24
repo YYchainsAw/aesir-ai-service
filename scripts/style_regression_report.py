@@ -43,6 +43,7 @@ from scripts.support.jsonl import iter_records as _iter_records
 def build_report(root: Path) -> dict:
     policy = get_style_policy()
     total = 0
+    text_rows = 0
     by_companion: Counter[str] = Counter()
     by_scene: Counter[str] = Counter()
 
@@ -65,6 +66,8 @@ def build_report(root: Path) -> dict:
         by_scene[rec.get("game_state", "(empty)")] += 1
 
         reply = rec.get("reply_text", "") or ""
+        if isinstance(rec.get('reply_text'), str) and rec.get('text_available') is not False:
+            text_rows += 1
         violations = rec.get("style_violations") or []
 
         # 1. 已拦截
@@ -97,6 +100,9 @@ def build_report(root: Path) -> dict:
 
     return {
         "total_turns": total,
+        "text_available_turns": text_rows,
+        "text_missing_turns": total-text_rows,
+        "text_count_gate_met": text_rows >= 26,
         "by_companion": dict(by_companion),
         "by_scene": dict(by_scene),
         "intercepted": {
@@ -122,6 +128,7 @@ def _utf8_stdio() -> None:
 def _print_human(report: dict) -> None:
     print("=== style_guard 词表定夺报告（#55 / T40）===")
     print(f"总轮数: {report['total_turns']}  按角色: {report['by_companion']}  按场景: {report['by_scene']}")
+    print(f"可核对回复原文: {report['text_available_turns']}；缺少原文: {report['text_missing_turns']}（不能判为无漏网）")
     print()
     print("--- 1. 已拦截违规（词表生效中）---")
     intc = report["intercepted"]
@@ -152,11 +159,11 @@ def _print_human(report: dict) -> None:
             print(f"  {term!r} × {n}")
     print()
     print("=== 定夺依据 ===")
-    if report["total_turns"] < 26:
-        print(f"⚠️  当前 {report['total_turns']} 轮，未达 26 轮回归门槛。")
+    if not report['text_count_gate_met']:
+        print(f"⚠️  当前仅 {report['text_available_turns']} 轮可核对原文，未达 26 轮回归门槛。")
         print("   用 chat_console 正常对话攒数据（自动落盘），达标后重跑本报告。")
     else:
-        print(f"✅ 已达 {report['total_turns']} 轮门槛。")
+        print(f"✅ 已达 {report['text_available_turns']} 轮可核对原文门槛。")
         print("   结合以上三类分布，决定词表：拦截分布正常、漏网清零、候选词无显著出现 = 词表定夺。")
 
 

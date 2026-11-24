@@ -42,13 +42,14 @@
   <label><input type="checkbox" id="auto-refresh" checked> 自动刷新（2s）</label>
   <span id="last-update">未刷新</span>
 </header>
-<main id="main">
-  <p class="error" id="loading">请选择角色并刷新。</p>
-</main>
+<p class="error" id="loading" role="status">请选择角色并刷新。</p>
+<main id="main"></main>
 <script>
 const basePath = window.location.pathname.replace(/\/ui\/?$/, '');
 const api = p => `${basePath}${p}`;
 let autoTimer = null;
+let renderGeneration = 0;
+let activeRender = null;
 
 async function fetchJson(url) {
   const r = await fetch(url);
@@ -66,11 +67,14 @@ function renderCard(title, rows) {
 function render() {
   const companionId = document.getElementById('companion-select').value;
   if (!companionId) return;
+  if (activeRender && activeRender.companionId === companionId) return activeRender.promise;
+  const generation = ++renderGeneration;
   document.getElementById('loading').textContent = '加载中…';
-  Promise.all([
+  const promise = Promise.all([
     fetchJson(api(`/state?companion_id=${encodeURIComponent(companionId)}`)),
     fetchJson(api(`/memory?companion_id=${encodeURIComponent(companionId)}`))
   ]).then(([state, memory]) => {
+    if (generation !== renderGeneration) return;
     const html = [];
     html.push(renderCard('运行时状态', [
       ['角色', `${fmt(state.display_name)} <span class="badge">${fmt(state.companion_id)}</span>`],
@@ -107,8 +111,16 @@ function render() {
     document.getElementById('main').innerHTML = html.join('');
     document.getElementById('last-update').textContent = '更新于 ' + new Date().toLocaleTimeString();
   }).catch(err => {
+    if (generation !== renderGeneration) return;
     document.getElementById('main').innerHTML = `<p class="error">加载失败：${escapeHtml(err.message)}</p>`;
+  }).finally(() => {
+    if (generation === renderGeneration) {
+      document.getElementById('loading').textContent = '';
+      activeRender = null;
+    }
   });
+  activeRender = {companionId, promise};
+  return promise;
 }
 
 function escapeHtml(s) {

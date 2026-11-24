@@ -34,3 +34,19 @@ def test_cli_reads_nested_jsonl_and_emits_only_aggregates(tmp_path,monkeypatch):
     main()
     result=output.read_text(encoding='utf-8')
     assert json.loads(result)['total']==1 and 'private text' not in result
+
+
+def test_natural_gate_requires_complete_scoped_attribution_and_deduplicates():
+    identity=dict(game_id='aesir',player_id='p',save_id='s',companion_id='npc',run_id='r',request_id='one')
+    base=dict(**identity,player_text='private',source='llm',relationship_delta=1,
+        data_origin='natural',origin_authority='server_configuration',turn_complete=True)
+    rows=[base,dict(base),dict(base,data_origin='seed',request_id='two'),
+          dict(base,data_origin='fault',request_id='three'),dict(base,request_id='four',turn_complete=False),
+          dict(base,request_id='five',origin_authority='client'),dict(base,request_id='six',player_text='known seed')]
+    result=audit(rows,{'known seed'})
+    assert result['attributed_natural_unique_complete_llm']==1
+    assert not result['natural_count_gate_met'] and not result['training_approved']
+    assert result['quality_by_origin']['seed']['rows']==1
+    assert result['quality_by_origin']['fault']['rows']==1
+    assert result['quality_by_origin']['unknown']['rows']==1
+    assert 'private' not in str(result)

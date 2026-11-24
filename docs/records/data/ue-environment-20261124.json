@@ -1,0 +1,44 @@
+{
+  "manifest_version": "5.8.3-58210709+++UE5+Release-5.8-Windows",
+  "scope": "required untagged Windows Intermediate files, presence and size only",
+  "files": 11722,
+  "matching_size": 4,
+  "missing": 11718,
+  "wrong_size": 0,
+  "missing_bytes": 2296098396,
+  "critical_files": [
+    {
+      "file": "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/CoreUObject/UHT/PrimaryAssetId.generated.h",
+      "exists": false,
+      "expected_bytes": 2310,
+      "expected_sha256": "71E8012A9CD428431CF270F24E98610E0D09DA79316F9B399D1603DFC0EF6C71",
+      "actual_sha256": null
+    },
+    {
+      "file": "Engine/Intermediate/Build/Win64/UnrealGame/Inc/CoreUObject/UHT/PrimaryAssetId.generated.h",
+      "exists": false,
+      "expected_bytes": 2310,
+      "expected_sha256": "71E8012A9CD428431CF270F24E98610E0D09DA79316F9B399D1603DFC0EF6C71",
+      "actual_sha256": null
+    },
+    {
+      "file": "Engine/Intermediate/Build/Win64/x64/UnrealEditor/Development/CoreUObject/UnrealEditor-CoreUObject.lib",
+      "exists": false,
+      "expected_bytes": 2842088,
+      "expected_sha256": "9E5C321997D00DC5A8AAD784C04AEFFE4CD3CA320D964C0852C6A2738FAEC23C",
+      "actual_sha256": null
+    }
+  ],
+  "missing_examples": [
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/ActionableMessage/UHT/ActionableMessageClasses.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/ActionableMessage/UHT/ActionableMessageSubsystem.generated.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/ActorPickerMode/UHT/ActorPickerModeClasses.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/ActorPickerMode/UHT/ActorPickerViewportInteraction.generated.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AddContentDialog/UHT/AddContentDialogClasses.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AddContentDialog/UHT/FeaturePackContentSource.generated.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AddContentDialog/UHT/IContentSource.generated.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AdvancedPreviewScene/UHT/AdvancedPreviewSceneClasses.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AdvancedPreviewScene/UHT/AssetViewerSettings.generated.h",
+    "Engine/Intermediate/Build/Win64/UnrealEditor/Inc/AdvancedPreviewScene/UHT/ViewportLightRotationInteraction.generated.h"
+  ]
+}

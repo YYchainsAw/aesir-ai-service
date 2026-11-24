@@ -1,0 +1,153 @@
+{
+  "synthetic": true,
+  "provider_calls": 0,
+  "cases": [
+    {
+      "name": "cat_paraphrase",
+      "category": "paraphrase",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "cross_turn_cat",
+      "category": "cross_turn",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "invented_experience",
+      "category": "unsupported",
+      "expected": false,
+      "baseline": false,
+      "hardened": false
+    },
+    {
+      "name": "negative_to_positive",
+      "category": "polarity",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "positive_to_negative",
+      "category": "polarity",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "negative_preserved",
+      "category": "polarity",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "opposed_fruit",
+      "category": "clause",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "positive_clause",
+      "category": "clause",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "current_negative",
+      "category": "correction",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "current_positive",
+      "category": "correction",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "hypothetical_residence",
+      "category": "modality",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "question_residence",
+      "category": "modality",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "uncertain_to_certain",
+      "category": "modality",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "uncertainty_preserved",
+      "category": "modality",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "other_actor",
+      "category": "challenge_actor",
+      "expected": false,
+      "baseline": true,
+      "hardened": true
+    },
+    {
+      "name": "time_transfer",
+      "category": "challenge_time",
+      "expected": false,
+      "baseline": true,
+      "hardened": false
+    },
+    {
+      "name": "place_substitution",
+      "category": "challenge_entity",
+      "expected": false,
+      "baseline": false,
+      "hardened": false
+    },
+    {
+      "name": "confirmed_residence",
+      "category": "positive",
+      "expected": true,
+      "baseline": true,
+      "hardened": true
+    }
+  ],
+  "totals": {
+    "baseline": {
+      "cases": 18,
+      "correct": 9,
+      "false_accepts": 9,
+      "false_rejects": 0
+    },
+    "hardened": {
+      "cases": 18,
+      "correct": 17,
+      "false_accepts": 1,
+      "false_rejects": 0
+    }
+  },
+  "remaining": [
+    {
+      "name": "other_actor",
+      "category": "challenge_actor"
+    }
+  ],
+  "limits": "Hand-authored counterexamples, not natural-player accuracy or general entailment verification"
+}

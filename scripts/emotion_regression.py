@@ -22,7 +22,9 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
+import os
 import sys
 import time
 import uuid
@@ -37,9 +39,29 @@ for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 SEEDS_PATH = Path(__file__).resolve().parents[1] / "data" / "test_scripts" / "emotion_seeds.json"
-SIGNALS_DIR = Path(__file__).resolve().parents[1] / "data" / "runtime" / "dialogue_signals" / "aesir"
 
 BUCKETS = ("deep", "warm", "cold", "hurtful", "none")
+
+
+@contextmanager
+def seed_capture():
+    """Dedicated in-process replay: it can never label its inputs as natural."""
+    from app.config import get_settings
+    get_settings()  # Load .env before taking/restoring the environment snapshot.
+    changes = {'AESIR_DIALOGUE_DATA_ORIGIN':'seed',
+               'AESIR_DIALOGUE_SIGNAL_TEXT_MODE':'full',
+               'AESIR_DIALOGUE_DATA_RUN_ID':f'emotion-{uuid.uuid4().hex[:8]}'}
+    previous = {key:os.environ.get(key) for key in changes}
+    os.environ.update(changes)
+    try:
+        settings = get_settings()
+        yield Path(settings.dialogue_signals_dir) / settings.game_id / 'seed' / settings.dialogue_data_run_id
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def load_seeds(bucket: str | None, limit: int | None) -> list[dict]:
@@ -177,24 +199,19 @@ def main():
                         help="人格 ID（Phase B 验收：换 Bruno 跑同一批种子）")
     args = parser.parse_args()
 
-    signals_path = SIGNALS_DIR / f"{args.companion}.jsonl"
-    seeds = load_seeds(args.bucket, args.limit)
-    print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}, delay={args.delay}s, companion={args.companion}）")
-
-    # 记录 signals 文件当前行数，跑完只读新增
-    baseline_lines = len(signals_path.read_text(encoding="utf-8").splitlines()) if signals_path.exists() else 0
-    print(f"signals 基线行: {baseline_lines}（{signals_path.name}）")
-
-    from app.main import app
-    client = TestClient(app)
-    print("开始回放...\n")
-    results = run(client, seeds, delay=args.delay, companion_id=args.companion)
-
-    print("\n读取 signals...")
-    signals = read_signals(signals_path, baseline_lines)
-    print(f"本次新增 signals: {len(signals)} 条")
-
-    report(results, signals)
+    with seed_capture() as root:
+        signals_path = root / f"{args.companion}.jsonl"
+        seeds = load_seeds(args.bucket, args.limit)
+        print(f"加载 {len(seeds)} 条种子（bucket={args.bucket or 'all'}, limit={args.limit}, delay={args.delay}s, companion={args.companion}）")
+        baseline_lines = len(signals_path.read_text(encoding="utf-8").splitlines()) if signals_path.exists() else 0
+        print(f"signals 来源: seed；本次目录: {root}")
+        from app.main import app
+        with TestClient(app) as client:
+            print("开始回放...\n")
+            results = run(client, seeds, delay=args.delay, companion_id=args.companion)
+        signals = read_signals(signals_path, baseline_lines)
+        print(f"本次新增 signals: {len(signals)} 条")
+        report(results, signals)
 
 
 if __name__ == "__main__":

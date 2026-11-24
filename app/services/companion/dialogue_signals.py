@@ -145,6 +145,8 @@ def record_turn_signal(
     lore_lookup: dict | None = None,
     facts_rejected: int | None = None,
     memory_corrections: dict[str, int] | None = None,
+    fallback_reason: str | None = None,
+    turn_complete: bool = True,
 ) -> None:
     """追加一条本轮对话信号记录（JSONL）；任何故障静默吞掉。
 
@@ -168,6 +170,9 @@ def record_turn_signal(
       LLM 倾向编造的直接证据；仅 >0 时落盘）。
     """
     try:
+        settings = get_settings()
+        data_origin = getattr(settings, 'dialogue_data_origin', 'unknown')
+        data_run_id = getattr(settings, 'dialogue_data_run_id', '')
         signals = {
             "negative_feedback": detect_negative_feedback(player_text),
             "repetition_score": round(
@@ -192,6 +197,15 @@ def record_turn_signal(
             "signals": signals,
             "repetitive": signals["repetition_score"] >= _REPETITION_FLAG_THRESHOLD,
             "style_violations": style_violations,
+            "data_origin": data_origin,
+            "data_run_id": data_run_id,
+            "origin_authority": "server_configuration",
+            "turn_complete": turn_complete,
+            "fallback_reason": fallback_reason or (
+                "style_guard" if style_violations and source != "llm" else
+                "upstream_error_unspecified" if source == "fallback" else
+                "mock_backend" if source == "mock" else "none"),
+            "quality_review": quality_candidates(reply_text, style_violations),
         }
         # 可选埋点仅在显式传入时落盘（保持旧记录结构稳定，缺省字段缺失不报错）。
         if memory_cited is not None:
@@ -212,10 +226,40 @@ def record_turn_signal(
             record["lore_lookup"] = lore_lookup
         if facts_rejected is not None:
             record["facts_rejected"] = facts_rejected
-        root = signal_directory(get_settings().dialogue_signals_dir, game_id)
+        text_mode = getattr(settings, 'dialogue_signal_text_mode', 'metadata')
+        record['text_mode'] = text_mode
+        record['text_available'] = text_mode == 'full'
+        if text_mode == 'metadata':
+            record.pop('player_text', None)
+            record.pop('reply_text', None)
+            record['injected_topic_count'] = len(record.pop('injected_topics'))
+            record['style_violations'] = [
+                {'category':item.get('category', 'unknown')} if isinstance(item, dict)
+                else {'category':'unstructured'} for item in style_violations or []]
+        root = signal_directory(settings.dialogue_signals_dir, game_id)
+        # Unknown retains the historical location. Explicit origins are partitioned.
+        if data_origin != "unknown":
+            root = root / data_origin
+            if data_run_id:
+                root = root / data_run_id
         record.update(signal_metadata())
-        append_jsonl(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False))
+        from app.services.companion.signal_files import write_signal
+        write_signal(root, f"{companion_id}.jsonl", json.dumps(record, ensure_ascii=False),
+                     getattr(settings, 'dialogue_signal_max_bytes', 10*1024*1024))
     except Exception as error:  # noqa: BLE001 - 埋点绝不阻塞对话主流程
         if current_scope():
             raise unavailable() from error
         pass
+
+
+def quality_candidates(reply_text, violations):
+    """Review queue signals, never a semantic factuality verdict."""
+    categories = {item.get('category', '') if isinstance(item, dict) else str(item)
+                  for item in violations or []}
+    narrative = bool(categories & {'fabrication_signal', 'unsupported_observation', 'unsupported_self_status'})
+    # Companion dialogue records do not carry an execution receipt. These
+    # phrases need review against agent/receipt logs, even if an action exists.
+    execution = bool(re.search(r'(?:我|已经|已)(?:已经|已|帮你|替你)?(?:完成|执行|释放|施放|攻击|击杀|到达|跟上)|(?:技能|攻击)(?:已经|已)(?:释放|执行|完成)', reply_text))
+    return {'unsupported_narrative_candidate': narrative,
+            'execution_claim_candidate': execution,
+            'semantic_factuality': 'unverified', 'execution_receipt_checked': False}

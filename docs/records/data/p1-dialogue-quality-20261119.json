@@ -1,0 +1,107 @@
+{
+  "total": 457,
+  "known_seed_texts": 75,
+  "known_seed_rows": 376,
+  "llm_rows_excluding_known_seeds": 60,
+  "remaining_by_npc": {
+    "companion.alice": 57,
+    "companion.bruno": 3
+  },
+  "reward_nonzero": 12,
+  "positive": 10,
+  "negative": 2,
+  "missing_request_id": 60,
+  "count_gate_met": false,
+  "quality_by_origin": {
+    "natural": {
+      "rows": 0,
+      "missing_completion_status": 0,
+      "missing_quality_review": 0,
+      "semantic_factuality_unverified": 0,
+      "by_source": {},
+      "incomplete": 0,
+      "repetitive": 0,
+      "negative_feedback": 0,
+      "facts_rejected": 0,
+      "unsupported_narrative_candidates": 0,
+      "execution_claim_candidates": 0,
+      "fallback_reasons": {},
+      "style_categories": {}
+    },
+    "seed": {
+      "rows": 0,
+      "missing_completion_status": 0,
+      "missing_quality_review": 0,
+      "semantic_factuality_unverified": 0,
+      "by_source": {},
+      "incomplete": 0,
+      "repetitive": 0,
+      "negative_feedback": 0,
+      "facts_rejected": 0,
+      "unsupported_narrative_candidates": 0,
+      "execution_claim_candidates": 0,
+      "fallback_reasons": {},
+      "style_categories": {}
+    },
+    "fault": {
+      "rows": 0,
+      "missing_completion_status": 0,
+      "missing_quality_review": 0,
+      "semantic_factuality_unverified": 0,
+      "by_source": {},
+      "incomplete": 0,
+      "repetitive": 0,
+      "negative_feedback": 0,
+      "facts_rejected": 0,
+      "unsupported_narrative_candidates": 0,
+      "execution_claim_candidates": 0,
+      "fallback_reasons": {},
+      "style_categories": {}
+    },
+    "evaluation": {
+      "rows": 0,
+      "missing_completion_status": 0,
+      "missing_quality_review": 0,
+      "semantic_factuality_unverified": 0,
+      "by_source": {},
+      "incomplete": 0,
+      "repetitive": 0,
+      "negative_feedback": 0,
+      "facts_rejected": 0,
+      "unsupported_narrative_candidates": 0,
+      "execution_claim_candidates": 0,
+      "fallback_reasons": {},
+      "style_categories": {}
+    },
+    "unknown": {
+      "rows": 457,
+      "missing_completion_status": 457,
+      "missing_quality_review": 457,
+      "semantic_factuality_unverified": 457,
+      "by_source": {
+        "llm": 359,
+        "mock": 14,
+        "fallback": 84
+      },
+      "incomplete": 0,
+      "repetitive": 2,
+      "negative_feedback": 2,
+      "facts_rejected": 40,
+      "unsupported_narrative_candidates": 0,
+      "execution_claim_candidates": 0,
+      "fallback_reasons": {
+        "unrecorded": 98
+      },
+      "style_categories": {
+        "meta_term": 3
+      }
+    }
+  },
+  "attributed_natural_unique_complete_llm": 0,
+  "attributed_natural_reward_nonzero": 0,
+  "natural_count_gate_met": false,
+  "provenance_verified": false,
+  "off_policy_propensities_available": false,
+  "training_approved": false,
+  "decision": "Only explicitly attributed natural requests count toward the natural gate; semantic review and training approval remain separate"
+}

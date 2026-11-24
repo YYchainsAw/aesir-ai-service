@@ -31,6 +31,39 @@ _SUBJECT_PREFIXES = ("玩家", "对方")
 _MIN_GROUNDING = 0.5
 # 实词少于 2 个的事实没有校验余地（也对不上任何具体内容），直接丢弃。
 _MIN_CONTENT_CHARS = 2
+_NEGATION = re.compile(r'从未|没有|并未|未曾|不是|不|没|未')
+_UNCERTAIN = re.compile(r'如果|假如|假设|要是|也许|可能|或许|听说|据说')
+
+
+def _polarity_supported(fact: str, sources: list[str]) -> bool:
+    """Reject a strong opposite-polarity match before character grounding.
+
+    Choose the most relevant clause, then the newest source (callers pass the
+    current turn first). This is a conservative lexical check, not general NLI.
+    Weak matches retain the existing cross-turn composition behavior.
+    """
+    core = content_chars(_NEGATION.sub('', fact))
+    if len(core) < _MIN_CONTENT_CHARS:
+        return True
+    candidates = []
+    for index, source in enumerate(sources):
+        # Keep question marks so an interrogative cannot become an assertion.
+        for clause in re.split(r'[，。！；,.!;\n]|但是|不过|然而|而是|但', source):
+            terms = content_chars(_NEGATION.sub('', clause))
+            overlap = len(core & terms) / len(core)
+            candidates.append((overlap, -index, bool(_NEGATION.search(clause)), clause))
+    if not candidates:
+        return True
+    # Stable ordering preserves clause order within a source.
+    best = max(candidates, key=lambda value: value[:2])
+    if best[0] < 0.8:
+        return True
+    if '?' in best[3] or '？' in best[3]:
+        return False
+    qualifiers = _UNCERTAIN.findall(best[3])
+    if qualifiers and not all(word in fact for word in qualifiers):
+        return False
+    return best[2] == bool(_NEGATION.search(fact))
 
 
 def normalize_fact(text: str) -> str:
@@ -58,6 +91,10 @@ def is_grounded(fact: str, sources: list[str]) -> bool:
     ``sources`` 为空（无任何玩家原文）时一律判不接地——没有依据的事实
     不写档案，这正是本校验存在的意义。
     """
+    from app.services.memory.relevance import supports_qualifiers
+    sources = [source for source in sources if supports_qualifiers(fact, source)]
+    if not _polarity_supported(fact, sources):
+        return False
     fact_chars = content_chars(fact)
     if len(fact_chars) < _MIN_CONTENT_CHARS:
         return False

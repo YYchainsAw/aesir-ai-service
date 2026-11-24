@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     # -- 回执与 LLM Provider -------------------------------------------------
     receipts_dir: str = "data/runtime/command_service/executions"
     dialogue_signals_dir: str = "data/runtime/dialogue_signals"  # 对话信号埋点（RL 前置数据，JSONL 按角色分文件）
+    dialogue_data_origin: Literal["unknown", "natural", "seed", "fault", "evaluation"] = "unknown"
+    dialogue_signal_text_mode: Literal["metadata", "full"] = "metadata"
+    dialogue_signal_max_bytes: int = Field(default=10*1024*1024, ge=4096, le=100*1024*1024)
+    dialogue_data_run_id: str = Field(default="", max_length=80,
+        pattern=r"^(?:[A-Za-z0-9_-](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?)?$")
     agent_steps_dir: str = "data/runtime/agent_steps"  # agent/step 决策埋点（T38：SC-005/006/013 数据源）
     event_signals_dir: str = "data/runtime/event_signals"  # 事件幂等埋点（T38：SC-007 数据源）
     persona_reviews_dir: str = "data/persona_reviews"  # 外部人格包人工审核记录（S5/T30，入库、人写签字）
@@ -123,6 +128,7 @@ class Settings(BaseSettings):
     memory_summary_limit: int = 80              # 跨会话经历摘要条数上限
     memory_archive_limit: int = 40              # 长期档案条数上限（承诺/重大事件优先保留）
     memory_injection_budget: int = 12           # 单次生成注入 prompt 的记忆条数预算
+    memory_injection_char_budget: int = Field(default=6000, ge=0, le=50000)
     # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
     memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
     memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）

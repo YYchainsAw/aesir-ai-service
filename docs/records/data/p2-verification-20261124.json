@@ -1,0 +1,150 @@
+{
+  "date": "2026-11-24",
+  "base_commit": "db037a1",
+  "scope": [
+    "childhood_evidence_filter",
+    "rendered_memory_character_budget"
+  ],
+  "core_tests": {
+    "passed": 1750,
+    "skipped": 13,
+    "failures": 0,
+    "errors": 0,
+    "xml_seconds": 115.966,
+    "warnings": 7
+  },
+  "skipped_tests": [
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribes_silent_wav_returns_empty",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_faster_whisper.test_transcribe_raises_on_invalid_audio",
+      "reason": "真机冒烟需 AESIR_ASR_SMOKE=1"
+    },
+    {
+      "test": "tests.services.test_fewshot_consistency.test_examples_reference_only_whitelisted_emotion_gesture_face[example_file2]",
+      "reason": "companion.narrator 未注册，无白名单可校验"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_symlink_without_overwriting_target",
+      "reason": "POSIX secure output semantics"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_source_and_static_output_paths_without_minting_token[web-root]",
+      "reason": "POSIX static web root policy"
+    },
+    {
+      "test": "tests.persistence.test_auth.test_cli_rejects_nonprivate_parent_directory",
+      "reason": "POSIX directory access policy"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_other_web_roots_without_creating_any_file",
+      "reason": "Linux deployment web root boundary"
+    },
+    {
+      "test": "tests.persistence.test_database.test_backup_rejects_nonprivate_parent",
+      "reason": "POSIX private directory permissions"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_84_runtime_has_dml_but_no_ddl_or_cross_database_privilege",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_uow_failure_rolls_back_both_documents_and_authoritative_version",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_committed_document_is_visible_to_a_fresh_python_process",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_http_event_restart_rebind_and_recovery_never_reapply",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    },
+    {
+      "test": "tests.persistence.test_mysql_integration.test_mysql_actual_state_version_conflict_preserves_the_winner",
+      "reason": "Dedicated MySQL runtime URL file was not provided"
+    }
+  ],
+  "stress": {
+    "synthetic": true,
+    "count_budget": 12,
+    "char_budget": 6000,
+    "before_count": 12,
+    "after_count": 3,
+    "before_chars": 20284,
+    "after_chars": 5198,
+    "whole_facts_preserved": true,
+    "provider_tokens_measured": false
+  },
+  "offline_relevance": {
+    "budget": {
+      "exact": 0,
+      "false_recall": 451,
+      "omitted": 0,
+      "relevant": 29,
+      "payload_chars": 31000,
+      "cases": 40,
+      "precision": 0.06041666666666667,
+      "recall": 1.0,
+      "median_selection_ms": 1.37385,
+      "by_split": {
+        "challenge": {
+          "cases": 8,
+          "exact": 0
+        },
+        "development": {
+          "cases": 32,
+          "exact": 0
+        }
+      }
+    },
+    "local": {
+      "exact": 30,
+      "false_recall": 113,
+      "omitted": 0,
+      "relevant": 29,
+      "payload_chars": 12599,
+      "cases": 40,
+      "precision": 0.20422535211267606,
+      "recall": 1.0,
+      "median_selection_ms": 1.6273499999999999,
+      "by_split": {
+        "challenge": {
+          "cases": 8,
+          "exact": 1
+        },
+        "development": {
+          "cases": 32,
+          "exact": 29
+        }
+      }
+    }
+  },
+  "source_sha256": {
+    "app/config.py": "0ee870daf9829cbe03b11140f16ae1ed704a6abd69c9d83092f17e86e3dc0bf3",
+    "app/services/companion/dialogue_service.py": "593e722f935d5807b5089e25a82331975dee5835a6d0d5c7cf0ac000012692b5",
+    "app/services/companion/prompt_builder.py": "ef25cab61065ad7cd025780354e7b939f5779d6c9b955d17df872ae47600d168",
+    "app/services/memory/relevance.py": "113148a9ff56cf432057337ca4026abff57b4317880b6768d6e48ec48f322e65",
+    "app/services/memory/retrieval.py": "23e9691fd2e688a73a6b06326ab246866ed4e7db209a5abda7b3a67a3815f341",
+    "scripts/evaluate_memory_boundaries.py": "19eee8e658fc4f7e9b58467c206838c1bcd4ae8d19e59524f2bcf435ac8af935",
+    "tests/services/test_memory_evidence_budget.py": "e9be3437fa4f250111822e5f958e394aaab81c7bd09dc048c7c27d8aa8e76577",
+    "tests/services/test_prompt_grounding.py": "f17886e65f2ce324ede91fcfdaac69cca714177213672595148c2052899c9fa1"
+  },
+  "xml_sha256": "d3691a1dded317eb05e5a699fbdf2d2a8a4f9949b22ca8248c65e21c4ee3dad2",
+  "limits": {
+    "server_tested": false,
+    "ue_tested": false,
+    "whole_prompt_capped": false,
+    "semantic_factuality_guaranteed": false,
+    "private_env_changed": false,
+    "training_started": false
+  },
+  "live_review": {
+    "cases": 4,
+    "llm_sources": 4,
+    "review": "manual",
+    "result": "two unknown answers and two grounded positive controls; synthetic only"
+  }
+}

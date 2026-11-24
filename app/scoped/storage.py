@@ -106,7 +106,7 @@ def read_memory_document(scope: NpcScope, root: str | Path | None = None) -> tup
             data = {"memory_epoch": str(uuid4()), **MemorySnapshot().model_dump(mode="json")}
             write_document("memory", scope.key, data, scope_parts=scope.key)
         try:
-            return UUID(data["memory_epoch"]), MemorySnapshot.model_validate(data)
+            return UUID(data["memory_epoch"]), MemorySnapshot.from_document(data)
         except (ValueError, TypeError, KeyError) as error:
             raise unavailable() from error
     path = memory_path(scope, root)
@@ -121,7 +121,7 @@ def read_memory_document(scope: NpcScope, root: str | Path | None = None) -> tup
         epoch = UUID(data["memory_epoch"])
         if not {"short_term", "summaries", "archive", "impressions"}.issubset(data):
             raise unavailable()
-        snapshot = MemorySnapshot.model_validate(data)
+        snapshot = MemorySnapshot.from_document(data)
         return epoch, snapshot
     except ScopeError:
         raise
@@ -131,7 +131,7 @@ def read_memory_document(scope: NpcScope, root: str | Path | None = None) -> tup
 
 def write_memory_document(scope: NpcScope, epoch: UUID, snapshot: MemorySnapshot,
                           root: str | Path | None = None) -> None:
-    payload = {"memory_epoch": str(epoch), **snapshot.model_dump(mode="json")}
+    payload = {"memory_epoch": str(epoch), **snapshot.to_document()}
     from app.persistence.database import database_enabled, write_document
     if database_enabled():
         write_document("memory", scope.key, payload, scope_parts=scope.key)
@@ -237,11 +237,12 @@ def reset_memory(scope: NpcScope, expected_epoch: UUID) -> dict:
 def forget_memory(scope: NpcScope, expected_epoch: UUID, entry_ids: list[UUID]) -> dict:
     """Atomically remove selected entries and rotate the epoch as a stale-write barrier.
 
-    All topic impressions and session history are cleared because they do not
-    carry exact entry attribution. Relationship/persona/logs remain unchanged.
+    Known unrelated topics/turns survive. Legacy unattributed context is cleared
+    conservatively. Epoch rotation still invalidates every old in-flight writer.
     """
     from app.services.memory.store import invalidate_scope
-    from app.services.companion.session_memory import clear_scoped_sessions
+    from app.services.companion import session_memory
+    from app.services.memory.attribution import forget_plan, prune_snapshot
     with scope_lock(scope):
         epoch, snapshot = read_memory_document(scope)
         if epoch != UUID(str(expected_epoch)):
@@ -251,12 +252,11 @@ def forget_memory(scope: NpcScope, expected_epoch: UUID, entry_ids: list[UUID]) 
         known = {entry.entry_id for layer in layers for entry in getattr(snapshot, layer)}
         if not targets <= known:
             raise ScopeError(404, 'MEMORY_ENTRY_UNKNOWN', 'A selected entry does not exist in this NPC scope')
-        for layer in layers:
-            setattr(snapshot, layer, [entry for entry in getattr(snapshot, layer) if entry.entry_id not in targets])
-        snapshot.impressions = []
+        removed, requests = forget_plan(snapshot, targets, session_memory._store, scope)
+        prune_snapshot(snapshot, removed, requests)
         epoch = uuid4()
         write_memory_document(scope, epoch, snapshot)
         invalidate_scope(scope)
-        cleared = clear_scoped_sessions(scope)
+        cleared = session_memory._store.forget_scope(scope, removed, requests)
         return {'memory_epoch': epoch, 'forgotten_entry_ids': [str(value) for value in entry_ids],
                 'cleared_sessions': cleared}
