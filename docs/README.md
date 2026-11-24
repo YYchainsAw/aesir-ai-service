@@ -31,7 +31,7 @@
 | 当前有哪些实现差距或未决规则 | [未决事项与跨仓依赖](planning/_01_known_issues.md) |
 | 哪些 Issue 可关闭、未完成工作怎样排序 | [Issue 核查与责任清单](records/_06_issue_audit_verification.md) |
 | 当前功能是否完备、来源/遗忘/检索与训练数据实测如何 | [项目功能测评](records/_08_project_functionality_assessment.md) |
-| 最新 UE 最小闭环测试是否通过、卡在哪一步 | [UE 最小闭环测试](records/_09_ue_minimal_loop_verification.md) |
+| 最新 UE 构建/原生测试是否通过、完整闭环还缺什么 | [UE 构建与原生验证](records/_13_ue_native_verification.md) · [首次阻塞记录](records/_09_ue_minimal_loop_verification.md) |
 | 本地检索的成本/准确率、关联遗忘和数据来源分区是否交付 | [P1 记忆与质量治理](records/_10_p1_memory_quality_verification.md) |
 | 童年证据边界和长记忆注入上限如何验证 | [P2 记忆边界与成本控制](records/_11_p2_memory_boundaries.md) |
 | UE 环境补齐进度、调试台刷新、阶段观测和日志保留 | [联调准备与治理](records/_12_integration_readiness.md) |

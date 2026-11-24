@@ -1,0 +1,157 @@
+{
+  "date": "2026-11-24",
+  "ue_commit": "af5510f7c1a5244b0714893483a9475cab236bdb",
+  "service_commit": "b386931",
+  "engine": {
+    "MajorVersion": 5,
+    "MinorVersion": 8,
+    "PatchVersion": 4,
+    "Changelist": 58902052,
+    "CompatibleChangelist": 55116800,
+    "IsLicenseeVersion": 0,
+    "IsPromotedBuild": 1,
+    "BranchName": "++UE5+Release-5.8"
+  },
+  "build": {
+    "exit_code": 0,
+    "result": "Succeeded",
+    "seconds": 73.5
+  },
+  "automation": {
+    "exit_code": 0,
+    "succeeded": 7,
+    "failed": 0,
+    "not_run": 0,
+    "duration_seconds": 1.6087883710861206,
+    "tests": [
+      {
+        "name": "Aesir.Companion.HttpContract.ExplorationRouting",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": [
+          "Scoped loopback contract passed: Alice chat/follow/retry/wait, Bruno routing, and run cleanup. This does not verify gameplay movement or GAS."
+        ]
+      },
+      {
+        "name": "Aesir.Companion.Lifecycle.CallbacksAndSessionIsolation",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.ContextAndBind",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.ExplorationActions",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.IdentityIsolation",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.MonotonicValidity",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      },
+      {
+        "name": "Aesir.Companion.ExplorationExecution",
+        "state": "Success",
+        "errors": 0,
+        "warnings": 0,
+        "notes": []
+      }
+    ]
+  },
+  "contract": {
+    "endpoint": "http://127.0.0.1:8011",
+    "identity": "development",
+    "storage": "json",
+    "coordination": "memory",
+    "backends": "rule/mock",
+    "http_contract_enabled": true,
+    "expected_contract_requests": 10,
+    "requests_including_readiness_and_cleanup": 12,
+    "all_status_200": true,
+    "duplicate_directive_stable": true,
+    "steps": [
+      {
+        "action": "directive",
+        "request_id": "45fcb766-4bb4-6193-91d8-b6acd70af7d7",
+        "directive_id": "933f85eb-2188-4ebc-9df7-07d0c45d5764",
+        "action_type": "follow"
+      },
+      {
+        "action": "directive",
+        "request_id": "45fcb766-4bb4-6193-91d8-b6acd70af7d7",
+        "directive_id": "933f85eb-2188-4ebc-9df7-07d0c45d5764",
+        "action_type": "follow"
+      },
+      {
+        "action": "directive",
+        "request_id": "43f82dc9-4ff7-b4e3-d612-d89afec23cbc",
+        "directive_id": "7d07bbeb-0fb4-4fba-834e-4006ce060731",
+        "action_type": "wait"
+      },
+      {
+        "action": "none",
+        "request_id": "2598d76e-425f-88e9-c0e0-20a5b921048e",
+        "directive_id": null,
+        "action_type": null
+      },
+      {
+        "action": "none",
+        "request_id": "b9dcb40b-459d-b2be-5572-babc15dc3a60",
+        "directive_id": null,
+        "action_type": null
+      },
+      {
+        "action": "directive",
+        "request_id": "b8221377-4615-edf6-7f0d-5b9b60ea6837",
+        "directive_id": "0275d888-243d-49d9-a8e4-afa3881a19b7",
+        "action_type": "follow"
+      }
+    ],
+    "final_context": {
+      "run_id": null,
+      "run_binding_id": null
+    }
+  },
+  "startup_diagnostics": {
+    "project_condition_failed": 13,
+    "blank_project_condition_failed": 13,
+    "root_cause": "unresolved; reproduced without AesirWarden module",
+    "blank_project_exit": "stopped after collecting startup baseline; Quit did not exit",
+    "ignored_content_not_present": true
+  },
+  "limitations": {
+    "real_map_navigation": false,
+    "burst_gas": false,
+    "execution_receipt_loop": false,
+    "sql_bearer": false,
+    "real_llm_asr": false,
+    "packaged_game": false,
+    "ue_original_worktree_modified": false
+  },
+  "sha256": {
+    "data/runtime/ue24-verified/build.log": "c2512dd2140181cbba3c88dbe45a7cd8e0c3e8dde2f4a261773ad3840969d742",
+    "data/runtime/ue24-verified/automation.log": "198855e6950ac87a3b1fc401846dcdfb8feec078aca6a65a781b632cdc1ff0cb",
+    "data/runtime/ue24-verified/automation/index.json": "bbd59dd59ae09ccdc5609786cd56397bb8a416ac442313a54e1f000dca437c6c",
+    "data/runtime/ue24-verified/engine-baseline.log": "55557c997e9f577d53cf7583d254630e0ebbd6210a9a0f5a0884663ae369d087",
+    ".workbuddy/ue/Binaries/Win64/UnrealEditor-AesirWarden.dll": "f34e45470be324d4f6ef8236fcaac22aa7456bea351ee4fc8c3d1406c94fb67f"
+  }
+}

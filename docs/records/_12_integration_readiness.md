@@ -1,5 +1,7 @@
 # 联调准备、刷新修复、阶段观测与日志治理
 
+后续：同日官方验证已完成，引擎实际更新到 5.8.4，构建和 7 项队友原生测试通过；[最新验证](_13_ue_native_verification.md)。以下引擎缺项与等待状态保留为修复前记录。
+
 2026-11-24，按用户要求刷新 UE 仓库并推进独立服务端改进。UE 原 `E:\AesirWarden` 存在本地提交与未提交修改，因此只 fetch，没有 pull/merge、重置、清理或覆盖。通过既有本机代理 fetch 成功，`origin/main` 仍为 `af5510f7c1a5244b0714893483a9475cab236bdb`；已有隔离源码副本 `.workbuddy/ue` 就是该版本。原工程的 uproject、DefaultEngine.ini、CommandServiceSubsystem.cpp 等改动保留。
 
 本轮只读复核确认引擎的 CoreUObject UHT 生成文件仍不完整，也未找到 Intermediate 开发链接库。Epic Launcher 已安装，但安装登记文件为空；用户确认 Launcher 库能识别 UE 5.8.3，正在运行官方“验证”。桌面/浏览器连接三次恢复后仍报 `Computer Use native pipe is unavailable`，未自动操作安装、认证、删除或重装引擎。验证完成前不编译，避免与官方校验同时写文件。UE 编译、原生测试与完整地图/GAS/回执仍待验证结束后继续，不记录为通过。
