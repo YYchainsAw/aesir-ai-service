@@ -1,0 +1,128 @@
+{
+  "date": "2026-11-24",
+  "service_base": "943e4ca",
+  "ue_commit": "05df10abb11e3fc175bcb0d3ef27baac50856065",
+  "ue_branch": "codex/ue-http-wait-closure",
+  "ue_build": {
+    "exit_code": 0,
+    "seconds": 77.09
+  },
+  "ue_tests": {
+    "succeeded": 7,
+    "failed": 0,
+    "not_run": 0,
+    "http_wait_actual_stop": true,
+    "duplicate_side_effect_prevented": true,
+    "results": [
+      {
+        "name": "Aesir.Companion.HttpContract.ExplorationRouting",
+        "state": "Success",
+        "entries": [
+          {
+            "event": {
+              "type": "Info",
+              "message": "Scoped loopback contract passed: Alice chat/follow/retry/wait, physical wait stop/duplicate protection, Bruno routing, and run cleanup. No map navigation or GAS verified.",
+              "context": "",
+              "artifact": "00000000000000000000000000000000"
+            },
+            "filename": "",
+            "lineNumber": -1,
+            "timestamp": "2026.11.24-02.29.44"
+          }
+        ]
+      },
+      {
+        "name": "Aesir.Companion.Lifecycle.CallbacksAndSessionIsolation",
+        "state": "Success",
+        "entries": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.ContextAndBind",
+        "state": "Success",
+        "entries": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.ExplorationActions",
+        "state": "Success",
+        "entries": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.IdentityIsolation",
+        "state": "Success",
+        "entries": []
+      },
+      {
+        "name": "Aesir.Companion.ScopedProtocol.MonotonicValidity",
+        "state": "Success",
+        "entries": []
+      },
+      {
+        "name": "Aesir.Companion.ExplorationExecution",
+        "state": "Success",
+        "entries": []
+      }
+    ]
+  },
+  "assets": {
+    "total_lfs": 386,
+    "checkout": 385,
+    "not_checkout": [
+      "SourceArt/UI/Fonts/SourceHanSerif/SourceHanSerifSC-Regular.otf"
+    ],
+    "main_map_available": false,
+    "third_party_assets_available": false,
+    "original_ue_modified": false
+  },
+  "core_tests": {
+    "passed": 1773,
+    "skipped": 13,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 113.023,
+    "warnings": 7
+  },
+  "followup_validation": {
+    "review_full_mode_filter": "2 passed after the core run"
+  },
+  "factuality": {
+    "baseline": {
+      "cases": 18,
+      "correct": 9,
+      "false_accepts": 9,
+      "false_rejects": 0
+    },
+    "hardened": {
+      "cases": 18,
+      "correct": 17,
+      "false_accepts": 1,
+      "false_rejects": 0
+    }
+  },
+  "natural_collection": {
+    "exported": 0,
+    "reviewed": 0,
+    "participants": 0,
+    "training_approved": false
+  },
+  "limits": {
+    "complete_playable_loop": false,
+    "real_navigation": false,
+    "burst_gas": false,
+    "execution_receipts": false,
+    "real_players": false,
+    "semantic_factuality_guaranteed": false,
+    "server_tested": false
+  },
+  "sha256": {
+    "app/services/memory/facts.py": "3ea4f2baef55dd49637cbf28e0169cfca8463d0918129f963991ff546d3152f9",
+    "app/services/companion/dialogue_service.py": "3196f1491f5c2afb484796f1d6809ae4cc12ba11b03333ac8f6a4b1f9031e9f9",
+    "scripts/dialogue_review.py": "0a786ba1a609d3db61acc6d3e7f2d5eefa937aad8963f992b8da21fbb8a20ecc",
+    "scripts/evaluate_fact_grounding.py": "be9f6089bfaed42af8fb7e8a32a710e8649bcd471894cd504fa19ec52dc8327a",
+    "data/evals/fact_grounding_boundaries.json": "4154d798e731a8f392c3eeaa25c789e565f493ebd0ad195304f28464547c65b1",
+    "data\\runtime\\ue25\\core-tests-final.xml": "7ed929a881832aea896ef2c45b26b15ec6c6430ac6c2d95fe94b1646cfee33b7",
+    "data\\runtime\\ue25\\automation\\index.json": "8dadfc6f440d04ae73380e87059f416e975eab59cdc42bb412b26b940f3869a4",
+    "data\\runtime\\ue25\\build.log": "2c061a99d927df01f1a8ff4b2408ef0a622e9ad0c1f12fbaff8bab535f80b4a7",
+    "data\\runtime\\ue25\\automation.log": "cf8418a69e0b9e83a001398e653afb117d191499bd91a7f7792650f4eb31071e",
+    "docs\\records\\data\\ue-http-wait-05df10a.patch": "376bc64fc014481194698520a84865cc86176590624149e189a4eddbc8037af4"
+  }
+}

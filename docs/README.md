@@ -35,6 +35,7 @@
 | 本地检索的成本/准确率、关联遗忘和数据来源分区是否交付 | [P1 记忆与质量治理](records/_10_p1_memory_quality_verification.md) |
 | 童年证据边界和长记忆注入上限如何验证 | [P2 记忆边界与成本控制](records/_11_p2_memory_boundaries.md) |
 | UE 环境补齐进度、调试台刷新、阶段观测和日志保留 | [联调准备与治理](records/_12_integration_readiness.md) |
+| 六项不足本轮推进了什么、如何采集人工评测 | [当前交付与剩余前置](records/_14_current_delivery.md) · [人工评测指南](guides/_14_dialogue_review_guide.md) |
 | 对话编排、语音、游戏Agent、记忆和云端服务怎样分批演进 | [交互演进计划](planning/_06_interaction_evolution_plan.md)，含20项UC/FR/DEP映射和AT-EVO验收 |
 | AIRI的20项学习点应用到哪里、UE接入该用哪组版本与任务 | [学习点与两仓交接基线](planning/_08_integration_alignment_plan.md)，含逐项实现边界、v0.4路由、golden及最小验收证据 |
 | 课程要求、真实修订过程和跨仓映射 | [课程索引](planning/_10_course_requirements_guide.md) |

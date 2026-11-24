@@ -1,0 +1,149 @@
+From 05df10abb11e3fc175bcb0d3ef27baac50856065 Mon Sep 17 00:00:00 2001
+From: loooooooooogp <19570126601@163.com>
+Date: Tue, 24 Nov 2026 10:39:22 +0800
+Subject: [PATCH] test: connect real HTTP wait directives to physical companion
+ stop
+
+---
+ .../Tests/CompanionScopedHttpTests.cpp        | 84 ++++++++++++++++++-
+ .../Companion/CompanionChatSubsystem.h        |  1 +
+ 2 files changed, 84 insertions(+), 1 deletion(-)
+
+diff --git a/Source/AesirWarden/Private/Tests/CompanionScopedHttpTests.cpp b/Source/AesirWarden/Private/Tests/CompanionScopedHttpTests.cpp
+index 357460b..c463585 100644
+--- a/Source/AesirWarden/Private/Tests/CompanionScopedHttpTests.cpp
++++ b/Source/AesirWarden/Private/Tests/CompanionScopedHttpTests.cpp
+@@ -2,6 +2,14 @@
+ 
+ #include "Services/Companion/CompanionChatSubsystem.h"
+ #include "Services/Companion/CompanionScopedProtocol.h"
++#include "AI/Companion/AesirCompanionAIController.h"
++#include "Characters/Companion/AesirCompanionCharacter.h"
++#include "Engine/Engine.h"
++#include "Engine/GameInstance.h"
++#include "Engine/World.h"
++#include "GameFramework/Character.h"
++#include "GameFramework/CharacterMovementComponent.h"
++#include "GameFramework/PlayerController.h"
+ 
+ #include "Dom/JsonObject.h"
+ #include "Dom/JsonValue.h"
+@@ -15,6 +23,69 @@
+ #include "Serialization/JsonSerializer.h"
+ #include "Serialization/JsonWriter.h"
+ 
++// Transient gameplay fixture: consumes the real server response below. No fake
++// executed receipt, navigation success or GAS result is manufactured here.
++struct FCompanionHttpGameplayFixture
++{
++	UGameInstance* Instance = nullptr;
++	UWorld* World = nullptr;
++	AAesirCompanionCharacter* Companion = nullptr;
++	AAesirCompanionAIController* Controller = nullptr;
++	UCompanionChatSubsystem* Chat = nullptr;
++
++	~FCompanionHttpGameplayFixture()
++	{
++		if (Chat)
++		{
++			Chat->bBindingReady = false;
++			Chat->bContextActive = false;
++			Chat->Binding = CompanionScoped::FBinding{};
++		}
++		if (Instance) Instance->Shutdown();
++		if (World) { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); }
++		if (Instance) Instance->RemoveFromRoot();
++	}
++
++	bool ApplyWait(FAutomationTestBase* Test, const CompanionScoped::FBinding& Binding, FCompanionAgentDirective Directive)
++	{
++		Instance = NewObject<UGameInstance>(GEngine);
++		Instance->AddToRoot();
++		Instance->InitializeStandalone(FName(*FGuid::NewGuid().ToString(EGuidFormats::Digits)));
++		World = Instance->GetWorld();
++		if (!Test->TestNotNull(TEXT("HTTP wait fixture world"), World)) return false;
++		World->CreateAISystem();
++		World->InitializeActorsForPlay(FURL());
++		FActorSpawnParameters Spawn;
++		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
++		APlayerController* PlayerController = World->SpawnActor<APlayerController>(Spawn);
++		ACharacter* Player = World->SpawnActor<ACharacter>(FVector(1000,0,100), FRotator::ZeroRotator, Spawn);
++		Companion = World->SpawnActor<AAesirCompanionCharacter>(FVector(0,0,100), FRotator::ZeroRotator, Spawn);
++		Controller = World->SpawnActor<AAesirCompanionAIController>(Spawn);
++		Chat = Instance->GetSubsystem<UCompanionChatSubsystem>();
++		if (!PlayerController || !Player || !Companion || !Controller || !Chat) return false;
++		PlayerController->Possess(Player);
++		Controller->Possess(Companion);
++		Chat->SelectedCompanionId = Binding.CompanionId;
++		Chat->Binding = Binding;
++		Chat->ContextGeneration = 1;
++		Chat->bBindingReady = true;
++		Chat->bContextActive = true;
++		Chat->SessionWorld = World;
++		Chat->SessionPlayer = Player;
++		Chat->SessionCompanion = Companion;
++		Directive.ContextGeneration = Chat->ContextGeneration;
++		Companion->GetCharacterMovement()->Velocity = FVector(300,0,0);
++		Chat->OnDirectiveReceived.Broadcast(Directive);
++		bool bPassed = Test->TestTrue(TEXT("Real HTTP wait stops physical velocity"), Companion->GetVelocity().IsNearlyZero());
++		bPassed &= Test->TestTrue(TEXT("Real HTTP wait is active"), Controller->IsWaitingForPlayerCommand());
++		bPassed &= Test->TestEqual(TEXT("Physical wait retains HTTP directive identity"), Controller->GetActiveExplorationDirectiveId(), Directive.DirectiveId);
++		Companion->GetCharacterMovement()->Velocity = FVector(10,0,0);
++		Chat->OnDirectiveReceived.Broadcast(Directive);
++		bPassed &= Test->TestEqual(TEXT("Duplicate HTTP directive has no second stop"), Companion->GetVelocity(), FVector(10,0,0));
++		return bPassed;
++	}
++};
++
+ namespace
+ {
+ // This save must be explicitly authorized by a disposable rule/mock test service.
+@@ -69,6 +140,7 @@ FString NewContractId()
+ 
+ struct FContractState
+ {
++	TUniquePtr<FCompanionHttpGameplayFixture> Gameplay;
+ 	FAutomationTestBase* Test = nullptr;
+ 	FString BaseUrl;
+ 	EContractStep Step = EContractStep::DiscoverAlice;
+@@ -382,7 +454,7 @@ private:
+ 			State->bRunBound = false;
+ 			State->Test->AddInfo(State->bHadFailure
+ 				? TEXT("Scoped loopback test run was closed after an earlier test failure.")
+-				: TEXT("Scoped loopback contract passed: Alice chat/follow/retry/wait, Bruno routing, and run cleanup. This does not verify gameplay movement or GAS."));
++				: TEXT("Scoped loopback contract passed: Alice chat/follow/retry/wait, physical wait stop/duplicate protection, Bruno routing, and run cleanup. No map navigation or GAS verified."));
+ 			State->Step = EContractStep::Done;
+ 			return;
+ 		}
+@@ -419,6 +491,16 @@ private:
+ 				{
+ 					State->FollowDirectiveId = Directive.DirectiveId;
+ 				}
++				else if (State->Step == EContractStep::AliceWait)
++				{
++					State->Gameplay = MakeUnique<FCompanionHttpGameplayFixture>();
++					if (!State->Gameplay->ApplyWait(State->Test, Binding, Directive))
++					{
++						State->Fail(TEXT("HTTP wait did not produce the expected gameplay state."));
++						return;
++					}
++					State->Gameplay.Reset();
++				}
+ 				else if (State->Step == EContractStep::AliceRepeat && Directive.DirectiveId != State->FollowDirectiveId)
+ 				{
+ 					State->Fail(TEXT("Same logical request returned a different directive identity."));
+diff --git a/Source/AesirWarden/Public/Services/Companion/CompanionChatSubsystem.h b/Source/AesirWarden/Public/Services/Companion/CompanionChatSubsystem.h
+index 40e9be3..02714fc 100644
+--- a/Source/AesirWarden/Public/Services/Companion/CompanionChatSubsystem.h
++++ b/Source/AesirWarden/Public/Services/Companion/CompanionChatSubsystem.h
+@@ -151,6 +151,7 @@ public:
+ 	FOnCompanionConversationReset OnConversationReset;
+ 
+ private:
++	friend struct FCompanionHttpGameplayFixture;
+ 	friend class FCompanionExplorationExecutionTest;
+ 
+ 	friend class FCompanionChatLifecycleTest;
+-- 
+2.51.0.windows.1
+

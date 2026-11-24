@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "cases": [
+    {"name":"cat_paraphrase","category":"paraphrase","fact":"玩家养了一只叫小黑的猫","sources":["我养了只猫，它叫小黑。"],"expected":true},
+    {"name":"cross_turn_cat","category":"cross_turn","fact":"玩家养了一只叫小黑的猫","sources":["它叫小黑。","我养了只猫。"],"expected":true},
+    {"name":"invented_experience","category":"unsupported","fact":"玩家上次给艾莉烤了鱼","sources":["今天天气不错。"],"expected":false},
+    {"name":"negative_to_positive","category":"polarity","fact":"玩家去过港口","sources":["我没去过港口。"],"expected":false},
+    {"name":"positive_to_negative","category":"polarity","fact":"玩家没去过港口","sources":["我去过港口。"],"expected":false},
+    {"name":"negative_preserved","category":"polarity","fact":"玩家没去过港口","sources":["我没有去过港口。"],"expected":true},
+    {"name":"opposed_fruit","category":"clause","fact":"玩家喜欢苹果","sources":["我不喜欢苹果，但喜欢香蕉。"],"expected":false},
+    {"name":"positive_clause","category":"clause","fact":"玩家喜欢香蕉","sources":["我不喜欢苹果但喜欢香蕉。"],"expected":true},
+    {"name":"current_negative","category":"correction","fact":"玩家喜欢苹果","sources":["我现在不喜欢苹果。","我喜欢苹果。"],"expected":false},
+    {"name":"current_positive","category":"correction","fact":"玩家喜欢苹果","sources":["我现在喜欢苹果。","我不喜欢苹果。"],"expected":true},
+    {"name":"hypothetical_residence","category":"modality","fact":"玩家住在港口","sources":["如果我住在港口会怎么样？"],"expected":false},
+    {"name":"question_residence","category":"modality","fact":"玩家住在港口","sources":["我住在港口吗？"],"expected":false},
+    {"name":"uncertain_to_certain","category":"modality","fact":"玩家住在港口","sources":["我可能住在港口。"],"expected":false},
+    {"name":"uncertainty_preserved","category":"modality","fact":"玩家可能住在港口","sources":["我可能住在港口。"],"expected":true},
+    {"name":"other_actor","category":"challenge_actor","fact":"玩家养了一只猫","sources":["我妹妹养了一只猫。"],"expected":false},
+    {"name":"time_transfer","category":"challenge_time","fact":"玩家小时候住在港口","sources":["我现在住在港口。"],"expected":false},
+    {"name":"place_substitution","category":"challenge_entity","fact":"玩家住在山城","sources":["我住在港口。"],"expected":false},
+    {"name":"confirmed_residence","category":"positive","fact":"玩家住在港口","sources":["我住在港口。"],"expected":true}
+  ]
+}

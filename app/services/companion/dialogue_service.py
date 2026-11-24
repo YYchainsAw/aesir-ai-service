@@ -355,7 +355,7 @@ def _record_turn(
             facts or [],
             # 接地来源 = 玩家本轮原话 + 近期真说过的玩家发言（跨轮拼出的复合事实
             # 也能落地，但凭空捏造的仍会被拦下）。
-            sources=[request.text, *(t.user_text for t in prior_history)],
+            sources=[request.text, *(t.user_text for t in reversed(prior_history))],
             game_id=game_id,
         )
         # #101 矛盾纠错：玩家改口时，把被纠正的旧事实标记为 superseded（检索时跳过）
