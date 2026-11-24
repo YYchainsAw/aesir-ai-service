@@ -36,7 +36,8 @@ def _prepare_dialogue(request):
     memory = get_session_memory(get_settings().dialogue_history_turns)
     history = memory.history(request.session_id, companion_id=request.companion_id) if request.session_id else ()
 
-    memories = _recall(request.companion_id, game_id=game_id, query=request.text)
+    memories = _recall(request.companion_id, game_id=game_id, query=request.text,
+                       display_name=profile.display_name)
     impressions = _recall_impressions(request.companion_id, history, game_id=game_id)
     stage = _relationship_stage(request.companion_id, game_id=game_id)
 
@@ -482,10 +483,11 @@ def _apply_relationship_signal(
         return 0, "store_error"
 
 
-def _recall(companion_id: str, *, game_id: str, query: str | None = None) -> list[MemoryEntry]:
+def _recall(companion_id: str, *, game_id: str, query: str | None = None,
+            display_name: str = "她") -> list[MemoryEntry]:
     """检索长期记忆（预算内）；故障降级为空列表（FR-011）。"""
     try:
-        return retrieve(get_memory_store(companion_id, game_id=game_id), query=query)
+        return retrieve(get_memory_store(companion_id, game_id=game_id), query=query, display_name=display_name)
     except MemoryStoreError:
         return []
 

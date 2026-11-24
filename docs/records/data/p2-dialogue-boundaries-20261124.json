@@ -1,0 +1,110 @@
+{
+  "synthetic": true,
+  "automatic_semantic_verdict": false,
+  "cases": [
+    {
+      "case": "hometown_only_cn",
+      "query": "我小时候住的那座镇子是哪儿？",
+      "expected": "unknown",
+      "injected_contents": [],
+      "response": {
+        "protocol_version": "0.1",
+        "companion_id": "companion.alice",
+        "session_id": "hometown_only_cn",
+        "reply_text": "这个我可答不上来，旅行者——你小时候住哪儿，我这边没有记录。要不你自己说说看？",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "source": "llm",
+        "relationship_stage": "distant",
+        "relationship_stage_display": "疏远",
+        "relationship_delta": 0,
+        "persona_revision": "0.2",
+        "memory_layers": {
+          "long_term": 0,
+          "impressions": 0
+        }
+      }
+    },
+    {
+      "case": "hometown_only_en",
+      "query": "Where did I live as a child?",
+      "expected": "unknown",
+      "injected_contents": [],
+      "response": {
+        "protocol_version": "0.1",
+        "companion_id": "companion.alice",
+        "session_id": "hometown_only_en",
+        "reply_text": "这个我可答不上来，旅行者——你小时候住哪儿，我这边没有半点记录。要是你愿意讲讲，我倒是很想听。",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "source": "llm",
+        "relationship_stage": "distant",
+        "relationship_stage_display": "疏远",
+        "relationship_delta": 0,
+        "persona_revision": "0.2",
+        "memory_layers": {
+          "long_term": 0,
+          "impressions": 0
+        }
+      }
+    },
+    {
+      "case": "explicit_childhood",
+      "query": "我小时候住在哪里？",
+      "expected": "山城",
+      "injected_contents": [
+        "玩家小时候住在山城。"
+      ],
+      "response": {
+        "protocol_version": "0.1",
+        "companion_id": "companion.alice",
+        "session_id": "explicit_childhood",
+        "reply_text": "你跟我说过，你小时候住在山城。怎么，突然想起问这个？",
+        "emotion_id": "emotion.thoughtful",
+        "gesture_id": "gesture.think",
+        "facial_expression_id": "face.thoughtful",
+        "interruptible": true,
+        "source": "llm",
+        "relationship_stage": "distant",
+        "relationship_stage_display": "疏远",
+        "relationship_delta": 0,
+        "persona_revision": "0.2",
+        "memory_layers": {
+          "long_term": 1,
+          "impressions": 0
+        }
+      }
+    },
+    {
+      "case": "hometown_control",
+      "query": "我的家乡是哪儿？",
+      "expected": "港口",
+      "injected_contents": [
+        "玩家的家乡是港口小镇。"
+      ],
+      "response": {
+        "protocol_version": "0.1",
+        "companion_id": "companion.alice",
+        "session_id": "hometown_control",
+        "reply_text": "港口小镇，你之前提过的。怎么，想考考我记性？",
+        "emotion_id": "emotion.pleased",
+        "gesture_id": "gesture.small_wave",
+        "facial_expression_id": "face.gentle_smile",
+        "interruptible": true,
+        "source": "llm",
+        "relationship_stage": "distant",
+        "relationship_stage_display": "疏远",
+        "relationship_delta": 0,
+        "persona_revision": "0.2",
+        "memory_layers": {
+          "long_term": 1,
+          "impressions": 0
+        }
+      }
+    }
+  ]
+}

@@ -126,6 +126,7 @@ class Settings(BaseSettings):
     memory_summary_limit: int = 80              # 跨会话经历摘要条数上限
     memory_archive_limit: int = 40              # 长期档案条数上限（承诺/重大事件优先保留）
     memory_injection_budget: int = 12           # 单次生成注入 prompt 的记忆条数预算
+    memory_injection_char_budget: int = Field(default=6000, ge=0, le=50000)
     # -- 模糊印象层（主题 × 提及频率，替代逐字长期记忆）-----------------------
     memory_impression_limit: int = 200          # 印象主题数上限（超限淘汰最淡的）
     memory_impression_half_life_days: float = 7.0  # 印象权重半衰期（长期不提自然淡忘）

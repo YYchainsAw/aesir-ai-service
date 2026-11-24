@@ -27,6 +27,16 @@ _ALIASES = (
 # These question types cannot be answered merely by sharing an entity name.
 _REQUIRED = (11, 12)
 _STOP = re.compile(r"你还记得|你记得|记不记得|告诉我|请问|什么|哪个|我的|我们|一下|吗|呢|[？?，,。.!！]")
+_CHILDHOOD = re.compile(r'小时候|童年|儿时|幼年|\bchildhood\b|\bas a child\b|\b(?:grow|grew|grown|growing) up\b', re.IGNORECASE)
+
+
+def supports_qualifiers(query: str, content: str) -> bool:
+    """A hometown is not evidence of childhood residence.
+
+    This is a narrow explicit-period check, not a semantic entailment verdict.
+    Filtering happens before fallback so importance cannot restore weak evidence.
+    """
+    return not _CHILDHOOD.search(_normalize(query)) or bool(_CHILDHOOD.search(_normalize(content)))
 
 
 def _normalize(text: str) -> str:
@@ -68,6 +78,6 @@ def needs_budget_fallback(query: str) -> bool:
     query = _normalize(query)
     if any(alias in query for i in _REQUIRED for alias in _ALIASES[i]):
         return False
-    personal = re.search(r'我|咱|家里|\b(?:my|we|our)\b', query)
+    personal = re.search(r'我|咱|家里|\b(?:i|my|we|our)\b', query)
     question = re.search(r'什么|哪|谁|怎么|多少|何|叫啥|啥|\b(?:what|which|where|when|who)\b', query)
     return bool(personal and question)
