@@ -4,6 +4,18 @@
 
 本轮只读复核确认引擎的 CoreUObject UHT 生成文件仍不完整，也未找到 Intermediate 开发链接库。Epic Launcher 已安装，但安装登记文件为空；用户确认 Launcher 库能识别 UE 5.8.3，正在运行官方“验证”。桌面/浏览器连接三次恢复后仍报 `Computer Use native pipe is unavailable`，未自动操作安装、认证、删除或重装引擎。验证完成前不编译，避免与官方校验同时写文件。UE 编译、原生测试与完整地图/GAS/回执仍待验证结束后继续，不记录为通过。
 
+## 同轮后续：独立源码与安装清单校验
+
+用户随后要求由助手独立验证。未检测到 Epic Launcher/BuildPatchTool/编辑器活动进程后，对最新隔离副本执行真实构建，仍 Exit 6：SharedPCH 在 `PrimaryAssetId.h:16` 缺 `PrimaryAssetId.generated.h`。构建日志位于 `data/runtime/ue24/build-latest.log`；未生成最新 DLL，未运行原生/地图测试。
+
+- 原 `E:\AesirWarden` HEAD 是 `06f2415`，相对最新远端多 1 个提交、落后 44 个提交；Source/Config/uproject 与远端有 70 个文件差异。未覆盖原修改或把原目录改称最新。
+- 隔离副本 HEAD 为 `af5510f`，131 个被跟踪的 Source/Config 文件与该提交没有 Git 差异，uproject 也未修改。
+- 从 Epic 安装条目的安全字段确认版本为 `5.8.3-58210709+++UE5+Release-5.8-Windows`、路径为 `D:\UE_5.8`。官方 BuildPatchTool `ExtractMetaData` 只读解析本机 manifest 后，按清单对必需、无可选标签的 `Engine/Intermediate/Build/Win64/` 文件检查存在性和大小：11722 个文件，只有 4 个大小相符、11718 个缺失，缺失内容合计 2296098396 字节。不是全引擎 SHA 校验或下载量估计；其余平台和目录未由这个数字覆盖。[结果与关键文件预期哈希](data/ue-environment-20261124.json)。
+- `PrimaryAssetId.generated.h` 及 `UnrealEditor-CoreUObject.lib` 均为官方清单中的基本文件，不是项目源码、可选调试符号或未制作的游戏资产。
+- 本机官方工具的 InstallManifest 模式支持文件重建，但须有 manifest 对应的 CloudDirs/分块来源；当前本地 Pending 没有可用分块。没有猜测下载地址、提取登录凭据、删除引擎或执行可能安装所有平台的大体积命令。
+
+剩余前置：通过 Launcher 的 5.8.3 下拉菜单“验证”补回文件，或提供相同版本/CL 的完整安装包/备份本机路径。桌面连接不可用时不能代操作 Launcher；来源齐备后可以继续命令行核对、构建与项目修复。此核查独立完成，但不等于引擎已经修复或 UE 完整闭环完成。
+
 ## 已交付的服务端修改
 
 - 调试台 loading 状态移到 main 外，连续渲染不再删掉状态节点；同角色进行中的刷新合并，角色切换后的旧响应不能覆盖新角色，失败后可重新刷新。三个 Node 原生测试直接执行页面脚本，覆盖 DOM 替换、请求乱序、合并和失败恢复。真实浏览器因连接故障未运行，不能把 DOM 替身当成浏览器/UE 实测。
